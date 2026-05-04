@@ -31,6 +31,12 @@ def setup(
     stream: IO[str] | None = None,
     name: str | None = None,
     propagate: bool = False,
+    handlers: list[str] | None = None,
+    sql_url: str | None = None,
+    sql_table: str = "logs",
+    sql_batch_size: int = 100,
+    json_path: str | None = None,
+    csv_path: str | None = None,
     **formatter_kwargs: Any,
 ) -> logging.Logger:
     """Configure a ulog-managed handler on the named (or root) logger.
@@ -44,18 +50,24 @@ def setup(
       color: 'auto' (default — TTY-detect), 'always', or 'never'. The
         `NO_COLOR` env var hard-clamps to 'never' regardless.
       stream: defaults to `sys.stderr`. Tests inject `io.StringIO`.
-      name: target logger name; `None` means the root logger. Setting
-        `name='myproject'` configures only `getLogger('myproject')`
-        and its children.
-      propagate: when `name` is non-None, controls whether records
-        bubble up to the root logger. Default `False` for namespaced
-        setup (avoids double-printing if the host configured the root
-        with a different formatter); set `True` if you want to feed an
-        upstream config.
-      **formatter_kwargs: passed through to the formatter's
-        constructor — e.g. `prefix='myapp'` for the qlnes formatter.
+      name: target logger name; `None` means the root logger.
+      propagate: bubble records to parent loggers (default False for
+        named setup, True for root).
+      handlers: list of handler kinds to install. Default `['stream']`.
+        Recognized:
+          - 'stream' — standard formatted output to `stream`.
+          - 'sql'    — SQLAlchemy persistence (needs `sql_url=...`).
+          - 'json'   — JSONLineHandler (needs `json_path=...`).
+          - 'csv'    — CSVHandler (needs `csv_path=...`).
+        Multi-handler: `handlers=['stream', 'sql']` logs to terminal
+        AND DB simultaneously.
+      sql_url, sql_table, sql_batch_size: forwarded to SQLHandler.
+      json_path: forwarded to JSONLineHandler.
+      csv_path: forwarded to CSVHandler.
+      **formatter_kwargs: passed to the stream formatter — e.g.
+        `prefix='myapp'` for QlnesFormatter.
 
-    Returns the configured `logging.Logger` (handy for chaining).
+    Returns the configured `logging.Logger`.
     """
     if level not in LOG_LEVELS and not isinstance(level, int):
         raise ValueError(
@@ -68,27 +80,86 @@ def setup(
 
     use_stream = stream if stream is not None else sys.stderr
     color_on = resolve_color(color, use_stream)
-    formatter = _resolve_formatter(
-        format, color_on=color_on, **formatter_kwargs
-    )
+    handler_kinds = handlers if handlers is not None else ["stream"]
 
     logger = logging.getLogger(name)
 
     # FR2 idempotency: drop only handlers WE installed; preserve user
-    # handlers (e.g. file handlers attached separately).
+    # handlers (e.g. file handlers attached separately). Closing each
+    # handler we drop releases its file/DB connection cleanly.
     for h in list(logger.handlers):
         if getattr(h, "_ulog_managed", False):
+            try:
+                h.close()
+            except Exception:  # noqa: BLE001
+                pass
             logger.removeHandler(h)
 
-    handler = logging.StreamHandler(use_stream)
-    handler.setFormatter(formatter)
-    handler._ulog_managed = True  # type: ignore[attr-defined]
-    logger.addHandler(handler)
+    for kind in handler_kinds:
+        handler = _build_handler(
+            kind,
+            stream=use_stream,
+            color_on=color_on,
+            format=format,
+            sql_url=sql_url,
+            sql_table=sql_table,
+            sql_batch_size=sql_batch_size,
+            json_path=json_path,
+            csv_path=csv_path,
+            **formatter_kwargs,
+        )
+        handler._ulog_managed = True  # type: ignore[attr-defined]
+        logger.addHandler(handler)
+
     logger.setLevel(level)
     if name is not None:
         logger.propagate = propagate
 
     return logger
+
+
+def _build_handler(
+    kind: str,
+    *,
+    stream: IO[str],
+    color_on: bool,
+    format: str,
+    sql_url: str | None,
+    sql_table: str,
+    sql_batch_size: int,
+    json_path: str | None,
+    csv_path: str | None,
+    **formatter_kwargs: Any,
+) -> logging.Handler:
+    """Internal: instantiate one handler from a kind name."""
+    if kind == "stream":
+        formatter = _resolve_formatter(format, color_on=color_on, **formatter_kwargs)
+        h: logging.Handler = logging.StreamHandler(stream)
+        h.setFormatter(formatter)
+        return h
+    if kind == "sql":
+        from .handlers.sql import SQLHandler
+
+        return SQLHandler(sql_url, table=sql_table, batch_size=sql_batch_size)
+    if kind == "json":
+        if json_path is None:
+            raise ValueError(
+                "handlers=['json'] requires a `json_path=` argument."
+            )
+        from .handlers.json_line import JSONLineHandler
+
+        return JSONLineHandler(json_path)
+    if kind == "csv":
+        if csv_path is None:
+            raise ValueError(
+                "handlers=['csv'] requires a `csv_path=` argument."
+            )
+        from .handlers.csv_file import CSVHandler
+
+        return CSVHandler(csv_path)
+    raise ValueError(
+        f"unknown handler kind {kind!r}; valid: 'stream', 'sql', 'json', 'csv'"
+    )
 
 
 def get_logger(name: str | None = None) -> logging.Logger:

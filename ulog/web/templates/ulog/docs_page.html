@@ -1,0 +1,25 @@
+{% extends 'ulog/base.html' %}
+
+{% block title %}ULog — {{ title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto p-4 md:p-6 grid md:grid-cols-[12rem_1fr] gap-6">
+  <aside class="text-sm">
+    <h2 class="font-semibold mb-2">Pages</h2>
+    <ul class="space-y-1">
+      {% for slug, title in all_pages.items %}
+        <li>
+          <a href="{% url 'ulog-docs-page' slug %}"
+             class="block px-2 py-1 rounded {% if slug == page %}bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 font-semibold{% else %}hover:bg-slate-100 dark:hover:bg-slate-800{% endif %}">
+            {{ title }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <article class="prose dark:prose-invert max-w-none">
+    {{ content_html|safe }}
+  </article>
+</div>
+{% endblock %}

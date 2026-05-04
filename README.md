@@ -107,10 +107,42 @@ ulog.setup(format='upper')
 | `structlog` | drop-in for stdlib consumers, no processor chains | richer event-style API, async-aware |
 | `rich.logging` | production-shaped output, JSON for pipelines | beautiful tracebacks, syntax highlighting |
 
+## v0.2 — Storage + Web UI
+
+Three persistent handlers + a Django + Tailwind inspection UI ship in
+v0.2 (see [`PRD-v0.2-storage-and-ui.md`](./PRD-v0.2-storage-and-ui.md)).
+
+```python
+ulog.setup(
+    handlers=['stream', 'sql', 'json'],
+    sql_url='sqlite:///./logs.sqlite',
+    json_path='./logs.jsonl',
+)
+log.info("hello")  # → stderr + sqlite + jsonl
+```
+
+Then inspect the result in a browser:
+
+```bash
+pip install ulog[web]
+ulog-web ./logs.sqlite       # auto-detects sqlite/jsonl/csv
+```
+
+Features of the v0.2 UI:
+- Filter sidebar (level, hierarchical sector tree, files,
+  time range, bound-context fields, full-text search)
+- Click any record for detail (JSON pretty-print, exception
+  traceback, context fields)
+- Tutorial overlay on first visit
+- Per-column tooltips
+- Light/dark mode (toggle + `prefers-color-scheme`)
+- Built-in `/docs` (5 pages: quickstart, storage, api,
+  troubleshooting, sectors-and-files)
+
 ## Tests
 
 ```bash
-make test         # 40+ unit tests
+make test         # 69 unit + integration tests across v0.1 + v0.2
 make mypy         # mypy --strict
 make check        # both
 ```

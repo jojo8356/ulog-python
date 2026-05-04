@@ -1,0 +1,65 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ULog Viewer{% endblock %}</title>
+    <!-- Tailwind via CDN for v0.2 prototype. Production builds use the
+         standalone CLI compile to vendored CSS — see PRD §FR41. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Dark mode preference: respect prefers-color-scheme, allow override
+        // via localStorage.
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} }
+        };
+        if (localStorage.theme === 'dark' ||
+            (!('theme' in localStorage) &&
+             window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+    <style>
+        /* Subtle base tweaks Tailwind doesn't cover */
+        body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+        code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    </style>
+</head>
+<body class="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 h-full">
+
+<header class="border-b border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center justify-between bg-slate-50 dark:bg-slate-900 sticky top-0 z-10">
+    <div class="flex items-center gap-3">
+        <a href="{% url 'ulog-list' %}" class="font-bold text-lg">ULog</a>
+        <span class="text-sm text-slate-500 dark:text-slate-400 truncate max-w-md" title="{{ logs_path }}">
+            {{ logs_path|default:"<no log file>" }}
+        </span>
+    </div>
+    <nav class="flex items-center gap-3 text-sm">
+        <a href="{% url 'ulog-list' %}" class="hover:underline">Records</a>
+        <a href="{% url 'ulog-docs-index' %}" class="hover:underline">Docs</a>
+        <button id="theme-toggle" type="button"
+                class="px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
+                title="Toggle light/dark mode">☼/☽</button>
+    </nav>
+</header>
+
+{% block content %}{% endblock %}
+
+<script>
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+        const html = document.documentElement;
+        if (html.classList.contains('dark')) {
+            html.classList.remove('dark');
+            localStorage.theme = 'light';
+        } else {
+            html.classList.add('dark');
+            localStorage.theme = 'dark';
+        }
+    });
+</script>
+
+</body>
+</html>

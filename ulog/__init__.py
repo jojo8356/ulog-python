@@ -27,6 +27,7 @@ from .formatters import (
     VerboseFormatter,
     register_formatter,
 )
+from .handlers import CSVHandler, JSONLineHandler, SchemaError, SQLHandler
 from .setup import (
     LOG_LEVELS,
     LogLevel,
@@ -58,5 +59,10 @@ __all__ = [
     "VerboseFormatter",
     "JsonFormatter",
     "register_formatter",
+    # Storage handlers (v0.2)
+    "SQLHandler",
+    "JSONLineHandler",
+    "CSVHandler",
+    "SchemaError",
     "__version__",
 ]

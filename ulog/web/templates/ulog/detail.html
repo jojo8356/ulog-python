@@ -1,0 +1,57 @@
+{% extends 'ulog/base.html' %}
+
+{% block title %}ULog — record #{{ record.id }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto p-4 md:p-6">
+  <a href="{% url 'ulog-list' %}{% if request.GET.qs %}?{{ request.GET.qs }}{% endif %}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">← Back to records</a>
+
+  <div class="mt-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-4">
+    <div class="flex items-baseline gap-3 flex-wrap">
+      <span class="inline-block text-sm font-mono px-2 py-1 rounded
+        {% if record.level == 'ERROR' or record.level == 'CRITICAL' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+        {% elif record.level == 'WARNING' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200
+        {% elif record.level == 'INFO' %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200
+        {% else %}bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200{% endif %}">
+        {{ record.level }}
+      </span>
+      <span class="font-mono text-sm text-slate-600 dark:text-slate-400">{{ record.ts }}</span>
+      <span class="font-mono text-sm text-slate-600 dark:text-slate-400">{{ record.logger }}</span>
+      <span class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ record.file }}:{{ record.line }}</span>
+    </div>
+
+    <div>
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1">Message</h2>
+      <p class="text-base whitespace-pre-wrap break-words">{{ record.msg }}</p>
+    </div>
+
+    {% if record.context %}
+    <div>
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1"
+          title="Bound context fields (from ulog.bind() or extra=) — propagated through the JSON formatter.">
+        Context
+      </h2>
+      <pre class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm overflow-x-auto"><code>{% for k, v in record.context.items %}{{ k }}: {{ v }}
+{% endfor %}</code></pre>
+    </div>
+    {% endif %}
+
+    {% if record.exc %}
+    <div>
+      <h2 class="text-xs uppercase font-semibold text-red-600 dark:text-red-400 mb-1">
+        Exception ({{ record.exc.type }})
+      </h2>
+      <p class="font-mono text-sm mb-2">{{ record.exc.msg }}</p>
+      {% if record.exc.tb %}
+      <pre class="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded p-3 text-xs overflow-x-auto"><code>{% for line in record.exc.tb %}{{ line }}
+{% endfor %}</code></pre>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="mt-4 text-sm text-slate-500 dark:text-slate-400">
+    Record id: {{ record.id }}
+  </div>
+</div>
+{% endblock %}

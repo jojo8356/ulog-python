@@ -30,6 +30,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "mypy>=1.0"]
+storage = ["sqlalchemy>=2.0"]
+web = ["django>=5.0", "sqlalchemy>=2.0"]
+
+[project.scripts]
+ulog-web = "ulog.web.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/jojo8356/ulog-python"

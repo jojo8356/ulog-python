@@ -1,0 +1,238 @@
+{% extends 'ulog/base.html' %}
+
+{% block title %}ULog — {{ total }} records{% endblock %}
+
+{% block content %}
+<div class="flex flex-col md:flex-row h-[calc(100vh-3rem)]">
+
+  {# === Filter sidebar (FR35) === #}
+  <aside class="w-full md:w-72 lg:w-80 border-r border-slate-200 dark:border-slate-800 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900">
+    <form method="get" id="filter-form" class="space-y-4 text-sm">
+
+      {# Levels #}
+      <div>
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+            title="Filter records by their severity level. Multi-select with Ctrl-click.">
+          Level
+        </h3>
+        <div class="space-y-1">
+          {% for lv, count in level_summary %}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="level" value="{{ lv }}"
+                     {% if lv in filters.levels %}checked{% endif %}
+                     class="rounded text-blue-600 focus:ring-blue-500">
+              <span class="flex-1 flex items-center gap-2">
+                <span class="inline-block w-12 text-center text-xs font-mono px-1 py-0.5 rounded
+                  {% if lv == 'ERROR' or lv == 'CRITICAL' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+                  {% elif lv == 'WARNING' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200
+                  {% elif lv == 'INFO' %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200
+                  {% else %}bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200{% endif %}">
+                  {{ lv }}
+                </span>
+                <span class="text-slate-500 dark:text-slate-400">({{ count }})</span>
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Sectors (logger-name tree) — FR44 #}
+      <div>
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+            title="Logger names, hierarchical. Click a sector to filter to it and its descendants.">
+          Sectors
+        </h3>
+        <div class="space-y-1 max-h-60 overflow-y-auto">
+          {% for sector, count in sectors %}
+            <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded">
+              <input type="checkbox" name="logger" value="{{ sector }}"
+                     {% if sector in filters.loggers %}checked{% endif %}
+                     class="rounded text-blue-600 focus:ring-blue-500">
+              <span class="font-mono text-xs flex-1 truncate" title="{{ sector }}">
+                {{ sector }}
+              </span>
+              <span class="text-slate-500 dark:text-slate-400 text-xs">{{ count }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Files (FR47-FR50) #}
+      <div>
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+            title="Source-file dropdown. Multi-select with Ctrl-click.">
+          Files
+        </h3>
+        <div class="space-y-1 max-h-48 overflow-y-auto">
+          {% for fname, count in files %}
+            <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded">
+              <input type="checkbox" name="file" value="{{ fname }}"
+                     {% if fname in filters.files %}checked{% endif %}
+                     class="rounded text-blue-600 focus:ring-blue-500">
+              <span class="font-mono text-xs flex-1 truncate" title="{{ fname }}">{{ fname }}</span>
+              <span class="text-slate-500 dark:text-slate-400 text-xs">{{ count }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Time range #}
+      <div>
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+            title="ISO-8601 datetime, e.g. 2026-05-04T13:30:00Z. Empty = unbounded.">
+          Time range
+        </h3>
+        <div class="space-y-1">
+          <input type="text" name="from" value="{{ filters.ts_from }}"
+                 placeholder="from (YYYY-MM-DDTHH:MM:SSZ)"
+                 class="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono">
+          <input type="text" name="to" value="{{ filters.ts_to }}"
+                 placeholder="to"
+                 class="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono">
+        </div>
+      </div>
+
+      {# Search msg #}
+      <div>
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+            title="Substring match in record.msg. Case-insensitive.">
+          Search
+        </h3>
+        <input type="text" name="q" value="{{ filters.search }}" placeholder="search msg…"
+               class="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
+      </div>
+
+      {# Bound fields #}
+      <div>
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+            title="Filter by bound context fields. Format: key=value. Add multiple inputs for AND.">
+          Bound fields
+        </h3>
+        <div class="space-y-1" id="bound-fields">
+          {% for raw in filters.bound.items %}
+            <input type="text" name="bound" value="{{ raw.0 }}={{ raw.1 }}"
+                   placeholder="key=value"
+                   class="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono">
+          {% endfor %}
+          <input type="text" name="bound" placeholder="key=value (e.g. rom_sha=abc)"
+                 class="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono">
+        </div>
+        {% if bound_keys %}
+        <details class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          <summary class="cursor-pointer">Detected keys ({{ bound_keys|length }})</summary>
+          <div class="font-mono mt-1 break-all">{{ bound_keys|join:", " }}</div>
+        </details>
+        {% endif %}
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-medium">
+          Apply
+        </button>
+        <a href="{% url 'ulog-list' %}" class="flex-1 text-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1.5 rounded font-medium">
+          Reset
+        </a>
+      </div>
+    </form>
+  </aside>
+
+  {# === Main list pane (FR36) === #}
+  <main class="flex-1 overflow-y-auto p-4">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        {{ total }} record{{ total|pluralize }} (page {{ page }} of {{ total_pages }})
+      </p>
+    </div>
+
+    {% if records %}
+    <table class="w-full text-sm">
+      <thead class="text-left text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+        <tr>
+          <th class="py-2 pr-2 w-44" title="ISO-8601 UTC timestamp from record.created">TS</th>
+          <th class="py-2 pr-2 w-20" title="Severity level (DEBUG/INFO/WARNING/ERROR/CRITICAL)">Level</th>
+          <th class="py-2 pr-2 w-56" title="Logger name (logging.getLogger argument)">Logger</th>
+          <th class="py-2 pr-2 w-44" title="Source file:line of the log call">File</th>
+          <th class="py-2" title="Message (truncated; click row for full text)">Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
+            onclick="window.location.href='{% url 'ulog-detail' r.id %}?qs={{ qs|urlencode }}';">
+          <td class="py-1.5 pr-2 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ r.ts }}</td>
+          <td class="py-1.5 pr-2">
+            <span class="inline-block w-12 text-center text-xs font-mono px-1 py-0.5 rounded
+              {% if r.level == 'ERROR' or r.level == 'CRITICAL' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+              {% elif r.level == 'WARNING' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200
+              {% elif r.level == 'INFO' %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200
+              {% else %}bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200{% endif %}">
+              {{ r.level }}
+            </span>
+          </td>
+          <td class="py-1.5 pr-2 font-mono text-xs truncate" title="{{ r.logger }}">{{ r.logger }}</td>
+          <td class="py-1.5 pr-2 font-mono text-xs text-slate-500 dark:text-slate-400" title="{{ r.file }}:{{ r.line }}">
+            {{ r.file|truncatechars:24 }}:{{ r.line }}
+          </td>
+          <td class="py-1.5">
+            <span class="block truncate" title="{{ r.msg }}">{{ r.msg|truncatechars:120 }}</span>
+            {% if r.context %}
+              <span class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate block">
+                {% for k, v in r.context.items %}{{ k }}={{ v }}  {% endfor %}
+              </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="text-slate-500 dark:text-slate-400 italic">No records match the current filters.</p>
+    {% endif %}
+
+    {# Pagination #}
+    {% if total_pages > 1 %}
+    <nav class="mt-4 flex items-center justify-center gap-2 text-sm">
+      {% if page > 1 %}
+      <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:-1 }}"
+         class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
+         ← Prev
+      </a>
+      {% endif %}
+      <span class="text-slate-500 dark:text-slate-400">page {{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+      <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:1 }}"
+         class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
+         Next →
+      </a>
+      {% endif %}
+    </nav>
+    {% endif %}
+  </main>
+</div>
+
+{# Tutorial overlay (FR38) — fires once per browser via localStorage. #}
+<div id="tutorial" class="hidden fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md shadow-xl">
+    <h2 class="text-xl font-bold mb-3">Welcome to ULog 👋</h2>
+    <ol class="list-decimal list-inside space-y-2 text-sm">
+      <li><b>Filter</b> records via the left sidebar (level, sectors, files, time, bound fields).</li>
+      <li><b>Click any row</b> to open its full detail view (JSON pretty-print + traceback).</li>
+      <li>The <b>Sectors</b> tree shows logger-name prefixes — drill from the root to the leaf.</li>
+      <li>Need help? <a href="{% url 'ulog-docs-index' %}" class="underline text-blue-600 dark:text-blue-400">Open the docs</a> — every page has examples.</li>
+    </ol>
+    <button id="tutorial-dismiss" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded">
+      Got it
+    </button>
+  </div>
+</div>
+<script>
+    // Show the tutorial once, unless localStorage says we already did.
+    if (!localStorage.getItem('ulogTutorialDismissed')) {
+        document.getElementById('tutorial').classList.remove('hidden');
+    }
+    document.getElementById('tutorial-dismiss').addEventListener('click', () => {
+        document.getElementById('tutorial').classList.add('hidden');
+        localStorage.setItem('ulogTutorialDismissed', '1');
+    });
+</script>
+{% endblock %}

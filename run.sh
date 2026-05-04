@@ -142,6 +142,46 @@ ensure_db_or_warn() {
 
 # ---- Subcommands ---------------------------------------------------------
 
+# Resolve --port / --host from forwarded args (with run.sh defaults of
+# 8765 / 127.0.0.1), inject --port if absent so the URL we print
+# matches what ulog-web actually binds, then print the serving banner +
+# clickable URL on its own line and exec ulog-web. Used by cmd_prod and
+# cmd_test which differ only in the DB path, label, and accent color.
+serve_db_with_url() {
+    local db="$1"; shift
+    local label="$1"; shift     # "prod" or "test"
+    local color_fn="$1"; shift  # c_g or c_y
+
+    local port=8765
+    local host=127.0.0.1
+    local args=("$@")
+
+    # Scan args for explicit --port/--host (both ` ` and `=` forms).
+    local i
+    for ((i=0; i<${#args[@]}; i++)); do
+        case "${args[i]}" in
+            --port=*) port="${args[i]#--port=}" ;;
+            --port)   port="${args[i+1]:-$port}" ;;
+            --host=*) host="${args[i]#--host=}" ;;
+            --host)   host="${args[i+1]:-$host}" ;;
+        esac
+    done
+
+    # If user didn't pass --port, inject our default so ulog-web binds
+    # 8765 deterministically (instead of a random free port) and the
+    # printed URL is accurate.
+    local has_port=0
+    local a
+    for a in "${args[@]}"; do
+        case "$a" in --port|--port=*) has_port=1; break ;; esac
+    done
+    [ "$has_port" -eq 0 ] && args=("--port" "$port" "${args[@]}")
+
+    echo "$("$color_fn" "→ serving $label logs") $(c_b "$db")"
+    echo "$("$color_fn" "→ ")$(c_b "http://$host:$port/")"
+    exec "$ULOG_WEB" "$db" "${args[@]}"
+}
+
 cmd_prod() {
     require_module "ulog" "pip install -e ."
     require_module "django" "pip install -e \".[web]\""
@@ -149,8 +189,7 @@ cmd_prod() {
     check_required_modules
     [ -x "$ULOG_WEB" ] || { echo "ulog-run: ulog-web not on PATH (install with pip install -e \".[web]\")" >&2; exit 127; }
     ensure_db_or_warn "$PROD_DB" "prod"
-    echo "$(c_g '→ serving prod logs') $(c_b "$PROD_DB")"
-    exec "$ULOG_WEB" "$PROD_DB" "$@"
+    serve_db_with_url "$PROD_DB" "prod" c_g "$@"
 }
 
 cmd_test() {
@@ -160,8 +199,7 @@ cmd_test() {
     check_required_modules
     [ -x "$ULOG_WEB" ] || { echo "ulog-run: ulog-web not on PATH (install with pip install -e \".[web]\")" >&2; exit 127; }
     ensure_db_or_warn "$TEST_DB" "test"
-    echo "$(c_y '→ serving test logs') $(c_b "$TEST_DB")"
-    exec "$ULOG_WEB" "$TEST_DB" "$@"
+    serve_db_with_url "$TEST_DB" "test" c_y "$@"
 }
 
 cmd_dev() {

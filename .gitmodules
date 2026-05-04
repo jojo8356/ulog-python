@@ -1,0 +1,3 @@
+[submodule "vendor/ucolor-python"]
+	path = vendor/ucolor-python
+	url = https://github.com/jojo8356/ucolor-python.git

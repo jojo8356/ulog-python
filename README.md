@@ -25,17 +25,38 @@ See `PRD.md` for the full design rationale and roadmap.
 
 ## Install
 
-```bash
-# Editable from a clone
-git clone https://github.com/jojo8356/ulog-python.git
-cd ulog-python
-pip install -e ".[dev]"
+ULog vendors [`ucolor`](https://github.com/jojo8356/ucolor-python) as
+a git submodule under `vendor/ucolor-python/` so you don't have to
+reinstall it separately. Always clone with `--recursive` (or
+initialize submodules after the fact):
 
-# Or pin via requirements.txt with -e or git+ syntax
+```bash
+# 1. Clone with submodules
+git clone --recursive https://github.com/jojo8356/ulog-python.git
+cd ulog-python
+# (equivalent if cloned without --recursive:
+#  git submodule update --init --recursive)
+
+# 2. Install ucolor from the submodule, then ULog itself
+pip install -e ./vendor/ucolor-python
+pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+. One required dep: `ucolor`. Optional `[json]`
-extra brings `orjson` for faster JSON serialization (planned v0.2).
+For the storage + web stack:
+
+```bash
+pip install -e ".[storage,web,dev]"
+```
+
+ULog itself has **zero PyPI runtime dependencies**. ucolor is
+optional — if it's missing, ULog falls back to an 8-color ANSI
+palette automatically. Optional groups:
+
+- `[storage]` — `sqlalchemy>=2.0` (needed by `SQLHandler`)
+- `[web]` — `django>=5.0` + sqlalchemy (needed by `ulog-web`)
+- `[dev]` — pytest + mypy
+
+Python 3.10+.
 
 ## Quick tour
 
@@ -96,6 +117,23 @@ class UpperFormatter(logging.Formatter):
 
 ulog.register_formatter('upper', UpperFormatter)
 ulog.setup(format='upper')
+```
+
+## Submodules
+
+ULog vendors one external package as a **git submodule** to avoid
+duplicating its source while still embedding it transparently in the
+clone:
+
+| Submodule | Repo | Init |
+|---|---|---|
+| `vendor/ucolor-python/` | [github.com/jojo8356/ucolor-python](https://github.com/jojo8356/ucolor-python) | `git submodule update --init --recursive` |
+
+Update the submodule pin to a newer ucolor commit:
+
+```bash
+cd vendor/ucolor-python && git pull origin main && cd ../..
+git add vendor/ucolor-python && git commit -m "bump ucolor"
 ```
 
 ## Why ULog over alternatives

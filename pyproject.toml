@@ -24,9 +24,11 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Logging",
 ]
-dependencies = [
-    "ucolor>=1.0.0",
-]
+# ULog has zero runtime dependencies on PyPI. `ucolor` is vendored as
+# a git submodule under `vendor/ucolor-python/` (see README's "Submodules"
+# section + INSTALL). Without ucolor installed, ULog falls back to an
+# 8-color ANSI palette gracefully.
+dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "mypy>=1.0"]

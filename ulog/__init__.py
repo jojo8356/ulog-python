@@ -7,7 +7,7 @@ field binding for structured logging.
 
 Designed to be dropped in alongside any code that already uses
 `logging.getLogger(__name__)` — ULog never installs a parallel logger
-hierarchy. See PRD.md for the full design rationale.
+hierarchy. See docs/prds/PRD-v0.1-core.md for the full design rationale.
 
 Quick start:
 

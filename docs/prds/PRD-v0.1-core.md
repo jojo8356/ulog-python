@@ -186,7 +186,7 @@ Three personas, drawn from real qlnes contributors:
 | NFR-PERF-1 | `setup()` overhead < 1 ms (one-time cost). |
 | NFR-PERF-2 | Per-log-call overhead within 1.2× of stdlib `logging` for level-filtered cases (the deferred-format pattern must be preserved — `logger.info("foo %s", x)` skips formatting when filtered). |
 | NFR-PERF-3 | JSON formatter throughput ≥ 50K records/sec on a single core (5 fields, 100-char message, no exc_info). |
-| NFR-DEP-1 | One required dep: `ucolor`. Optional via `[json]` extra: `orjson` for faster JSON serialization (20-30× over stdlib `json`). |
+| NFR-DEP-1 | **Zero required PyPI deps.** `ucolor` is vendored as a git submodule under `vendor/ucolor-python/` (see README "Submodules"). When ucolor isn't importable, ULog falls back to a built-in 8-color ANSI palette (per FR14). Optional via `[json]` extra: `orjson` for faster JSON serialization (20–30× over stdlib `json`). |
 | NFR-COMPAT-1 | Python 3.10+. Type-checked with `mypy --strict`. |
 | NFR-PORT-1 | Linux + macOS + Windows. `is_supported()`-style TTY checks tolerate the Windows console quirks. |
 | NFR-REL-1 | Setup is idempotent — verified by `test_setup_twice_does_not_double_log`. |

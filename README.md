@@ -21,7 +21,7 @@ log.info("hello")          # → hello
 log.error("boom")          # → qlnes: error: boom    (red on a TTY)
 ```
 
-See `PRD.md` for the full design rationale and roadmap.
+See [`docs/prds/PRD-v0.1-core.md`](./docs/prds/PRD-v0.1-core.md) for the full design rationale and roadmap.
 
 ## Install
 
@@ -148,7 +148,7 @@ git add vendor/ucolor-python && git commit -m "bump ucolor"
 ## v0.2 — Storage + Web UI
 
 Three persistent handlers + a Django + Tailwind inspection UI ship in
-v0.2 (see [`PRD-v0.2-storage-and-ui.md`](./PRD-v0.2-storage-and-ui.md)).
+v0.2 (see [`docs/prds/PRD-v0.2-storage-and-ui.md`](./docs/prds/PRD-v0.2-storage-and-ui.md)).
 
 ```python
 ulog.setup(

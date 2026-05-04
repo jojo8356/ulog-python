@@ -5,7 +5,7 @@ version: 0.2.0
 date: 2026-05-04
 author: jojo8356
 status: draft v1
-parent_prd: PRD.md (v0.1)
+parent_prd: PRD-v0.1-core.md
 ---
 
 # ULog v0.2 — Storage Backends + Django Inspection UI

@@ -82,6 +82,15 @@ Once you can filter logs by author, three workflows unlock:
   filter during quarterly retros to map "where do our logs cluster?"
   by-author; informs refactor priorities.
 
+### 1.4 Success Criteria
+
+| SC | Description |
+|---|---|
+| SC1 | ≥ 90 % of `(file, line)` pairs from the logs of a representative repo (qlnes, ulog-python) resolve to a non-`<unknown>` author after a clean `--repo` index run. |
+| SC2 | The NFR-PERF-30 budget (≤ 5 s indexer / 100 K records / 30-file repo) holds on 3 reference repos: `qlnes`, `ulog-python`, and one external 100 K-LOC repo (`cpython` quick-clone). |
+| SC3 | Zero regression of NFR-PERF-31 page-load (≤ 500 ms) when `--no-author-index` is set, measured against the v0.3 baseline on the same fixture. |
+| SC4 | The four edge cases listed in §2.3 each have at least one passing test in `tests/test_author_index.py`. |
+
 ---
 
 ## 2. Scope (v0.4)
@@ -176,6 +185,16 @@ ulog-web --no-author-index ./logs.sqlite
   is v0.6.
 - **Inline diff viewer**. The "view diff" link spawns the user's
   configured `git show` — no in-UI syntax-highlighted diff. v0.5.
+
+### 2.3 Edge cases & failure modes
+
+| Case | Behaviour |
+|---|---|
+| **Line deleted** — log emitted at `foo.py:280` but `foo.py` now has 200 lines | Record gets `<unknown>` author with diagnostic field `blame_skip_reason="line-out-of-range"`. Archeology via `git log -S` is non-goal (v0.5+). |
+| **File renamed** | `git blame --follow -C -M` is used on first attempt. If rename detection fails, record gets `<unknown>` + `blame_skip_reason="file-not-tracked"`. |
+| **Squashed / rebased commit** — cached `commit_sha` no longer reachable after `git gc` | `/diff/<sha>` validates via `git rev-parse --verify` and returns a friendly 404; the cached author + date stay visible in the detail panel. |
+| **Submodule path** — file under a `.gitmodules`-tracked path | Blamed against the **submodule's** git history (auto-detect via `git rev-parse --show-toplevel` from the file's parent dir). Cross-repo blame across the superproject remains a v0.5+ non-goal (§2.2). |
+| **No git repo at `--repo`** | Covered by FR74: all records `<unknown>` + stderr warn at startup. |
 
 ---
 

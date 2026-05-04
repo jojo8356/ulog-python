@@ -12,10 +12,11 @@
   <div class="mt-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-4">
     <div class="flex items-baseline gap-3 flex-wrap">
       <span class="inline-block text-sm font-mono px-2 py-1 rounded
-        {% if record.level == 'ERROR' or record.level == 'CRITICAL' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+        {% if record.level == 'CRITICAL' %}bg-red-600 text-white font-semibold dark:bg-red-700 dark:text-white
+        {% elif record.level == 'ERROR' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
         {% elif record.level == 'WARNING' %}bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200
         {% elif record.level == 'INFO' %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200
-        {% else %}bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200{% endif %}">
+        {% else %}bg-slate-100 text-slate-500 dark:bg-slate-800/50 dark:text-slate-400{% endif %}">
         {{ record.level }}
       </span>
       <span class="font-mono text-sm text-slate-600 dark:text-slate-400">{{ record.ts }}</span>

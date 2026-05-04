@@ -63,6 +63,19 @@ class SQLHandler(logging.Handler):
         batch_size: int = 100,
     ) -> None:
         super().__init__()
+        # Initialize the lock + empty buffer FIRST. logging.Handler.__init__
+        # has already registered us in the global handler list; if the
+        # sqlalchemy import below fails, logging.shutdown() will still
+        # iterate this instance and call flush() — which would crash on
+        # a missing _lock. With these set, flush() becomes a clean no-op
+        # on a degraded handler. (Bug found running run.sh demo on a
+        # python without sqlalchemy installed.)
+        self._lock = threading.Lock()
+        self._buffer: list[dict[str, Any]] = []
+        self._url = url or f"sqlite:///{(Path.cwd() / 'ulog.sqlite').as_posix()}"
+        self._table_name = table
+        self._batch_size = max(1, batch_size)
+
         from sqlalchemy import (
             JSON,
             Column,
@@ -76,12 +89,7 @@ class SQLHandler(logging.Handler):
             create_engine,
         )
 
-        self._url = url or f"sqlite:///{(Path.cwd() / 'ulog.sqlite').as_posix()}"
-        self._table_name = table
-        self._batch_size = max(1, batch_size)
         self._engine = create_engine(self._url, future=True)
-        self._lock = threading.Lock()
-        self._buffer: list[dict[str, Any]] = []
 
         metadata = MetaData()
         self._table = Table(

@@ -30,7 +30,10 @@ from .formatters import (
 from .handlers import CSVHandler, JSONLineHandler, SchemaError, SQLHandler
 from .setup import (
     LOG_LEVELS,
+    PROFILES,
     LogLevel,
+    Profile,
+    default_db_path,
     get_logger,
     is_configured,
     set_level,
@@ -45,8 +48,11 @@ __all__ = [
     "get_logger",
     "set_level",
     "is_configured",
+    "default_db_path",
     "LOG_LEVELS",
     "LogLevel",
+    "PROFILES",
+    "Profile",
     # Context binding
     "bind",
     "unbind",

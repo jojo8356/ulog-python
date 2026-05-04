@@ -13,7 +13,9 @@ keep the standard `logging.Logger` API.
 from __future__ import annotations
 
 import logging
+import os
 import sys
+from pathlib import Path
 from typing import IO, Any, Literal
 
 from ._color import ColorMode, resolve_color
@@ -21,6 +23,43 @@ from .formatters import _resolve_formatter
 
 LOG_LEVELS: tuple[str, ...] = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+PROFILES: tuple[str, ...] = ("prod", "test")
+ProfileChoice: tuple[str, ...] = ("prod", "test", "auto")
+Profile = Literal["prod", "test", "auto"]
+
+
+def default_db_path(profile: str = "prod") -> Path:
+    """Return the canonical SQLite path for a profile.
+
+    `~/.cache/ulog/<profile>.sqlite` by default. Honors the `XDG_CACHE_HOME`
+    env var on Linux/macOS systems that follow the spec.
+
+    The `prod` profile is for the application's regular runs; the `test`
+    profile is for pytest sessions (auto-selected when ULog detects
+    pytest). Both can be opened independently in `ulog-web`.
+    """
+    if profile not in PROFILES:
+        raise ValueError(
+            f"unknown profile {profile!r}; valid: {', '.join(PROFILES)}"
+        )
+    cache_dir = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    return cache_dir / "ulog" / f"{profile}.sqlite"
+
+
+def _auto_profile() -> Profile:
+    """Detect the default profile based on the running interpreter.
+
+    Returns `'test'` when pytest is in charge (we look for the
+    `PYTEST_CURRENT_TEST` env var pytest sets per-test, OR `pytest`
+    in `sys.modules` — covers `pytest` invocations and direct
+    pytest-internal calls). Otherwise `'prod'`.
+    """
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return "test"
+    if "pytest" in sys.modules:
+        return "test"
+    return "prod"
 
 
 def setup(
@@ -32,6 +71,7 @@ def setup(
     name: str | None = None,
     propagate: bool = False,
     handlers: list[str] | None = None,
+    profile: Profile | str | None = None,
     sql_url: str | None = None,
     sql_table: str = "logs",
     sql_batch_size: int = 100,
@@ -53,15 +93,27 @@ def setup(
       name: target logger name; `None` means the root logger.
       propagate: bubble records to parent loggers (default False for
         named setup, True for root).
-      handlers: list of handler kinds to install. Default `['stream']`.
+      handlers: list of handler kinds to install. Default depends on
+        `profile`:
+          - `profile='prod'` (or auto-detected) → `['stream', 'sql']`
+            with sql_url defaulting to `~/.cache/ulog/prod.sqlite`.
+          - `profile='test'` → `['stream', 'sql']` with sql_url
+            defaulting to `~/.cache/ulog/test.sqlite`. ULog
+            auto-selects 'test' when pytest is in charge.
+          - `profile=None` AND no auto-detect → `['stream']` only
+            (preserves the v0.1 zero-storage default).
         Recognized:
           - 'stream' — standard formatted output to `stream`.
           - 'sql'    — SQLAlchemy persistence (needs `sql_url=...`).
           - 'json'   — JSONLineHandler (needs `json_path=...`).
           - 'csv'    — CSVHandler (needs `csv_path=...`).
-        Multi-handler: `handlers=['stream', 'sql']` logs to terminal
-        AND DB simultaneously.
+      profile: high-level shortcut — 'prod' or 'test'. Resolves to a
+        default `sql_url` under `~/.cache/ulog/<profile>.sqlite`. If
+        an explicit `sql_url=` is also passed, that wins. Auto-detected
+        as 'test' when pytest is running, otherwise 'prod'. Pass
+        `profile='prod'` explicitly inside fixtures to opt out.
       sql_url, sql_table, sql_batch_size: forwarded to SQLHandler.
+        Explicit `sql_url=` overrides the profile's default path.
       json_path: forwarded to JSONLineHandler.
       csv_path: forwarded to CSVHandler.
       **formatter_kwargs: passed to the stream formatter — e.g.
@@ -80,6 +132,29 @@ def setup(
 
     use_stream = stream if stream is not None else sys.stderr
     color_on = resolve_color(color, use_stream)
+
+    # Profile resolution.
+    #   - profile=None (default) → preserves v0.1 stream-only behavior;
+    #     no SQL side effect.
+    #   - profile='prod' → ['stream', 'sql'] + ~/.cache/ulog/prod.sqlite
+    #   - profile='test' → ['stream', 'sql'] + ~/.cache/ulog/test.sqlite
+    #   - profile='auto' → 'test' if pytest is running, else 'prod'.
+    #     Pick this for run scripts / demos that want the right thing
+    #     to happen in both environments without thinking about it.
+    if profile is not None and profile not in ProfileChoice:
+        raise ValueError(
+            f"unknown profile {profile!r}; valid: {', '.join(ProfileChoice)}"
+        )
+    if profile == "auto":
+        profile = _auto_profile()
+    if profile is not None:
+        if handlers is None:
+            handlers = ["stream", "sql"]
+        if sql_url is None and "sql" in handlers:
+            db_path = default_db_path(profile)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            sql_url = f"sqlite:///{db_path}"
+
     handler_kinds = handlers if handlers is not None else ["stream"]
 
     logger = logging.getLogger(name)

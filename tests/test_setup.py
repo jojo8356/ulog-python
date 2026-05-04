@@ -134,3 +134,84 @@ def test_is_configured_reports_correctly():
 
 def test_log_levels_constant():
     assert ulog.LOG_LEVELS == ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+
+# ---- v0.2.2 profile (prod / test / auto) --------------------------------
+
+
+def test_default_db_path_for_known_profiles(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    p_prod = ulog.default_db_path("prod")
+    p_test = ulog.default_db_path("test")
+    assert p_prod == tmp_path / "ulog" / "prod.sqlite"
+    assert p_test == tmp_path / "ulog" / "test.sqlite"
+    assert p_prod != p_test
+
+
+def test_default_db_path_rejects_unknown_profile():
+    with pytest.raises(ValueError, match="unknown profile"):
+        ulog.default_db_path("staging")
+
+
+def test_setup_profile_prod_creates_sqlite(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    ulog.setup(profile="prod", color="never")
+    log = ulog.get_logger()
+    log.info("from prod")
+    for h in logging.getLogger().handlers:
+        h.flush()
+    assert (tmp_path / "ulog" / "prod.sqlite").exists()
+
+
+def test_setup_profile_test_creates_separate_db(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    ulog.setup(profile="test", color="never")
+    ulog.get_logger().info("from test")
+    for h in logging.getLogger().handlers:
+        h.flush()
+    assert (tmp_path / "ulog" / "test.sqlite").exists()
+    # prod path should NOT have been touched
+    assert not (tmp_path / "ulog" / "prod.sqlite").exists()
+
+
+def test_setup_profile_auto_picks_test_under_pytest(monkeypatch, tmp_path):
+    """`profile='auto'` should resolve to 'test' when pytest is running.
+
+    We're literally inside pytest right now, so the test MUST land in
+    the test DB."""
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    ulog.setup(profile="auto", color="never")
+    ulog.get_logger().info("auto-detected")
+    for h in logging.getLogger().handlers:
+        h.flush()
+    assert (tmp_path / "ulog" / "test.sqlite").exists()
+    assert not (tmp_path / "ulog" / "prod.sqlite").exists()
+
+
+def test_setup_profile_none_keeps_v01_stream_only_behavior(monkeypatch, tmp_path):
+    """No `profile=` arg → no SQL handler installed; backward compat."""
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    ulog.setup(stream=io.StringIO(), color="never")
+    # Default should NOT touch ~/.cache/ulog/ at all
+    assert not (tmp_path / "ulog").exists()
+
+
+def test_setup_explicit_sql_url_overrides_profile(tmp_path):
+    """If both profile= and sql_url= are passed, sql_url wins."""
+    custom = tmp_path / "custom.sqlite"
+    ulog.setup(
+        profile="prod", sql_url=f"sqlite:///{custom}", color="never"
+    )
+    ulog.get_logger().info("custom")
+    for h in logging.getLogger().handlers:
+        h.flush()
+    assert custom.exists()
+
+
+def test_setup_rejects_unknown_profile():
+    with pytest.raises(ValueError, match="unknown profile"):
+        ulog.setup(profile="staging")  # type: ignore[arg-type]
+
+
+def test_profiles_constant():
+    assert ulog.PROFILES == ("prod", "test")

@@ -23,14 +23,14 @@
                      {% if lv in filters.levels %}checked{% endif %}
                      class="rounded text-blue-600 focus:ring-blue-500">
               <span class="flex-1 flex items-center gap-2">
-                <span class="inline-block w-12 text-center text-xs font-mono px-1 py-0.5 rounded
+                <span class="inline-block w-16 text-center text-xs font-mono px-1 py-0.5 rounded
                   {% if lv == 'ERROR' or lv == 'CRITICAL' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
                   {% elif lv == 'WARNING' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200
                   {% elif lv == 'INFO' %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200
                   {% else %}bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200{% endif %}">
                   {{ lv }}
                 </span>
-                <span class="text-slate-500 dark:text-slate-400">({{ count }})</span>
+                <span class="ml-auto text-xs text-slate-500 dark:text-slate-400 tabular-nums min-w-[2rem] text-right">{{ count }}</span>
               </span>
             </label>
           {% endfor %}
@@ -49,11 +49,11 @@
             <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded">
               <input type="checkbox" name="logger" value="{{ sector }}"
                      {% if sector in filters.loggers %}checked{% endif %}
-                     class="rounded text-blue-600 focus:ring-blue-500">
-              <span class="font-mono text-xs flex-1 truncate" title="{{ sector }}">
+                     class="rounded text-blue-600 focus:ring-blue-500 flex-shrink-0">
+              <span class="font-mono text-xs flex-1 min-w-0 truncate" title="{{ sector }}">
                 {{ sector }}
               </span>
-              <span class="text-slate-500 dark:text-slate-400 text-xs">{{ count }}</span>
+              <span class="ml-2 text-slate-500 dark:text-slate-400 text-xs tabular-nums min-w-[2rem] text-right flex-shrink-0">{{ count }}</span>
             </label>
           {% endfor %}
         </div>
@@ -71,9 +71,9 @@
             <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded">
               <input type="checkbox" name="file" value="{{ fname }}"
                      {% if fname in filters.files %}checked{% endif %}
-                     class="rounded text-blue-600 focus:ring-blue-500">
-              <span class="font-mono text-xs flex-1 truncate" title="{{ fname }}">{{ fname }}</span>
-              <span class="text-slate-500 dark:text-slate-400 text-xs">{{ count }}</span>
+                     class="rounded text-blue-600 focus:ring-blue-500 flex-shrink-0">
+              <span class="font-mono text-xs flex-1 min-w-0 truncate" title="{{ fname }}">{{ fname }}</span>
+              <span class="ml-2 text-slate-500 dark:text-slate-400 text-xs tabular-nums min-w-[2rem] text-right flex-shrink-0">{{ count }}</span>
             </label>
           {% endfor %}
         </div>

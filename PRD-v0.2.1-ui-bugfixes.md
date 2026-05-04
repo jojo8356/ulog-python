@@ -4,7 +4,7 @@ project_name: ulog-python
 version: 0.2.1
 date: 2026-05-04
 author: jojo8356
-status: draft v1
+status: shipped v0.2.1 (4 tests added; ghost counts + spacing fixed)
 parent_prd: PRD-v0.2-storage-and-ui.md
 priority: high (visible UX bugs)
 ---
@@ -173,9 +173,20 @@ column.
 
 ## 5. Definition of Done
 
-- [ ] Adapters return ghost counts per axis.
-- [ ] Sidebar template fixes spacing + tabular alignment.
-- [ ] Two new tests pin the ghost-count behavior.
-- [ ] Existing 69 tests still pass.
-- [ ] `/docs/sectors-and-files.md` updated with the ghost-count note.
-- [ ] Tag `v0.2.1` + push.
+- [x] Adapters return ghost counts per axis (`SQLiteAdapter.query`
+       + `_filter_and_paginate` use 3 distinct `where` clauses for
+       level / logger / file counts; main records list keeps the
+       full filter).
+- [x] Sidebar template fixes spacing + tabular alignment
+       (`ml-2 tabular-nums min-w-[2rem] text-right` on every count
+       span; `flex-shrink-0` on inputs/labels to keep counts pinned
+       to the right column).
+- [x] Four new tests pin the ghost-count behavior:
+       `test_level_counts_unaffected_by_level_filter`,
+       `test_sector_counts_unaffected_by_sector_filter`,
+       `test_file_counts_unaffected_by_file_filter`,
+       `test_jsonl_adapter_ghost_counts`.
+- [x] Existing 69 tests still pass; suite now 73/73 green.
+- [x] `/docs/sectors-and-files.md` updated with the "Ghost counts"
+       section explaining the UX pattern.
+- [x] Tag `v0.2.1` + push.

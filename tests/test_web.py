@@ -94,6 +94,96 @@ def test_sqlite_adapter_get_returns_record(sqlite_fixture):
     assert ad.get(99999) is None
 
 
+# ---- v0.2.1 ghost counts -------------------------------------------------
+
+
+def test_level_counts_unaffected_by_level_filter(sqlite_fixture):
+    """v0.2.1 ghost-count: ticking a level filter must NOT zero out
+    the other levels' counts. Each level row should show the count
+    that filter would yield, regardless of what's currently ticked
+    on the level axis."""
+    from ulog.web.viewer.adapters import Filters, SQLiteAdapter
+
+    ad = SQLiteAdapter(sqlite_fixture)
+    # No filter → all 5 records, INFO/WARNING/ERROR all visible
+    res_unfiltered = ad.query(Filters())
+    assert res_unfiltered.level_counts.get("INFO", 0) == 3
+    assert res_unfiltered.level_counts.get("WARNING", 0) == 1
+    assert res_unfiltered.level_counts.get("ERROR", 0) == 1
+
+    # Tick INFO only → records list shrinks to 3, but level_counts
+    # for WARNING / ERROR must STILL show 1 each (ghost count).
+    res_info = ad.query(Filters(levels=["INFO"]))
+    assert res_info.total == 3
+    assert res_info.level_counts.get("INFO", 0) == 3
+    assert res_info.level_counts.get("WARNING", 0) == 1, (
+        "WARNING count collapsed under self-axis filter — ghost-count "
+        "behavior broken (PRD-v0.2.1 regression)"
+    )
+    assert res_info.level_counts.get("ERROR", 0) == 1
+
+
+def test_sector_counts_unaffected_by_sector_filter(sqlite_fixture):
+    """v0.2.1 ghost-count: same shape for the sector axis. Ticking a
+    sector must keep the other sectors' counts visible."""
+    from ulog.web.viewer.adapters import Filters, SQLiteAdapter
+
+    ad = SQLiteAdapter(sqlite_fixture)
+    # Unfiltered baseline counts
+    res_unfiltered = ad.query(Filters())
+    assert res_unfiltered.sector_counts.get("myapp.audio.engine") == 1
+    assert res_unfiltered.sector_counts.get("myapp.web") == 1
+
+    # Tick myapp.audio.engine → records list shrinks to 1, but sector
+    # counts for myapp.web must STILL show 1 (ghost count).
+    res_engine = ad.query(Filters(loggers=["myapp.audio.engine"]))
+    assert res_engine.total == 1
+    assert res_engine.sector_counts.get("myapp.audio.engine") == 1
+    assert res_engine.sector_counts.get("myapp.web") == 1, (
+        "myapp.web sector count collapsed when myapp.audio.engine is "
+        "filter-selected — ghost-count behavior broken"
+    )
+
+
+def test_file_counts_unaffected_by_file_filter(sqlite_fixture):
+    """v0.2.1 ghost-count: same shape for the file axis."""
+    from ulog.web.viewer.adapters import Filters, SQLiteAdapter
+
+    ad = SQLiteAdapter(sqlite_fixture)
+    res_unfiltered = ad.query(Filters())
+    files_in_data = list(res_unfiltered.file_counts.keys())
+    assert len(files_in_data) >= 1
+    # Tick one file → other files' counts must persist
+    one_file = files_in_data[0]
+    res_filtered = ad.query(Filters(files=[one_file]))
+    assert res_filtered.file_counts == res_unfiltered.file_counts, (
+        "Per-file counts changed when a file filter was applied — "
+        "ghost-count behavior broken on the file axis"
+    )
+
+
+def test_jsonl_adapter_ghost_counts(tmp_path):
+    """Same ghost-count contract for the in-memory JSONL adapter."""
+    from ulog.web.viewer.adapters import Filters, JSONLAdapter
+
+    path = tmp_path / "logs.jsonl"
+    ulog.setup(handlers=["json"], json_path=str(path))
+    ulog.get_logger("a").info("one")
+    ulog.get_logger("a").error("two")
+    ulog.get_logger("b").info("three")
+    for h in logging.getLogger().handlers:
+        h.flush()
+
+    ad = JSONLAdapter(path)
+    res = ad.query(Filters(levels=["INFO"]))
+    assert res.total == 2  # 2 INFO records
+    assert res.level_counts.get("INFO") == 2
+    # Ghost: ERROR row must still show its count (1)
+    assert res.level_counts.get("ERROR") == 1, (
+        "JSONL adapter ghost-count broken on the level axis"
+    )
+
+
 def test_jsonl_adapter_round_trip(tmp_path):
     """Build a JSONL via JSONLineHandler then read it back."""
     from ulog.web.viewer.adapters import Filters, JSONLAdapter

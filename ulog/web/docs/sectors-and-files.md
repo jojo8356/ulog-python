@@ -70,6 +70,24 @@ or from inside `render_rom_audio_v2`.
 Sectors alone wouldn't tell you — the same `qlnes.cli` logger could
 be writing both messages. The file filter pinpoints the source.
 
+## Ghost counts (v0.2.1)
+
+The numbers shown next to each filter value (level, sector, file)
+are **ghost counts** — they reflect what you'd get if you added
+that value to the current filter, NOT the count for the currently
+active query. So:
+
+- If you tick `ERROR`, the `INFO` row still shows `(9)` — meaning
+  "if you ALSO tick INFO, you'd see 9 more records on top of the
+  ERRORs". The 9 doesn't drop to 0 just because INFO isn't currently
+  selected.
+- Same for sectors: tick `qlnes.audio.engine`, and `qlnes.web` still
+  shows its count.
+
+Why: this is the "ghost count" UX pattern from Datadog/Sentry/Grafana.
+Without it, multi-axis exploration becomes painful — you'd have to
+untick a value, see the counts, then re-tick.
+
 ## "By directory" toggle (planned in v0.3)
 
 When the file list grows past 30 entries, group files by their parent

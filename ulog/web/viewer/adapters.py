@@ -151,35 +151,55 @@ class SQLiteAdapter(Adapter):
         return and_(*clauses) if clauses else None
 
     def query(self, filters: Filters, page: int = 1, page_size: int = 100) -> QueryResult:
+        """Run the filtered query.
+
+        Per PRD-v0.2.1 ("ghost counts"): each axis's per-value counts
+        are computed with a `where` clause that EXCLUDES that axis's
+        own filter. So when the user has DEBUG ticked, the INFO/WARNING
+        rows still show what they'd get if they ALSO ticked those —
+        not 0 just because they're not currently in the filter.
+
+        The main record list keeps the full filter set (correct).
+        """
+        from dataclasses import replace as _replace
         from sqlalchemy import select, func
 
         t = self._table
-        where = self._base_filters(filters)
+        full_where = self._base_filters(filters)
+        # Build per-axis "all filters except this one" where-clauses.
+        where_no_levels = self._base_filters(_replace(filters, levels=[]))
+        where_no_loggers = self._base_filters(_replace(filters, loggers=[]))
+        where_no_files = self._base_filters(_replace(filters, files=[]))
 
         with self._engine.begin() as conn:
-            # Total count
+            # Total count uses the FULL filter (matches the records list).
             stmt = select(func.count()).select_from(t)
-            if where is not None:
-                stmt = stmt.where(where)
+            if full_where is not None:
+                stmt = stmt.where(full_where)
             total = conn.execute(stmt).scalar() or 0
 
-            # Page rows
+            # Page rows use the FULL filter.
             stmt = (
                 select(t)
                 .order_by(t.c.id.desc())
                 .limit(page_size)
                 .offset((page - 1) * page_size)
             )
-            if where is not None:
-                stmt = stmt.where(where)
+            if full_where is not None:
+                stmt = stmt.where(full_where)
             rows = list(conn.execute(stmt))
 
-            # Aggregates over the FULL filtered dataset (so the sidebar
-            # counts reflect the active query, not just the page).
-            level_counts = self._count_by(conn, t.c.level, where)
-            file_counts = self._count_by(conn, t.c.file, where)
-            logger_counts = self._count_by(conn, t.c.logger, where)
-            bound_keys = self._distinct_bound_keys(conn, where)
+            # Per-axis counts use the "all filters except this axis" where-clause.
+            # This is the ghost-count UX pattern (Datadog/Sentry/Grafana):
+            # the user always sees what they'd get by ticking another value
+            # on this axis, regardless of what's currently ticked on it.
+            level_counts = self._count_by(conn, t.c.level, where_no_levels)
+            file_counts = self._count_by(conn, t.c.file, where_no_files)
+            logger_counts = self._count_by(conn, t.c.logger, where_no_loggers)
+            # `bound_keys` is just an auto-detected list, not a count axis;
+            # it can use the full filter (we want it to reflect what's
+            # actually in scope).
+            bound_keys = self._distinct_bound_keys(conn, full_where)
 
         records = [self._row_to_record(r) for r in rows]
         sector_counts = _build_sector_counts(logger_counts)
@@ -328,39 +348,54 @@ def _payload_to_record(payload: dict[str, Any], idx: int) -> Record:
 def _filter_and_paginate(
     records: list[Record], f: Filters, page: int, page_size: int
 ) -> QueryResult:
-    """In-memory filtering for JSONL/CSV adapters."""
-    def keep(r: Record) -> bool:
-        if f.levels and r.level not in f.levels:
+    """In-memory filtering for JSONL/CSV adapters.
+
+    Per PRD-v0.2.1 ghost-count rules: each per-axis count is computed
+    against the dataset filtered by "all axes except this one". The
+    main record list uses the full filter.
+    """
+    from dataclasses import replace as _replace
+
+    def keep(r: Record, ff: Filters) -> bool:
+        if ff.levels and r.level not in ff.levels:
             return False
-        if f.loggers and not any(
+        if ff.loggers and not any(
             r.logger == p or r.logger.startswith(p + ".") or r.logger.startswith(p)
-            for p in f.loggers
+            for p in ff.loggers
         ):
             return False
-        if f.files and r.file not in f.files:
+        if ff.files and r.file not in ff.files:
             return False
-        if f.search and f.search.lower() not in r.msg.lower():
+        if ff.search and ff.search.lower() not in r.msg.lower():
             return False
-        if f.ts_from and r.ts < f.ts_from:
+        if ff.ts_from and r.ts < ff.ts_from:
             return False
-        if f.ts_to and r.ts > f.ts_to:
+        if ff.ts_to and r.ts > ff.ts_to:
             return False
-        for k, v in f.bound.items():
+        for k, v in ff.bound.items():
             if str(r.context.get(k, "")) != v:
                 return False
         return True
 
-    filtered = [r for r in records if keep(r)]
-    total = len(filtered)
+    # Full filter — for records list + total + bound_keys
+    full_filtered = [r for r in records if keep(r, f)]
+    total = len(full_filtered)
     start = (page - 1) * page_size
-    page_records = list(reversed(filtered))[start:start + page_size]
+    page_records = list(reversed(full_filtered))[start:start + page_size]
 
-    level_counts = Counter(r.level for r in filtered)
-    file_counts = Counter(r.file for r in filtered)
-    logger_counts = Counter(r.logger for r in filtered)
+    # Per-axis ghost-count datasets
+    no_levels_filtered = [r for r in records if keep(r, _replace(f, levels=[]))]
+    no_loggers_filtered = [r for r in records if keep(r, _replace(f, loggers=[]))]
+    no_files_filtered = [r for r in records if keep(r, _replace(f, files=[]))]
+
+    level_counts = Counter(r.level for r in no_levels_filtered)
+    file_counts = Counter(r.file for r in no_files_filtered)
+    logger_counts = Counter(r.logger for r in no_loggers_filtered)
     sector_counts = _build_sector_counts(logger_counts)
+
+    # bound_keys: auto-detected list (not a count axis); use full filter.
     bound_keys: set[str] = set()
-    for r in filtered[:500]:
+    for r in full_filtered[:500]:
         bound_keys.update(r.context.keys())
 
     return QueryResult(

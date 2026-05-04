@@ -104,15 +104,21 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
 
-    # Use the WSGI dev server directly (`runserver` reloader fights with
-    # threading; we want a simple single-process serve).
-    from django.core.management.commands.runserver import Command as RunServer
+    # Bypass `runserver` and call Django's underlying WSGI runner
+    # directly. This skips runserver's banner ("Starting development
+    # server at...", date line, dev-server WARNING) and its migration
+    # check, which fires false positives against our `:memory:` stub
+    # DB. We still get the per-request access log via
+    # WSGIRequestHandler, plus static-file serving via StaticFilesHandler.
+    from django.contrib.staticfiles.handlers import StaticFilesHandler
+    from django.core.servers.basehttp import run
+    from django.core.wsgi import get_wsgi_application
 
-    rs = RunServer()
-    rs.run_from_argv([
-        "ulog-web", "runserver", f"{args.host}:{port}",
-        "--noreload", "--skip-checks",
-    ])
+    handler = StaticFilesHandler(get_wsgi_application())
+    try:
+        run(args.host, port, handler, threading=True)
+    except KeyboardInterrupt:
+        pass
     return 0
 
 

@@ -76,3 +76,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Markdown doc pages location (FR40)
 ULOG_DOCS_DIR = BASE_DIR / "docs"
+
+# Skip migrations for apps we never query — DATABASES['default'] is a
+# `:memory:` stub (we read external .sqlite/.jsonl/.csv files instead),
+# so contenttypes models are never used. This silences the noisy
+# "You have N unapplied migration(s)" warning on every server start.
+MIGRATION_MODULES = {"contenttypes": None}

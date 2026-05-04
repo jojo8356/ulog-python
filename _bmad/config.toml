@@ -11,7 +11,7 @@
 # ─────────────────────────────────────────────────────────────────
 
 [core]
-project_name = "ulog"
+project_name = "ulog-python"
 document_output_language = "English"
 output_folder = "_bmad-output"
 

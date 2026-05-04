@@ -27,20 +27,21 @@
         code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
         /* Smooth fade for the dark/light theme switch (FR — Theme toggle
          * fade animation). Applied to background, text, and border colours
-         * across the whole document. 220ms is short enough to feel snappy,
-         * long enough to feel intentional. */
+         * across the whole document. 1s is gentle on the eyes — the
+         * full-screen luminance flip feels smooth instead of strobing. */
         body, header, aside, main, table, tr, td, th, button, input,
         a, span, code, pre, div {
-            transition: background-color 220ms ease,
-                        color 220ms ease,
-                        border-color 220ms ease;
+            transition: background-color 1s ease,
+                        color 1s ease,
+                        border-color 1s ease;
         }
         /* Theme-toggle icon crossfade — the inactive icon fades out, the
          * active one fades in. Both occupy the same grid cell so the
-         * button's width doesn't jitter. */
+         * button's width doesn't jitter. Same 1s curve as the body
+         * so they swap in lockstep. */
         #theme-toggle .icon-sun, #theme-toggle .icon-moon {
             grid-area: 1 / 1;
-            transition: opacity 200ms ease, transform 220ms ease;
+            transition: opacity 1s ease, transform 1s ease;
         }
         html:not(.dark) #theme-toggle .icon-moon { opacity: 1; transform: rotate(0); }
         html:not(.dark) #theme-toggle .icon-sun  { opacity: 0; transform: rotate(-90deg); }

@@ -41,6 +41,13 @@ ulog-web = "ulog.web.cli:main"
 Homepage = "https://github.com/jojo8356/ulog-python"
 Issues = "https://github.com/jojo8356/ulog-python/issues"
 
+[tool.setuptools.packages.find]
+# Constrain auto-discovery to the `ulog` package only — keeps the
+# `vendor/ucolor-python/` submodule from being misread as a sibling
+# top-level package by setuptools 70+.
+include = ["ulog*"]
+exclude = ["tests*", "vendor*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

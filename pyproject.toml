@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ulog"
+version = "0.1.0"
+description = "Stdlib `logging` upgraded — sensible defaults, ucolor formatters, byte-stable contract for CLI tools and pipelines"
+authors = [{ name = "jojo8356" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["logging", "logger", "cli", "color", "structured", "json"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+]
+dependencies = [
+    "ucolor>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "mypy>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/jojo8356/ulog-python"
+Issues = "https://github.com/jojo8356/ulog-python/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true

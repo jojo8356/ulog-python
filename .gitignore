@@ -8,3 +8,14 @@ dist/
 *.egg-info/
 .coverage
 htmlcov/
+
+# uv-generated lockfile — ulog is a library, not an app, so the lockfile
+# is a local install artifact (consumers install via pyproject.toml).
+uv.lock
+
+# Backup files from BMad install / installer reruns.
+*.bak
+
+# Claude Code project-local install (skills installed by `bmad install`).
+# Re-create on a fresh clone with `bmad install` reading _bmad/config.toml.
+.claude/

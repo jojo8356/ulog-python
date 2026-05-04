@@ -11,9 +11,10 @@
 
       {# Levels #}
       <div>
-        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
             title="Filter records by their severity level. Multi-select with Ctrl-click.">
-          Level
+          {% lucide "gauge" size=14 %}
+          <span>Level</span>
         </h3>
         <div class="space-y-1">
           {% for lv, count in level_summary %}
@@ -38,9 +39,10 @@
 
       {# Sectors (logger-name tree) — FR44 #}
       <div>
-        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
             title="Logger names, hierarchical. Click a sector to filter to it and its descendants.">
-          Sectors
+          {% lucide "git-branch" size=14 %}
+          <span>Sectors</span>
         </h3>
         <div class="space-y-1 max-h-60 overflow-y-auto">
           {% for sector, count in sectors %}
@@ -59,9 +61,10 @@
 
       {# Files (FR47-FR50) #}
       <div>
-        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
             title="Source-file dropdown. Multi-select with Ctrl-click.">
-          Files
+          {% lucide "file-text" size=14 %}
+          <span>Files</span>
         </h3>
         <div class="space-y-1 max-h-48 overflow-y-auto">
           {% for fname, count in files %}
@@ -78,9 +81,10 @@
 
       {# Time range #}
       <div>
-        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
             title="ISO-8601 datetime, e.g. 2026-05-04T13:30:00Z. Empty = unbounded.">
-          Time range
+          {% lucide "clock" size=14 %}
+          <span>Time range</span>
         </h3>
         <div class="space-y-1">
           <input type="text" name="from" value="{{ filters.ts_from }}"
@@ -94,9 +98,10 @@
 
       {# Search msg #}
       <div>
-        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
             title="Substring match in record.msg. Case-insensitive.">
-          Search
+          {% lucide "search" size=14 %}
+          <span>Search</span>
         </h3>
         <input type="text" name="q" value="{{ filters.search }}" placeholder="search msg…"
                class="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800">
@@ -104,9 +109,10 @@
 
       {# Bound fields #}
       <div>
-        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300"
+        <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
             title="Filter by bound context fields. Format: key=value. Add multiple inputs for AND.">
-          Bound fields
+          {% lucide "tag" size=14 %}
+          <span>Bound fields</span>
         </h3>
         <div class="space-y-1" id="bound-fields">
           {% for raw in filters.bound.items %}
@@ -126,11 +132,13 @@
       </div>
 
       <div class="flex gap-2 pt-2">
-        <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-medium">
-          Apply
+        <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-medium flex items-center justify-center gap-1.5">
+          {% lucide "funnel" size=14 %}
+          <span>Apply</span>
         </button>
-        <a href="{% url 'ulog-list' %}" class="flex-1 text-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1.5 rounded font-medium">
-          Reset
+        <a href="{% url 'ulog-list' %}" class="flex-1 text-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1.5 rounded font-medium flex items-center justify-center gap-1.5">
+          {% lucide "x" size=14 %}
+          <span>Reset</span>
         </a>
       </div>
     </form>
@@ -194,15 +202,17 @@
     <nav class="mt-4 flex items-center justify-center gap-2 text-sm">
       {% if page > 1 %}
       <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:-1 }}"
-         class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
-         ← Prev
+         class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1">
+         {% lucide "chevron-left" size=14 %}
+         <span>Prev</span>
       </a>
       {% endif %}
       <span class="text-slate-500 dark:text-slate-400">page {{ page }} / {{ total_pages }}</span>
       {% if page < total_pages %}
       <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:1 }}"
-         class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
-         Next →
+         class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1">
+         <span>Next</span>
+         {% lucide "chevron-right" size=14 %}
       </a>
       {% endif %}
     </nav>
@@ -213,15 +223,31 @@
 {# Tutorial overlay (FR38) — fires once per browser via localStorage. #}
 <div id="tutorial" class="hidden fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center p-4">
   <div class="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md shadow-xl">
-    <h2 class="text-xl font-bold mb-3">Welcome to ULog 👋</h2>
-    <ol class="list-decimal list-inside space-y-2 text-sm">
-      <li><b>Filter</b> records via the left sidebar (level, sectors, files, time, bound fields).</li>
-      <li><b>Click any row</b> to open its full detail view (JSON pretty-print + traceback).</li>
-      <li>The <b>Sectors</b> tree shows logger-name prefixes — drill from the root to the leaf.</li>
-      <li>Need help? <a href="{% url 'ulog-docs-index' %}" class="underline text-blue-600 dark:text-blue-400">Open the docs</a> — every page has examples.</li>
+    <h2 class="text-xl font-bold mb-3 flex items-center gap-2">
+      {% lucide "sparkles" size=22 class="text-blue-500" %}
+      <span>Welcome to ULog</span>
+    </h2>
+    <ol class="space-y-3 text-sm">
+      <li class="flex items-start gap-2">
+        {% lucide "funnel" size=16 class="text-blue-500 mt-0.5 flex-shrink-0" %}
+        <span><b>Filter</b> records via the left sidebar (level, sectors, files, time, bound fields).</span>
+      </li>
+      <li class="flex items-start gap-2">
+        {% lucide "mouse-pointer-click" size=16 class="text-blue-500 mt-0.5 flex-shrink-0" %}
+        <span><b>Click any row</b> to open its full detail view (JSON pretty-print + traceback).</span>
+      </li>
+      <li class="flex items-start gap-2">
+        {% lucide "git-branch" size=16 class="text-blue-500 mt-0.5 flex-shrink-0" %}
+        <span>The <b>Sectors</b> tree shows logger-name prefixes — drill from the root to the leaf.</span>
+      </li>
+      <li class="flex items-start gap-2">
+        {% lucide "book-open" size=16 class="text-blue-500 mt-0.5 flex-shrink-0" %}
+        <span>Need help? <a href="{% url 'ulog-docs-index' %}" class="underline text-blue-600 dark:text-blue-400">Open the docs</a> — every page has examples.</span>
+      </li>
     </ol>
-    <button id="tutorial-dismiss" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded">
-      Got it
+    <button id="tutorial-dismiss" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded flex items-center justify-center gap-1.5">
+      {% lucide "check" size=16 %}
+      <span>Got it</span>
     </button>
   </div>
 </div>

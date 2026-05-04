@@ -9,7 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         // Dark mode preference: respect prefers-color-scheme, allow override
-        // via localStorage.
+        // via localStorage. Set BEFORE Tailwind paints to avoid FOUC flash.
         tailwind.config = {
             darkMode: 'class',
             theme: { extend: {} }
@@ -23,26 +23,59 @@
         }
     </script>
     <style>
-        /* Subtle base tweaks Tailwind doesn't cover */
         body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
         code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+        /* Smooth fade for the dark/light theme switch (FR — Theme toggle
+         * fade animation). Applied to background, text, and border colours
+         * across the whole document. 220ms is short enough to feel snappy,
+         * long enough to feel intentional. */
+        body, header, aside, main, table, tr, td, th, button, input,
+        a, span, code, pre, div {
+            transition: background-color 220ms ease,
+                        color 220ms ease,
+                        border-color 220ms ease;
+        }
+        /* Theme-toggle icon crossfade — the inactive icon fades out, the
+         * active one fades in. Both occupy the same grid cell so the
+         * button's width doesn't jitter. */
+        #theme-toggle .icon-sun, #theme-toggle .icon-moon {
+            grid-area: 1 / 1;
+            transition: opacity 200ms ease, transform 220ms ease;
+        }
+        html:not(.dark) #theme-toggle .icon-moon { opacity: 1; transform: rotate(0); }
+        html:not(.dark) #theme-toggle .icon-sun  { opacity: 0; transform: rotate(-90deg); }
+        html.dark        #theme-toggle .icon-sun  { opacity: 1; transform: rotate(0); }
+        html.dark        #theme-toggle .icon-moon { opacity: 0; transform: rotate(90deg); }
     </style>
 </head>
 <body class="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 h-full">
 
 <header class="border-b border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center justify-between bg-slate-50 dark:bg-slate-900 sticky top-0 z-10">
     <div class="flex items-center gap-3">
-        <a href="{% url 'ulog-list' %}" class="font-bold text-lg">ULog</a>
-        <span class="text-sm text-slate-500 dark:text-slate-400 truncate max-w-md" title="{{ logs_path }}">
-            {{ logs_path|default:"<no log file>" }}
+        <a href="{% url 'ulog-list' %}" class="font-bold text-lg flex items-center gap-2">
+            {% lucide "scroll-text" size=20 class="text-blue-600 dark:text-blue-400" %}
+            <span>ULog</span>
+        </a>
+        <span class="text-sm text-slate-500 dark:text-slate-400 truncate max-w-md flex items-center gap-1.5" title="{{ logs_path }}">
+            {% lucide "database" size=14 %}
+            <span class="truncate">{{ logs_path|default:"<no log file>" }}</span>
         </span>
     </div>
     <nav class="flex items-center gap-3 text-sm">
-        <a href="{% url 'ulog-list' %}" class="hover:underline">Records</a>
-        <a href="{% url 'ulog-docs-index' %}" class="hover:underline">Docs</a>
+        <a href="{% url 'ulog-list' %}" class="hover:underline flex items-center gap-1.5">
+            {% lucide "list" size=16 %}
+            <span class="hidden sm:inline">Records</span>
+        </a>
+        <a href="{% url 'ulog-docs-index' %}" class="hover:underline flex items-center gap-1.5">
+            {% lucide "book-open" size=16 %}
+            <span class="hidden sm:inline">Docs</span>
+        </a>
         <button id="theme-toggle" type="button"
-                class="px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800"
-                title="Toggle light/dark mode">☼/☽</button>
+                class="p-1.5 rounded grid place-items-center hover:bg-slate-200 dark:hover:bg-slate-800 relative w-8 h-8"
+                title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+            <span class="icon-sun" aria-hidden="true">{% lucide "sun" size=18 %}</span>
+            <span class="icon-moon" aria-hidden="true">{% lucide "moon" size=18 %}</span>
+        </button>
     </nav>
 </header>
 

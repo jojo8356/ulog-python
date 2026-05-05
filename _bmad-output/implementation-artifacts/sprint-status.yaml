@@ -1,5 +1,5 @@
 # generated: 2026-05-05
-# last_updated: 2026-05-05 (story 1-2 done — code-review passed, 13 patches applied, 98/98 tests)
+# last_updated: 2026-05-05 (Epic 8 / v0.6 static-export added per PRD-v0.6 — 15 stories appended)
 # project: ulog-python
 # project_key: NOKEY
 # tracking_system: file-system
@@ -164,3 +164,27 @@ development_status:
   7-11-tests-coverage-matrix-md-fr-edge-case-test-mapping: backlog
   7-12-tag-v0-5-0-push-qlnes-migration: backlog
   epic-7-retrospective: optional
+
+  # ========================================================================
+  # Epic 8: v0.6 — Static HTML export (`ulog export-html`) (15 stories)
+  # Added 2026-05-05 per PRD-v0.6-static-export. Depends on Epic 7
+  # (consolidated `ulog` CLI) — should ship after v0.5.0 tag.
+  # Story 8.1 (Tailwind standalone CLI build) accelerates Decision D3.
+  # ========================================================================
+  epic-8: backlog
+  8-1-tailwind-standalone-cli-build-pipeline: backlog
+  8-2-ulog-export-html-cli-subcommand-boilerplate: backlog
+  8-3-standalone-django-render-to-string-orchestrator: backlog
+  8-4-output-directory-layout-index-pagination: backlog
+  8-5-filter-dsl-integration-v0-5-grammar: backlog
+  8-6-include-section-gating: backlog
+  8-7-theme-light-dark-bundled-css: backlog
+  8-8-inline-data-vs-separate-data-heuristic: backlog
+  8-9-author-index-integration-via-repo: backlog
+  8-10-integrity-badge-frozen-per-page-header: backlog
+  8-11-readme-html-at-output-root: backlog
+  8-12-edge-case-test-suite-empty-broken-xss-traversal-cap: backlog
+  8-13-cross-browser-compatibility-playwright: backlog
+  8-14-performance-benchmark-sc1-gate: backlog
+  8-15-doc-page-static-export-md: backlog
+  epic-8-retrospective: optional

@@ -7,11 +7,12 @@ workflowType: 'epics-and-stories'
 project_name: 'ulog-python'
 user_name: 'Johan'
 date: '2026-05-05'
-scope: 'drafts v0.3 → v0.5 (v0.1/v0.2/v0.2.1 shipped — out of scope)'
+scope: 'drafts v0.3 → v0.6 (v0.1/v0.2/v0.2.1 shipped — out of scope)'
 inputDocuments:
   - docs/prds/PRD-v0.3-test-integration.md
   - docs/prds/PRD-v0.4-commit-author-filter.md
   - docs/prds/PRD-v0.5-forensic-archive.md
+  - docs/prds/PRD-v0.6-static-export.md
   - _bmad-output/planning-artifacts/architecture.md
   - _bmad-output/project-context.md
 ---
@@ -99,6 +100,25 @@ v0.2.1) are out-of-scope — their architecture is substrate.
 - **FR116:** New doc page `ulog/web/docs/v0.5-forensic-archive.md`: 30-second pitch, 7 invariants, 6 worked examples, troubleshooting section.
 - **FR117:** Existing doc pages (quickstart, storage, api, troubleshooting, sectors-and-files) updated to mention new APIs without breaking v0.4 readers.
 
+**v0.6 — Static HTML export (PRD-v0.6 §3, FR130 → FR145):**
+
+- **FR130:** `ulog export-html <input> --output <dir>` is the canonical CLI entry point, exposed as a subcommand of the consolidated `ulog` binary (post-Decision C1 from v0.5).
+- **FR131:** `--filter <dsl>` accepts the v0.5 `correlate`/`bisect` filter DSL grammar (Decision C5). Records not matching the filter are excluded from the export. Parse errors fail fast before any output is written.
+- **FR132:** `--include` accepts a comma-separated list of section names (`level`, `sectors`, `authors`, `tests`, `incidents`, `multi-track`, `docs`). Default: all. Excluded sections do not appear in the export navigation.
+- **FR133:** `--theme {light,dark}` selects a pre-built CSS bundle. Frozen at export time — no runtime toggle in the static output.
+- **FR134:** `--inline-data` / `--separate-data` (default heuristic) toggle whether record JSON is embedded in HTML or written to `data/*.json`.
+- **FR135:** `--force` is required to overwrite a non-empty output directory. Without it, refuse with a clear message and non-zero exit.
+- **FR136:** `--max-records N` (default 1_000_000) caps exports. Above the cap, refuse unless `--force-cap` is also passed (separate flag).
+- **FR137:** Output layout per PRD-v0.6 §2.1.2. Asset paths are relative; no absolute URLs. The export is portable (zip + unzip preserves all links).
+- **FR138:** Every page extends `ulog/web/templates/ulog/base.html`. The integrity badge in the header shows the FROZEN-AT-EXPORT state.
+- **FR139:** A doc-style README is emitted at the output root (`README.html`) explaining how to open the report, the inline-vs-separate-data trade-off, and `python -m http.server` recipe for browsers blocking `fetch()` on `file://`.
+- **FR140:** The exporter configures Django in standalone mode (`django.setup()` with minimal `settings`) and uses `django.template.loader.render_to_string()` to render every page. NO new Django templates ship.
+- **FR141:** The exporter reuses the v0.5 adapter contract (`Adapter.query()`, `Adapter.multi_track()`) for data fetching. Storage-agnostic by construction.
+- **FR142:** When invoked on a `.jsonl` or `.csv` input, the exporter optionally builds the v0.4 `AuthorIndex` if a repo path is provided via `--repo`. Author column hidden if no repo / if `--no-author-index`.
+- **FR143:** `integrity.html` is a dedicated page reproducing the `ulog verify` output at export time: chain length, span, broken-at point if any, last-check timestamp.
+- **FR144:** If chain is BROKEN at export, EVERY page in the export header carries the red `Integrity ✗ broken at #N` badge. No silent omission.
+- **FR145:** New `/docs/static-export.html` page (also rendered as `ulog/web/docs/static-export.md`) covering install, CLI usage, inline-vs-separate-data trade-off, GitHub Pages hosting recipe, GitHub Release attachment recipe.
+
 ### NonFunctional Requirements
 
 **v0.3:**
@@ -135,6 +155,20 @@ v0.2.1) are out-of-scope — their architecture is substrate.
 - **NFR-DOC-50:** Doc page `v0.5-forensic-archive.md` ships with 6 worked examples covering each FR cluster. (= FR116.)
 - **NFR-SEC-50:** All CLI inputs (`bisect`, `verify --range`, `incidents`, `trace`) validated against shell-injection. `record_hash` arguments must match `[0-9a-f]{4,64}`. `pattern` for bisect compiled as Python regex (no shell expansion).
 - **NFR-SEC-51:** Issue-template URL placeholders are URL-encoded server-side. User template not eval'd.
+
+**v0.6:**
+
+- **NFR-PERF-60:** Export of 100K records in ≤ 30s on GitHub Actions ubuntu-latest CPython 3.12 NVMe SSD. `pytest-benchmark` median 5 runs. (= SC1.)
+- **NFR-PERF-61:** First-paint of exported `index.html` (1000 records, default `--separate-data`) ≤ 1s on Chromium with simulated `Fast 3G` throttling. Playwright Lighthouse audit.
+- **NFR-SIZE-60:** Total export size ≤ 10 MB for 100K records `--separate-data`; ≤ 50 MB for `--inline-data`. (= SC3.)
+- **NFR-DEP-60:** `pyproject.toml dependencies = []` unchanged. Django stays in `[web]` extra. (= SC4.)
+- **NFR-COMPAT-60:** Exported HTML opens correctly with `file://` on Chrome ≥ 100, Firefox ≥ 100, Safari ≥ 16. Verified by Playwright.
+- **NFR-PORT-60:** Linux + macOS + Windows. Output paths via `pathlib.Path` and `.as_posix()` for relative URLs.
+- **NFR-SEC-60:** All log content HTML-escaped at template render (Django autoescape). Injection-style records tested.
+- **NFR-SEC-61:** Record fields (`file`, `logger`) rendered as text only — never used to construct output paths. Only path-manipulation input is `--output`.
+- **NFR-DOC-60:** Doc page `static-export.md` shipped with 4 worked examples. (= FR145.)
+- **NFR-REL-60:** Empty archive case (0 records) produces a valid HTML with empty-state placeholder.
+- **NFR-REL-61:** Chain-broken archive still produces a complete export, with broken state surfaced on every page header.
 
 ### Additional Requirements
 
@@ -287,6 +321,22 @@ The existing v0.2 viewer's UX patterns (Tailwind via CDN, lucide icons, dark-mod
 | FR115 | Epic 6 | Sidebar "Incidents" section |
 | FR116 | Epic 7 | Doc page `v0.5-forensic-archive.md` |
 | FR117 | Epic 7 | Existing doc pages updated (quickstart/storage/api/troubleshooting) |
+| FR130 | Epic 8 | `ulog export-html` CLI subcommand registration |
+| FR131 | Epic 8 | `--filter <dsl>` reuses v0.5 correlate filter DSL |
+| FR132 | Epic 8 | `--include` section gating |
+| FR133 | Epic 8 | `--theme light/dark` (depends on Decision D3 Tailwind standalone) |
+| FR134 | Epic 8 | `--inline-data` / `--separate-data` toggle + heuristic |
+| FR135 | Epic 8 | `--force` to overwrite non-empty output dir |
+| FR136 | Epic 8 | `--max-records` cap with `--force-cap` opt-out |
+| FR137 | Epic 8 | Output directory layout (index/r/incidents/multi-track/integrity/docs/static) |
+| FR138 | Epic 8 | Per-page header integrity badge frozen at export |
+| FR139 | Epic 8 | `README.html` at output root |
+| FR140 | Epic 8 | Standalone Django + `render_to_string()` orchestrator |
+| FR141 | Epic 8 | Adapter contract reuse (SQLite/JSONL/CSV) |
+| FR142 | Epic 8 | v0.4 `AuthorIndex` integration via `--repo` |
+| FR143 | Epic 8 | `integrity.html` page reproducing `ulog verify` output |
+| FR144 | Epic 8 | BROKEN integrity surfaced on every page header |
+| FR145 | Epic 8 | Doc page `/docs/static-export.html` (+ markdown source) |
 
 **NFR & cross-cutting coverage (NFRs apply to multiple epics; primary verification venue listed):**
 
@@ -330,6 +380,17 @@ The existing v0.2 viewer's UX patterns (Tailwind via CDN, lucide icons, dark-mod
 | Edge cases PRD-v0.4 §2.3 (4 cases) | Epic 2 | `tests/test_author_index.py` |
 | Edge cases PRD-v0.5 §2.3 (8 cases) | Epic 3 (5 storage/chain), Epic 4 (1 replay edge), Epic 5 (2 incident edges), Epic 6 (1 OTel absent) | distributed across test files |
 | Locked-out libraries audit | Epic 7 | code review checklist + grep gate |
+| NFR-PERF-60 / SC1 (export ≤30s/100K) | Epic 8 | `tests/bench_export_html.py` |
+| NFR-PERF-61 (first-paint ≤1s) | Epic 8 | Playwright Lighthouse |
+| NFR-SIZE-60 (≤10MB / ≤50MB) | Epic 8 | post-export `du -sh` assertion in CI |
+| NFR-DEP-60 (deps = []) | Epic 7 (E2 grep gate) — also covers v0.6 | |
+| NFR-COMPAT-60 (Chrome/Firefox/Safari latest) | Epic 8 | Playwright cross-browser e2e |
+| NFR-PORT-60 (Linux/macOS/Windows) | Epic 8 | CI matrix + `as_posix()` discipline |
+| NFR-SEC-60 (HTML escape) | Epic 8 | `tests/test_export_xss.py` |
+| NFR-SEC-61 (path traversal) | Epic 8 | `tests/test_export_path_traversal.py` |
+| NFR-REL-60 / 61 (empty / broken-chain edges) | Epic 8 | `tests/test_export_empty.py` + `test_export_broken_chain.py` |
+| NFR-DOC-60 (`static-export.md`) | Epic 8 | doc file shipped (FR145) |
+| Decision D3 acceleration (open Q3 of PRD-v0.6) | Epic 8 | dedicated story 8.1 |
 
 ## Epic List
 
@@ -460,6 +521,22 @@ The existing v0.2 viewer's UX patterns (Tailwind via CDN, lucide icons, dark-mod
 - Tag `v0.5.0`, push, migrate qlnes (SC6a).
 
 **Sequence within Epic 7:** STABILITY.md & BENCHMARK.md drafted in parallel with prior epics; CLI consolidation lands LAST (after every subcommand introduced in Epics 3-6 exists).
+
+---
+
+### Epic 8: v0.6 — Static HTML export (`ulog export-html`)
+
+**User outcome:** Compliance officers, tech leads, and DevRel teams generate frozen-at-the-time HTML reports of the log archive — single-folder, zippable, openable in any browser without Python or a server. Use cases: SOC 2 audit attachments, GitHub Release transparency, monthly postmortems, GitHub Pages hosting, e-mail to non-technical stakeholders. The integrity badge embedded in every page makes the export legitimate audit evidence.
+
+**FRs covered:** FR130, FR131, FR132, FR133, FR134, FR135, FR136, FR137, FR138, FR139, FR140, FR141, FR142, FR143, FR144, FR145 (16 FRs).
+
+**Standalone after Epics 1-7:** depends on the consolidated `ulog` CLI (Decision C1, Epic 7) and on Decision D3 (Tailwind standalone CLI build — open question 3 of PRD-v0.6) which is accelerated into this epic. Reuses v0.5 chain integrity surfacing, v0.4 author index, v0.3 test records, v0.2 viewer templates.
+
+**Implementation notes:**
+- New sub-package `ulog/web/export/` with `exporter.py` (orchestrator) + `standalone.py` (Django setup-without-server).
+- New CLI subcommand `ulog/_cli/cmd_export_html.py`.
+- Reuses existing Django templates via `render_to_string()` — zero new templates (FR140, SC5 of PRD-v0.6).
+- Decision D3 (Tailwind standalone CLI build) accelerated into Story 8.1 per PRD-v0.6 §8 open question 3.
 
 ---
 
@@ -2027,11 +2104,325 @@ So that SC6a is satisfied and the first reference adopter validates the release.
 
 ---
 
+## Epic 8: v0.6 — Static HTML export (`ulog export-html`)
+
+Compliance officers, tech leads, and DevRel teams generate frozen-at-the-time HTML reports of the log archive — single-folder, zippable, openable in any browser without Python or a server. The integrity badge embedded in every page makes the export legitimate audit evidence.
+
+### Story 8.1: Tailwind standalone CLI build pipeline (Decision D3 acceleration)
+
+As a release engineer,
+I want a Tailwind standalone CLI build that emits `ulog/web/static/ulog/tailwind.css` from the existing template's classes,
+So that the live viewer (post-v0.6) and the static export both ship with a self-contained CSS bundle instead of relying on the CDN.
+
+**Acceptance Criteria:**
+
+**Given** the Tailwind standalone binary is downloaded (no Node, no npm)
+**When** `make tailwind-build` runs
+**Then** `ulog/web/static/ulog/tailwind.css` exists, contains only the classes referenced in `ulog/web/templates/ulog/*.html` (purged), under 50 KB.
+
+**Given** `base.html`
+**When** rendered post-build
+**Then** it links `tailwind.css` from the static dir (relative path) and the CDN `<script>` tag is removed.
+
+**Given** any future template change
+**When** Tailwind classes are added or removed
+**Then** `make tailwind-build` re-emits the CSS; CI runs this build and fails if the committed CSS is stale.
+
+---
+
+### Story 8.2: `ulog export-html` CLI subcommand boilerplate
+
+As a CLI user,
+I want `ulog export-html <input> --output <dir>` to be a registered subcommand of the consolidated `ulog` binary with all flags parsed at the argparse boundary,
+So that input validation fails fast before any output is written.
+
+**Acceptance Criteria:**
+
+**Given** the `ulog` binary (post-Epic 7 consolidation)
+**When** `ulog export-html --help` runs
+**Then** all flags from PRD-v0.6 §2.1.1 are listed (`--output`, `--filter`, `--include`, `--theme`, `--inline-data`/`--separate-data`, `--force`, `--max-records`, `--repo`, `--no-author-index`).
+
+**Given** an output directory that exists and is non-empty
+**When** the command runs without `--force`
+**Then** it refuses with non-zero exit and a clear message (FR135).
+
+**Given** an archive with > 1_000_000 records (or `--max-records N` exceeded)
+**When** the command runs without `--force-cap`
+**Then** it refuses with non-zero exit listing the record count and the cap (FR136).
+
+---
+
+### Story 8.3: Standalone Django setup + `render_to_string` orchestrator
+
+As an exporter implementer,
+I want a standalone Django setup module (`ulog/web/export/standalone.py`) and an `HtmlExporter` class (`exporter.py`) that drives `render_to_string()` per page,
+So that the exporter shares the live viewer's template machinery without running a server.
+
+**Acceptance Criteria:**
+
+**Given** `from ulog.web.export import HtmlExporter`
+**When** `HtmlExporter(input_path, options).run()` is called
+**Then** Django is configured in standalone mode (no server, just template loading) and pages are rendered to disk via `render_to_string()` (FR140).
+
+**Given** any output page
+**When** inspected
+**Then** every template used is from the existing `ulog/web/templates/ulog/*.html` set — zero new templates ship (FR140, SC5 of PRD-v0.6).
+
+**Given** the adapter contract
+**When** the exporter loads records
+**Then** it uses `Adapter.query()` and `Adapter.multi_track()` like the live viewer — same data path for SQLite/JSONL/CSV inputs (FR141).
+
+---
+
+### Story 8.4: Output directory layout + index pagination
+
+As a consumer of an exported report,
+I want a portable directory layout with relative asset paths (zippable, hostable on GitHub Pages, openable with `file://`),
+So that I can distribute the report without breaking links.
+
+**Acceptance Criteria:**
+
+**Given** an export of N records (N ≤ 1000)
+**When** complete
+**Then** the output directory matches the layout in PRD-v0.6 §2.1.2: `index.html`, `r/<id>.html` per record, `incidents.html`, `multi-track.html`, `integrity.html`, `docs/` mirrored, `static/` (FR137).
+
+**Given** N > 1000 records
+**When** the index renders
+**Then** it paginates into `index.html`, `page-2.html`, `page-3.html`, ... at 1000 records per page by default.
+
+**Given** the export is zipped and unzipped at a different path
+**When** opened
+**Then** all internal links resolve correctly (no absolute URLs).
+
+---
+
+### Story 8.5: `--filter` integration with v0.5 DSL
+
+As a user generating a focused report,
+I want `--filter <dsl>` to use the same grammar as `ulog correlate` / `bisect`,
+So that a single mental model covers querying and exporting.
+
+**Acceptance Criteria:**
+
+**Given** `--filter "level=ERROR AND date>-30d"`
+**When** the export runs
+**Then** only matching records appear in the output (index + record pages) (FR131).
+
+**Given** an invalid DSL expression
+**When** parsed
+**Then** the command fails fast with the same error format as `ulog correlate`'s DSL parser — before any output file is written.
+
+---
+
+### Story 8.6: `--include` section gating
+
+As a user controlling report scope,
+I want `--include level,sectors,authors,tests,incidents,multi-track,docs` to gate which sections appear in the navigation and output,
+So that a slim audit-focused report can omit visual extras.
+
+**Acceptance Criteria:**
+
+**Given** `--include incidents,integrity` (only)
+**When** the export runs
+**Then** the output contains `index.html`, `incidents.html`, `integrity.html`, plus per-record pages — but NOT `multi-track.html` or `docs/` (FR132).
+
+**Given** the default (no `--include` flag)
+**When** the export runs
+**Then** all sections are emitted.
+
+---
+
+### Story 8.7: `--theme light/dark` with bundled CSS
+
+As a user shipping a branded report,
+I want `--theme light` or `--theme dark` to select the corresponding pre-built CSS bundle (from Story 8.1's Tailwind output),
+So that the report's visual identity is frozen at export time without runtime JS toggle.
+
+**Acceptance Criteria:**
+
+**Given** `--theme dark`
+**When** the export renders
+**Then** every page references `static/ulog-dark.css`; the dark-mode bootstrap script in the live viewer's `base.html` is replaced by an inline class on `<html>` (FR133).
+
+**Given** `--theme light`
+**When** the export renders
+**Then** every page references `static/ulog-light.css`.
+
+---
+
+### Story 8.8: `--inline-data` vs `--separate-data` + heuristic default
+
+As a user balancing portability vs file size,
+I want `--inline-data` to embed records' JSON in `<script>` blocks (single-folder portable) and `--separate-data` to write `data/*.json` files (smaller),
+So that I can pick the right trade-off per use case.
+
+**Acceptance Criteria:**
+
+**Given** `--inline-data`
+**When** the export renders
+**Then** record JSON appears in `<script type="application/json" id="ulog-data">` inside HTML pages — no `data/` directory is written.
+
+**Given** `--separate-data`
+**When** the export renders
+**Then** record JSON lives in `data/records-page-N.json` files; HTML loads them via `fetch()` (FR134).
+
+**Given** neither flag is passed
+**When** the heuristic runs
+**Then** archives < 10K records default to `--inline-data`; ≥ 10K default to `--separate-data` (per PRD-v0.6 §8 open question 1).
+
+---
+
+### Story 8.9: AuthorIndex integration via `--repo`
+
+As a user exporting a JSONL/CSV archive with author attribution,
+I want `--repo PATH` to drive the v0.4 `AuthorIndex` build during export,
+So that author columns appear in the exported HTML even though the source isn't SQLite.
+
+**Acceptance Criteria:**
+
+**Given** a JSONL log file and `--repo /path/to/repo`
+**When** the export runs
+**Then** the v0.4 `AuthorIndex` builds (one-shot at export time) and author columns appear in record pages and the Authors sidebar section (FR142).
+
+**Given** no `--repo` and no SQLite source
+**When** the export runs
+**Then** the Authors sidebar section is hidden in the output and `<unknown>` author rendering is suppressed.
+
+---
+
+### Story 8.10: Integrity badge frozen at export + per-page header surfacing
+
+As a compliance auditor,
+I want the integrity check result frozen at export time, surfaced on EVERY page header, AND a dedicated `integrity.html` page,
+So that a BROKEN chain is visible in any view of the report (auditors cannot miss it).
+
+**Acceptance Criteria:**
+
+**Given** a clean archive
+**When** the export runs
+**Then** `integrity.html` shows `Integrity ✓ verified up to #N` and every page header carries the green badge with a frozen `last-check-ts` timestamp (FR143, FR138).
+
+**Given** a chain BROKEN at #142,071
+**When** the export runs
+**Then** `integrity.html` shows the BROKEN-at point with details, AND every page header carries the RED `Integrity ✗ broken at #142,071` badge — no silent omission (FR144).
+
+---
+
+### Story 8.11: `README.html` at output root
+
+As a non-technical recipient of an exported bundle,
+I want a `README.html` at the output root explaining how to open the report and the inline-vs-separate-data caveat,
+So that I can navigate the bundle without reading the ulog docs.
+
+**Acceptance Criteria:**
+
+**Given** the export is complete
+**When** I open `README.html`
+**Then** it explains: (a) start with `index.html`, (b) the `fetch()`-on-`file://` caveat for `--separate-data`, (c) the `python -m http.server` recipe as a workaround, (d) ulog version + export format version metadata (FR139).
+
+**Given** the README content
+**When** rendered
+**Then** it does not require JS to be readable — pure HTML + inlined CSS only.
+
+---
+
+### Story 8.12: Edge case test suite
+
+As a release manager,
+I want each of 5 PRD-v0.6 §2.3 edge cases covered by ≥ 1 test,
+So that exotic conditions don't cause silent corruption or vacuous passes.
+
+**Acceptance Criteria:**
+
+**Given** an archive with 0 records matching the filter
+**When** the export runs
+**Then** `index.html` shows a clear "No records match" empty state (NFR-REL-60).
+
+**Given** an archive with chain corruption
+**When** the export runs
+**Then** the export completes; every page header shows the red ✗ badge; `integrity.html` documents the broken-at point (NFR-REL-61).
+
+**Given** records containing `<script>alert(1)</script>` as `msg`
+**When** the export renders
+**Then** the content is HTML-escaped — no JS execution on page load (NFR-SEC-60). Verified with Playwright `page.on('dialog', ...)`.
+
+**Given** a record with `file='../../etc/passwd'`
+**When** the export writes detail pages
+**Then** the malicious path is rendered as text only — never used to construct a file path (NFR-SEC-61).
+
+**Given** an archive of 1_000_001 records
+**When** the export runs without `--force-cap`
+**Then** it refuses with non-zero exit before any file is written (FR136).
+
+---
+
+### Story 8.13: Cross-browser compatibility (Playwright)
+
+As a release manager certifying cross-browser support,
+I want a Playwright-driven e2e suite that opens the export in Chrome, Firefox, and WebKit and asserts the integrity badge + record list render correctly,
+So that NFR-COMPAT-60 is mechanically gated.
+
+**Acceptance Criteria:**
+
+**Given** an export in `--separate-data` mode served via `python -m http.server`
+**When** opened in headless Chrome / Firefox / WebKit
+**Then** `index.html` paints, no console errors, integrity badge visible (NFR-COMPAT-60).
+
+**Given** an export in `--inline-data` mode opened with `file://` URL
+**When** loaded in headless Chrome / Firefox / WebKit
+**Then** records render without `fetch()` errors.
+
+**Given** a Playwright Lighthouse audit on Chromium with `Fast 3G` throttling
+**When** measured
+**Then** first-paint of `index.html` (1000 records, default `--separate-data`) is ≤ 1s (NFR-PERF-61).
+
+---
+
+### Story 8.14: Performance benchmark + SC1 gate
+
+As a release manager certifying export performance,
+I want `tests/bench_export_html.py` to run a 100K-record fixture export and gate on ≤ 30s wall time,
+So that NFR-PERF-60 / SC1 is mechanically enforced.
+
+**Acceptance Criteria:**
+
+**Given** a 100K-record fixture archive
+**When** `pytest tests/bench_export_html.py --benchmark-only` runs on GitHub Actions ubuntu-latest
+**Then** the median of 5 runs is ≤ 30s (NFR-PERF-60, SC1).
+
+**Given** the export
+**When** measured for output size
+**Then** `--separate-data` total ≤ 10 MB; `--inline-data` total ≤ 50 MB (NFR-SIZE-60, SC3).
+
+**Given** a future regression that doubles export time
+**When** CI runs
+**Then** the benchmark step fails the build with a clear regression message.
+
+---
+
+### Story 8.15: Doc page `/docs/static-export.md`
+
+As a new `ulog export-html` user,
+I want a doc page covering install (no extra needed beyond `[web]`), CLI usage, the inline-vs-separate-data trade-off, and 4 worked examples (compliance audit, GitHub Release, GitHub Pages, e-mail),
+So that I can adopt the feature without reading the PRD.
+
+**Acceptance Criteria:**
+
+**Given** the live viewer is running v0.6
+**When** the user navigates to `/docs/static-export/`
+**Then** the page renders covering all topics from PRD-v0.6 §6 worked examples (FR145, NFR-DOC-60).
+
+**Given** the markdown source `ulog/web/docs/static-export.md`
+**When** processed by the in-house renderer
+**Then** it renders without syntax errors (no markdown-it-py dep added).
+
+---
+
 ## Final Validation Results
 
 ### 1. FR Coverage Validation ✅
 
-All 61 FRs (FR51 → FR117) are mapped to stories with testable acceptance criteria:
+All 77 FRs (FR51 → FR117 + FR130 → FR145) are mapped to stories with testable acceptance criteria:
 
 | Epic | FR range | Count | Stories |
 |---|---|---|---|
@@ -2042,7 +2433,10 @@ All 61 FRs (FR51 → FR117) are mapped to stories with testable acceptance crite
 | Epic 5 (incidents) | FR105-FR108 | 4/4 | Stories 5.1-5.6 |
 | Epic 6 (cross-service & UI) | FR109-FR115 | 7/7 | Stories 6.1-6.10 |
 | Epic 7 (release) | FR116-FR117 | 2/2 | Stories 7.1-7.12 |
-| **Total** | | **61/61** | **71 stories** |
+| **Epic 8 (v0.6 static export)** | **FR130-FR145** | **16/16** | **Stories 8.1-8.15** |
+| **Total** | | **77/77** | **87 stories** |
+
+_Epic 8 added 2026-05-05 after PRD-v0.6 was drafted; folded into the same sprint planning doc for consistency. Original v0.3-v0.5 validation (72 stories / 61 FRs — the original "71" total was an off-by-one) extended; no impact on Epics 1-7 already shipped or in-flight. Verified against sprint-status.yaml: 87 stories / 8 epics / 8 retrospectives = 103 entries._
 
 ### 2. NFR Coverage Validation ✅
 
@@ -2095,6 +2489,7 @@ All 61 FRs (FR51 → FR117) are mapped to stories with testable acceptance crite
 | Epic 5 (incidents) | Epic 3 (chain) | ✅ |
 | Epic 6 (cross-service & UI) | Epic 3 (chain) + Epic 5 (incident data) | ✅ |
 | Epic 7 (release) | All prior | ✅ (consolidation epic by design) |
+| Epic 8 (v0.6 static export) | Epic 7 (consolidated `ulog` CLI) + reuses v0.2/v0.3/v0.4/v0.5 templates and adapter contract | ✅ (after v0.5.0 ships) |
 
 No circular dependencies. No epic depends on a LATER epic. Each is independently valuable after its predecessors land.
 

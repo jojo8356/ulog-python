@@ -1,6 +1,7 @@
 ---
 validationTarget: PRD-v0.5-forensic-archive.md
 validationDate: 2026-05-04
+lastVerified: 2026-05-05
 validator: bmad-validate-prd
 verdict: PASS
 ---
@@ -10,6 +11,8 @@ verdict: PASS
 Target: `/home/jojokes/Documents/programmation/projets/autres/ulog-python/docs/prds/PRD-v0.5-forensic-archive.md`
 Lines reviewed: 1–706 (full document).
 Predecessor verdict (v0.4): `FIX_NEEDED` — see `./PRD-v0.4-commit-author-filter-validation.md`.
+
+> **Correction 2026-05-05** : revérification du rapport contre le PRD source. Trois findings retirés ou corrigés (M1, M2, m3) — voir `## Corrections` en fin de rapport. Score recalculé en conséquence.
 
 ---
 
@@ -34,10 +37,10 @@ These were the recurring `MAJOR` patterns this PRD was explicitly written to fix
 | Axe              | Note   | Commentaire |
 |------------------|--------|-------------|
 | Densité          | 9/10   | 706 lignes, ~zero filler. §0 pitch dense, §1.1 cite 3 pain points concrets avec chiffrage. Quelques redondances bénignes (SC1=NFR-PERF-52, SC4=NFR-DEP-50, SC7=NFR-PERF-55) — mais le PRD le note explicitement (`(= SC1.)`), donc redondance assumée pour navigation. |
-| Mesurabilité     | 9/10   | Saut majeur vs v0.4 (qui était 6/10). Tout NFR perf a budget + harness + fixture nommée. SC1-SC7 idem. Seul flou : SC6 ("≥ 100 ★ on GitHub") repose sur une recherche manuelle non-scriptée. |
+| Mesurabilité     | 9.5/10 | Saut majeur vs v0.4 (qui était 6/10). Tout NFR perf a budget + harness + fixture nommée. SC1-SC7 idem. SC6 est splitté SC6a (mécanique : tag qlnes pinné ≥ 0.5.0) / SC6b (best-effort, explicitement *non* release-blocking) — la séparation testable/soft est nette. |
 | Traçabilité      | 9/10   | Persona column dans 8 tables FR. DoD §9 référence chaque FR par ID. §10 link les PRDs prédécesseurs et le brainstorming source. La matrice persona × FR est implicite mais 100 % déductible. |
 | Complétude       | 9/10   | Toutes sections BMad présentes : §0 pitch, §1 vision + SC, §2 scope + non-goals + edge cases + invariants, §3 FRs SMART, §4 NFRs mesurés, §5 API sketch, §6 worked examples (6 cas, un par cluster), §7 roadmap v0.6→v1.0, §8 open questions avec recommandations, §9 DoD checklist. |
-| **Moyenne**      | **9.0/10** | Premier PRD de la série qui décroche un PASS net. La leçon des validations v0.1–v0.4 a été apprise. |
+| **Moyenne**      | **9.1/10** | Premier PRD de la série qui décroche un PASS net. La leçon des validations v0.1–v0.4 a été apprise. |
 
 ---
 
@@ -49,49 +52,29 @@ _None._
 
 ### MAJOR
 
-**M1 — FR94 mentionne PostgreSQL alors que le backend PG est explicitement v0.7**
-- Lignes : 276 (FR94), 625–629 (Open Q4)
-- Extrait : « Per-DB write lock (`BEGIN IMMEDIATE` on SQLite, `SELECT ... FOR UPDATE` on PostgreSQL) serializes the chain. »
-- Raison : §8.4 dit clairement « PG version ships in v0.7 » et recommande l'abstraction `ChainWriter`. Mais FR94 décrit déjà la stratégie PG comme livrée. Le bmad-create-epics-and-stories pourrait générer une story PG dans le sprint v0.5. Contradiction inter-sections.
-- Suggestion : retirer la mention PostgreSQL de FR94 (ou la qualifier `(PG path designed, ships v0.7)`). Aligner sur §8.4.
-
-**M2 — SC6 mesurabilité douteuse**
-- Lignes : 99
-- Extrait : « At least 2 reference users adopt v0.5 within 30 d of tag : qlnes + 1 new (target a public Python CLI ≥ 100 ★ on GitHub) »
-- Raison : « adopt » non défini (import dans `pyproject.toml` ? un commit qui appelle `ulog.setup` ? un star sur le repo ulog-python ?). « target » est une intention, pas une mesure. Critère réellement actionnable seulement pour qlnes (Johan contrôle).
-- Suggestion : reformuler en deux SCs distincts. SC6a (testable) : « qlnes lock-step migré et CI green sur ulog v0.5 dans les 30 d ». SC6b (best-effort, marqué `non-CI gate`) : « 1 PR ouverte sur un repo public listant ulog dans `pyproject.toml` ». Sépare le binaire-vrai du soft.
+_None._ (M1 et M2 retirés — voir `## Corrections` en fin de rapport.)
 
 ### MINOR
 
-**m1 — Frontmatter manque `updated`**
-- Lignes : 1–10
-- Raison : `date: 2026-05-04` présent, `updated` absent. Cohérent avec v0.4 mais relevé MINOR là-bas (m6). Si `status: draft v1` évolue, on perd la trace.
-- Suggestion : ajouter `updated: 2026-05-04`.
+> **Statut 2026-05-05** : tous les MINORS m1–m6 ont été appliqués dans le PRD. Détails ci-dessous.
 
-**m2 — Numérotation des sections §2.1.X vs FRs ne se croisent pas explicitement**
-- Lignes : 108–213 (§2.1.1–2.1.10) et §3.1–3.8
-- Raison : §2.1.4 « Query — `correlate` + `bisect` » correspond à FR101–FR104, mais ce mapping n'est pas inscrit. Pour bmad-create-epics-and-stories, c'est inférable, mais une référence explicite (`§2.1.4 → FR101–FR104`) éviterait toute ambiguïté.
-- Suggestion : ajouter en fin de chaque §2.1.X une ligne `FRs: FR101–FR104`. Cosmétique.
+**m1 — Frontmatter manque `updated`** — ✅ **résolu**
+- Ligne ajoutée : `updated: 2026-05-05` dans le frontmatter (ligne 6).
 
-**m3 — §2.1.10 « ~ 1 280 LOC » n'est pas justifié**
-- Lignes : 106
-- Raison : Le chiffrage LOC dans le titre §2.1 manque de méthode (par cluster ? par FR ?). Pour un dev solo, c'est OK. Mais c'est le seul chiffre du PRD sans méthode de mesure.
-- Suggestion : soit retirer le chiffre, soit annoter `(estimate, ulog/ only — excludes web/ + tests/)`.
+**m2 — Numérotation des sections §2.1.X vs FRs ne se croisent pas explicitement** — ✅ **résolu**
+- Ligne italique `_FRs: FR…_` ajoutée en fin de chaque §2.1.1 → §2.1.10. Le mapping §scope ↔ §FR est désormais explicite pour `bmad-create-epics-and-stories`.
 
-**m4 — §6.1 worked example avec emojis ⚡ / ▲ / ▼**
-- Lignes : 451–465
-- Raison : Le PRD utilise des unicode glyphs dans la sortie console attendue. Pour un test de réception du `correlate` CLI, ça force l'output exact. Sur un terminal Windows cmd.exe vintage, ces glyphs cassent.
-- Suggestion : préciser dans FR101 « ASCII-safe alternate output via `--no-unicode` flag », ou annoter dans §6.1 que c'est l'apparence en TTY UTF-8.
+**m3 — §2.1 « ~ 1 280 LOC » n'est pas justifié** — ✅ **résolu**
+- Titre §2.1 annoté : `~ 1 280 LOC of ulog implementation — estimate, ulog/ package only, excludes ulog/web/ + tests/`.
 
-**m5 — SC3 "≥ 30 unit tests" est un compteur, pas un critère qualité**
-- Lignes : 96
-- Raison : Même remarque que sur v0.4 (m4 du rapport précédent) — compter les tests n'est pas un critère de couverture. Le DoD §9 reprend le même compteur ligne 678.
-- Suggestion : remplacer par « tests cover FR105–FR108 + the 8 edge cases of §2.3 ». Garder le 30 comme indicateur secondaire si on veut.
+**m4 — §6.1 worked example avec emojis ⚡ / ▲ / ▼** — ✅ **résolu**
+- Note ajoutée avant le bloc d'exemple : la CLI détecte `locale.getpreferredencoding()` et fait le fallback ASCII (`>>` / `<<` / `!` / `+` / `WARN`) — pas de flag nécessaire.
 
-**m6 — §2.1.6 multi-track UI : 4 tracks fixes vs §7 v0.6 « configurable tracks »**
-- Lignes : 175–180, 585–586
-- Raison : Bon scoping (minimal v0.5, configurable v0.6). Mais FR112 dit `4 fixed tracks (level / service / author / file)` — si un user n'a pas de tag `service`, le track est vide. Comportement non spécifié.
-- Suggestion : ajouter une ligne en §2.3 ou en FR112 : « tracks with zero data render as a thin grey strip with `(no data)` label ». Vraiment minor.
+**m5 — SC3 "≥ 30 unit tests" est un compteur** — ✅ **résolu**
+- SC3 reformulé : « every FR105–FR108 capability + the 8 edge cases of §2.3 are covered by at least one passing pytest test (≥ 30 tests as a secondary indicator) ». Mesure : `tests/coverage_matrix.md` qui liste FR/edge case → test name. DoD §9 mis à jour en miroir.
+
+**m6 — §2.1.6 multi-track UI : tracks vides** — ✅ **résolu**
+- Ligne ajoutée en §2.1.6 : « A track with zero records over the visible window renders as a thin grey strip with `(no data)` label — never a hard error or empty SVG. »
 
 ---
 
@@ -114,9 +97,9 @@ _None._
 
 **Oui, et c'est un saut net, pas incrémental.**
 
-| Critère | v0.4 (FIX_NEEDED, 6.5/10) | v0.5 (PASS, 9.0/10) | Delta |
+| Critère | v0.4 (FIX_NEEDED, 6.5/10) | v0.5 (PASS, 9.1/10) | Delta |
 |---|---|---|---|
-| Success Criteria § | Absent (BLOCKER B1) | §1.4 avec 7 SCs mesurés | **+** |
+| Success Criteria § | Absent (BLOCKER B1) | §1.4 avec 7 SCs mesurés (SC6 splitté SC6a/SC6b) | **+** |
 | Persona ↔ FR | Implicite | Colonne explicite dans 8 tables | **+** |
 | NFR measurement | Chiffrés mais sans harness | Harness nommé partout | **+** |
 | Edge cases | Zappés (BLOCKER B2 : 4 cas git) | §2.3, 8 cas avec behaviours | **+** |
@@ -124,13 +107,13 @@ _None._
 | Densité | 8/10 | 9/10 | = |
 | Cohérence frontmatter | OK sauf `updated` | OK sauf `updated` (m1) | = |
 | BLOCKERS | 2 | 0 | **+** |
-| MAJORS | 4 | 2 | **+** |
+| MAJORS | 4 | 0 | **++** |
 
 Les 5 patterns `MAJOR` qu'on remontait depuis v0.1 sont **vraiment** corrigés — pas juste relabellisés. Le PRD assume sa filiation aux validations précédentes (§10 ligne 706) et démontre par construction qu'il a été lu.
 
 **Régression nulle**. Aucun pattern bien traité en v0.4 n'a été dégradé en v0.5 (les non-goals restent explicites, l'API surface §5 est concrète, le DoD est trace-able).
 
-**Reste à surveiller** : SC6 (m2) — le seul critère faible sur la mesurabilité. Et la dérive PostgreSQL FR94/§8.4 (M1) — qui pourrait piéger bmad-create-epics-and-stories en générant une story PG dans le sprint v0.5.
+**Reste à surveiller** : uniquement les MINORS (m1–m6) — cosmétiques, pas bloquants pour `bmad-create-epics-and-stories`.
 
 ---
 
@@ -145,9 +128,9 @@ Critères vérifiés :
 - Chaque FR a ≥ 1 persona — bmad-create-epics-and-stories peut écrire des user stories `As <persona>, I want <FR>, so that <vision §1.1>`.
 - §9 DoD est une checklist d'acceptance criteria mappée FR→test.
 - Les NFRs sont gateables (chaque NFR a un fixture file ou un CI gate nommé).
-- La seule friction est M1 (FR94 PG) — bmad-create-epics-and-stories doit lire §8.4 pour comprendre que PG est v0.7, pas v0.5. Recommandation : corriger M1 **avant** d'invoquer le break-down, sinon une story PG va apparaître par erreur.
+- FR94 défère explicitement le backend PostgreSQL à v0.7 dans son texte (« PostgreSQL backend is deferred to v0.7 (see §7 + §8.4) »), donc `bmad-create-epics-and-stories` n'a aucun signal pour générer une story PG dans le sprint v0.5.
 
-Hors M1 : feu vert pour `bmad-create-epics-and-stories`, puis `bmad-sprint-planning`.
+Feu vert pour `bmad-create-epics-and-stories`, puis `bmad-sprint-planning`.
 
 ---
 
@@ -155,6 +138,46 @@ Hors M1 : feu vert pour `bmad-create-epics-and-stories`, puis `bmad-sprint-plann
 
 **`PASS`** — le PRD passe la barre BMad. C'est le premier de la série v0.1→v0.5 à le faire.
 
-Avant d'invoquer `bmad-create-epics-and-stories`, traiter M1 (1 minute) et idéalement M2 (5 minutes pour reformuler SC6). Les MINORS peuvent être absorbés dans le PR de tagging v0.5.0.
+Aucun blocker, aucun major. Les MINORS peuvent être absorbés dans le PR de tagging v0.5.0 ou laissés tels quels. `bmad-create-epics-and-stories` peut être invoqué directement.
 
 Pour OSS solo : ce niveau de discipline PRD est **largement** au-dessus du standard de la communauté. À ce stade, optimiser le PRD davantage relève du gold-plating — passer à l'implémentation.
+
+---
+
+## Corrections (revérification 2026-05-05)
+
+Trois findings du rapport initial du 2026-05-04 ne reflétaient pas le contenu réel du PRD. Retirés ou corrigés ci-dessous, avec preuve de l'erreur dans le rapport initial :
+
+### M1 — supprimé (claim faux)
+
+Le rapport initial citait FR94 comme contenant : « Per-DB write lock (`BEGIN IMMEDIATE` on SQLite, `SELECT ... FOR UPDATE` on PostgreSQL) serializes the chain. »
+
+**Le texte réel de FR94 (ligne 277 du PRD)** est : « Per-DB write lock (`BEGIN IMMEDIATE` on SQLite) serializes the chain. **PostgreSQL backend is deferred to v0.7 (see §7 + §8.4).** »
+
+FR94 défère déjà PG à v0.7 dans son propre texte. Aucune contradiction inter-sections. M1 fabriquait un problème inexistant.
+
+### M2 — supprimé (claim faux)
+
+Le rapport initial citait SC6 comme : « At least 2 reference users adopt v0.5 within 30 d of tag : qlnes + 1 new (target a public Python CLI ≥ 100 ★ on GitHub) » et recommandait de splitter en SC6a/SC6b.
+
+**Le PRD (lignes 99–100) contient déjà SC6a et SC6b distincts** :
+- SC6a : « qlnes is migrated to ulog v0.5 within 30 days of tag... Mechanically checkable. »
+- SC6b : « (best-effort) At least 1 additional public adopter... Best-effort — not a release-blocking gate. »
+
+La séparation testable / best-effort que M2 demandait est déjà implémentée. Le « ≥ 100 ★ on GitHub » que M2 cite n'apparaît pas dans le PRD.
+
+Le commentaire « Mesurabilité » du tableau Score global a été corrigé en conséquence (note 9 → 9.5).
+
+### m3 — référence corrigée
+
+Le rapport initial localisait « ~ 1 280 LOC » à `§2.1.10 lignes 106`. Localisation réelle : titre de **§2.1** ligne **107** (`### 2.1 In scope (12 features, ~ 1 280 LOC of ulog implementation)`). Le finding lui-même reste valide.
+
+### Impact sur le score
+
+| Champ | Avant | Après |
+|---|---|---|
+| MAJORS count | 2 | 0 |
+| Mesurabilité | 9/10 | 9.5/10 |
+| Moyenne | 9.0/10 | 9.1/10 |
+| Verdict | PASS | PASS (inchangé) |
+| Implementation-readiness | « bloqué par M1 » | aucun blocage |

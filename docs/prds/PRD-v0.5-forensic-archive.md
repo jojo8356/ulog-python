@@ -3,6 +3,7 @@ docType: prd
 project_name: ulog-python
 version: 0.5.0
 date: 2026-05-04
+updated: 2026-05-05
 author: jojo8356
 status: draft v1
 parent_prd: PRD-v0.4-commit-author-filter.md
@@ -93,7 +94,7 @@ v0.5 closes all three.
 |---|---|---|
 | **SC1** | `ulog verify` reports an integrity status in **≤ 5 s on a 100 K-record DB** | `pytest-benchmark` median 5 runs, GitHub Actions `ubuntu-latest`, CPython 3.12, SQLite WAL mode |
 | **SC2** | `ulog correlate <filter>` returns top-10 lifted dimensions in **≤ 500 ms** on a 10 K-filter / 1 M-baseline DB | Same harness as SC1, fixture in `tests/bench_correlate.py` |
-| **SC3** | Incidents ledger : in **≥ 30 unit tests**, every `ulog.resolve()` correctly links the resolution to its parent error within the chain | Foreign-key validation + chain-walk verification |
+| **SC3** | Incidents ledger : every FR105–FR108 capability + the 8 edge cases of §2.3 are covered by at least one passing pytest test (≥ 30 tests as a secondary indicator) | Foreign-key validation + chain-walk verification ; coverage matrix `tests/coverage_matrix.md` lists each FR/edge case → test name |
 | **SC4** | **Zero PyPI runtime dep added.** `pyproject.toml`'s `dependencies = []` stays unchanged. ucolor still vendored. | Regression gate in CI (`grep '^dependencies' pyproject.toml \| grep -q '\[\]'`) |
 | **SC5** | **Stdlib `logging.getLogger(__name__).info(...)` continues to work unchanged.** | Existing v0.1 byte-stable test (`tests/test_qlnes_compat.py`) stays green |
 | **SC6a** | **qlnes is migrated to ulog v0.5 within 30 days of tag** (existing v0.1 dependency upgraded). | Tag exists in `jojo8356/qlnes` repo with `pyproject.toml` pinned to ulog ≥ 0.5.0. Mechanically checkable. |
@@ -104,7 +105,7 @@ v0.5 closes all three.
 
 ## 2. Scope (v0.5)
 
-### 2.1 In scope (12 features, ~ 1 280 LOC of ulog implementation)
+### 2.1 In scope (12 features, ~ 1 280 LOC of ulog implementation — estimate, `ulog/` package only, excludes `ulog/web/` + `tests/`)
 
 #### 2.1.1 Storage architecture
 
@@ -119,6 +120,8 @@ Two-tier storage in a single SQLite DB :
 A shared `id` sequence + a unified `chain_pos` column lets the hash chain
 walk both tables in order.
 
+_FRs: FR90, FR91._
+
 #### 2.1.2 Hash chain + `ulog verify`
 
 At each write, ulog computes :
@@ -130,6 +133,8 @@ where `canonical_json` = `json.dumps(record, sort_keys=True, separators=(',',':'
 A per-DB write lock (`BEGIN IMMEDIATE` on SQLite) serializes the chain.
 `ulog verify` walks the chain offline, reports `OK` / `BROKEN at #N`.
 The UI shows an **Integrity ✓** badge on every page.
+
+_FRs: FR94, FR95, FR96, FR97, FR113._
 
 #### 2.1.3 Replay (regression test driver)
 
@@ -144,6 +149,8 @@ generates a pytest fixture that replays the records around an incident
 and asserts the new code path resolves the bug. Auxiliary uses (UI
 scrub, fuzz) postponed to v0.6.
 
+_FRs: FR98, FR99, FR100._
+
 #### 2.1.4 Query — `correlate` + `bisect`
 
 - **`ulog correlate <filter>`** — for every (tag, value) in the records,
@@ -155,6 +162,8 @@ scrub, fuzz) postponed to v0.6.
   provides total ordering) to find the **first** record matching
   `pattern` (regex on msg + tags). Returns matched record + v0.4 commit
   context.
+
+_FRs: FR101, FR102, FR103, FR104._
 
 #### 2.1.5 Incidents ledger
 
@@ -172,12 +181,18 @@ Postmortem KPIs (opened / closed / net debt / mean time to resolve / P95
 / reopens) are computed from the chain itself — no external tracker
 needed.
 
+_FRs: FR105, FR106, FR107, FR108, FR114, FR115._
+
 #### 2.1.6 Multi-track UI minimal
 
 4 fixed tracks in the browse view : `level`, `service`, `author`, `file`.
 Each track is a horizontal SVG strip (one tick per record) over the
 shared time axis. Mute toggle hides records on that track from the main
-list.
+list. A track with zero records over the visible window renders as a
+thin grey strip with `(no data)` label — never a hard error or empty
+SVG.
+
+_FRs: FR112._
 
 #### 2.1.7 Retention floor
 
@@ -187,12 +202,16 @@ ulog.setup(min_retention_days=730)   # SOC 2 / GDPR Art. 30 hook
 `ulog purge --before <date>` refuses operations that would drop records
 younger than `today − N days`. Default N = 0 (off, opt-in).
 
+_FRs: FR92, FR93._
+
 #### 2.1.8 OTel cross-service binding
 
 If contextvar `_OTEL_TRACE_CONTEXT` (or env `traceparent`) is present at
 log time, ulog auto-attaches `trace_id` and `span_id`. Zero new dep —
 ulog only reads stdlib contextvars. CLI : `ulog trace <id>` lists all
 records sharing a trace_id chronologically across services.
+
+_FRs: FR109, FR110._
 
 #### 2.1.9 Issue button
 
@@ -206,11 +225,15 @@ UI button on the record detail panel populates the URL with placeholders
 `{commit_sha}` `{record_hash}` `{labels}` `{body}` (latter = JSON dump
 of record + 5 surrounding records). Tracker-agnostic.
 
+_FRs: FR111._
+
 #### 2.1.10 Documentation
 
 New doc page `/docs/v0.5-forensic-archive.md` (in `ulog/web/docs/`) :
 30-second pitch · the 7 invariants · the 6 worked examples (one per FR
 cluster).
+
+_FRs: FR116, FR117._
 
 ### 2.2 Explicit non-goals (deferred to v0.6+)
 
@@ -449,6 +472,11 @@ $ ulog repair --confirm                            # post-BROKEN recovery
 Spike of 800 errors in 30 min. Without `correlate` : 30–45 min of manual
 filter-clic-back-filter. With `correlate` :
 
+> Output below assumes a UTF-8 TTY. On legacy terminals (Windows
+> `cmd.exe`, no-locale CI), the unicode glyphs (▲ ▼ ⚡ ⊕ ⚠) fall back to
+> ASCII equivalents (`>>` / `<<` / `!` / `+` / `WARN`). The CLI detects
+> the locale via `locale.getpreferredencoding()` ; no flag needed.
+
 ```
 $ ulog correlate 'level=ERROR AND date>-30min' --db ./logs.sqlite
 
@@ -676,7 +704,9 @@ logs by hand.
 - [ ] **UI**
   - [ ] Multi-track minimal (4 fixed tracks, mute) (FR112).
 - [ ] **Tests**
-  - [ ] ≥ 30 unit tests for `resolve` + chain referential integrity
+  - [ ] FR105–FR108 + the 8 edge cases of §2.3 are each covered by at
+        least one passing pytest test ; coverage matrix written to
+        `tests/coverage_matrix.md` (≥ 30 tests as secondary indicator)
         (SC3).
   - [ ] `tests/test_chain_concurrency.py` 8 writers × 10 K records
         (NFR-REL-50).

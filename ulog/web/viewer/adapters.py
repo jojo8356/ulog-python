@@ -54,6 +54,12 @@ class Filters:
     # (`logger='ulog.test'`) AND propagated app records (any logger that
     # inherited `test_id` via Story 1.4's bound-context mechanism).
     test_id: str = ""
+    # Story 2.6/2.7 (FR76/FR77/FR78) — author attribution multi-select.
+    # `authors` is a list of email addresses; OR semantics. The sentinel
+    # "<unknown>" represents records whose AuthorIndex.author_for(...)
+    # returned None (untracked file / line out of range / no idx).
+    authors: list[str] = field(default_factory=list)
+    show_unknown: bool = True  # FR78 — default ON
 
     def is_empty(self) -> bool:
         return (
@@ -61,7 +67,7 @@ class Filters:
             and not self.search and not self.bound
             and not self.ts_from and not self.ts_to
             and not self.failed_only and not self.slowest_only
-            and not self.test_id
+            and not self.test_id and not self.authors
         )
 
 

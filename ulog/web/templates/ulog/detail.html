@@ -106,6 +106,38 @@
     </div>
     {% endif %}
 
+    {# Story 2.8 — Authored by panel (FR80). Hidden when no resolved author. #}
+    {% if author %}
+    <div data-authored-by-panel="true">
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5"
+          title="git blame --porcelain attribution for this record's source file:line">
+        {% lucide "user" size=12 %}
+        <span>Authored by</span>
+      </h2>
+      <div class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm space-y-2">
+        <div class="font-mono text-xs flex items-center gap-2 flex-wrap">
+          <span>{{ author.name }}</span>
+          <span class="text-slate-500">&lt;{{ author.email|slice:":40" }}{% if author.email|length > 40 %}…{% endif %}&gt;</span>
+          <span class="text-slate-500">·</span>
+          <span class="font-mono text-slate-600 dark:text-slate-300" title="{{ author.sha }}">{{ author_short_sha }}</span>
+        </div>
+        <div class="font-mono text-xs text-slate-500 dark:text-slate-400">
+          committed {{ author_relative_date }}
+        </div>
+        <div class="flex items-center gap-3 flex-wrap pt-1 text-xs">
+          <a href="{% url 'ulog-list' %}?author={{ author.email|urlencode }}"
+             class="text-blue-600 dark:text-blue-400 hover:underline">
+            view all records from this author →
+          </a>
+          <a href="/diff/{{ author.sha }}/"
+             class="text-blue-600 dark:text-blue-400 hover:underline">
+            view diff: {{ author_short_sha }} →
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     {% if record.exc %}
     <div>
       <h2 class="text-xs uppercase font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">

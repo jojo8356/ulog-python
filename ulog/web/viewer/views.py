@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -54,15 +55,78 @@ def _parse_filters(request) -> Filters:
         slowest_only=qs.get("slowest_only", "").strip().lower() in ("1", "true", "on"),
         # Story 1.7 (FR65) — click-to-filter test_id from the TESTS sidebar.
         test_id=qs.get("test_id", "").strip(),
+        # Story 2.6/2.7 (FR76/FR77/FR78) — Authors sidebar multi-select.
+        # `?author=foo@x&author=bar@y&show_unknown=0` — OR semantics.
+        authors=[a for a in qs.getlist("author") if a],
+        show_unknown=qs.get("show_unknown", "1").strip().lower() not in ("0", "false", "off"),
     )
 
 
 def list_view(request):
     """Main filter + list view (FR35-FR36)."""
+    from dataclasses import replace
+
+    from .adapters import QueryResult
+    from .blame import compute_authors_summary, get_global_index
+
     adapter = _adapter_or_404()
     filters = _parse_filters(request)
     page = max(1, int(request.GET.get("page", "1") or "1"))
-    result = adapter.query(filters, page=page, page_size=100)
+    page_size = 100
+
+    idx = get_global_index()
+
+    # Story 2.7 — when an author filter is active (selection or
+    # show_unknown=False), we post-filter records in Python because the
+    # adapter doesn't know about the index. Cost: O(N) for in-memory
+    # adapters; bounded for SQLite (NFR-PERF-31 ≤500ms is the budget).
+    author_filter_active = (
+        bool(filters.authors) or not filters.show_unknown
+    ) and idx is not None
+
+    if author_filter_active:
+        full = adapter.query(filters, page=1, page_size=10_000_000)
+        selected = set(filters.authors)
+        unknown_ticked = "<unknown>" in selected
+        kept = []
+        for r in full.records:
+            a = idx.author_for(r.file, r.line)
+            if selected:
+                if a is not None and a.email in selected:
+                    kept.append(r)
+                elif a is None and unknown_ticked:
+                    kept.append(r)
+            else:
+                # No specific authors selected — show_unknown is the only filter.
+                if a is None and not filters.show_unknown:
+                    continue
+                kept.append(r)
+        total = len(kept)
+        start = (page - 1) * page_size
+        result = QueryResult(
+            records=kept[start:start + page_size],
+            total=total,
+            page=page,
+            page_size=page_size,
+            sector_counts=full.sector_counts,
+            file_counts=full.file_counts,
+            level_counts=full.level_counts,
+            bound_keys=full.bound_keys,
+            test_summary=full.test_summary,
+        )
+    else:
+        result = adapter.query(filters, page=page, page_size=page_size)
+
+    # Story 2.6 — Authors sidebar with ghost counts.
+    # Ghost-count rule (v0.2.1, FR79): the count next to each author is
+    # what would be added if you toggled THAT author. Compute against
+    # filters MINUS the author axis itself.
+    authors_summary = None
+    if idx is not None:
+        # ghost_filters is conceptually filters minus the author axis;
+        # compute_authors_summary walks the adapter ignoring author state.
+        ghost_filters = replace(filters, authors=[])  # noqa: F841
+        authors_summary = compute_authors_summary(adapter, idx)
 
     # Build a flat sorted sector list for the template
     sectors = sorted(result.sector_counts.items(), key=lambda kv: kv[0])
@@ -99,6 +163,9 @@ def list_view(request):
         # Story 1.6 — TESTS sidebar: list of TestSummaryRow, empty if no
         # `ulog.test` records exist (template renders nothing in that case).
         "test_summary": result.test_summary,
+        # Story 2.6 (FR76/FR79) — author sidebar data; None when indexer
+        # is disabled or no .git/ — template hides the block in that case.
+        "authors_summary": authors_summary,
         # Story 1.7 — query-string fragment carrying every CURRENT filter
         # except test_id and page; consumed by the sidebar's click-to-filter
         # anchor so non-test_id filters survive the click.
@@ -127,6 +194,13 @@ def detail_view(request, record_id: int):
         test_summary_row = adapter.get_test_summary_row(test_id)
         test_record_count = adapter.count_records_for_test_id(test_id)
 
+    # Story 2.8 (FR80) — author panel below Context. None when no idx
+    # is active or the (file, line) doesn't resolve.
+    from .blame import get_global_index
+    idx = get_global_index()
+    author = idx.author_for(record.file, record.line) if idx else None
+    author_relative_date = _relative_date(author.ts) if author else ""
+
     return render(
         request,
         "ulog/detail.html",
@@ -136,8 +210,122 @@ def detail_view(request, record_id: int):
             "test_id": test_id,
             "test_summary_row": test_summary_row,
             "test_record_count": test_record_count,
+            # Story 2.8 — Authored by panel data; None when unavailable.
+            "author": author,
+            "author_short_sha": author.sha[:7] if author else "",
+            "author_relative_date": author_relative_date,
         },
     )
+
+
+_SHA_RE = __import__("re").compile(r"^[0-9a-f]{4,40}$", __import__("re").IGNORECASE)
+
+
+def _validate_sha(sha: str) -> bool:
+    """NFR-SEC-30 — first-line defense against shell injection via the
+    URL path. The Django route already restricts to <str:sha>, but we
+    enforce hex-only and length 4-40 so no shell metacharacter can ever
+    reach a subprocess argv list."""
+    return bool(_SHA_RE.match(sha))
+
+
+def diff_view(request, sha: str):
+    """Story 2.9 (FR81 / NFR-SEC-30) — render `git show <sha>` safely."""
+    import subprocess
+
+    from django.http import HttpResponse, HttpResponseBadRequest
+
+    if not _validate_sha(sha):
+        return HttpResponseBadRequest(
+            f"invalid sha {sha!r}: must match [0-9a-f]{{4,40}}",
+        )
+
+    repo = os.environ.get("ULOG_AUTHOR_REPO")
+    if not repo:
+        return HttpResponse(
+            "no --repo configured; cannot resolve diffs. "
+            "Restart ulog-web with --repo PATH or auto-detect from a git tree.",
+            status=503,
+            content_type="text/plain",
+        )
+
+    # Step 1: rev-parse --verify confirms the commit is reachable.
+    try:
+        rp = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{sha}^{{commit}}"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        return HttpResponse(
+            f"git invocation failed: {e}", status=503, content_type="text/plain",
+        )
+    if rp.returncode != 0:
+        return HttpResponse(
+            f"sha {sha} not reachable in {repo}",
+            status=404,
+            content_type="text/plain",
+        )
+
+    # Step 2: git show — sha is now validated AND reachable.
+    show = subprocess.run(
+        ["git", "show", "--patch", "--no-color", sha],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+    )
+    if show.returncode != 0:
+        return HttpResponse(
+            f"git show failed: {show.stderr}",
+            status=500,
+            content_type="text/plain",
+        )
+
+    return render(
+        request,
+        "ulog/diff.html",
+        {
+            "sha": sha,
+            "short_sha": sha[:7],
+            "diff_text": show.stdout,
+        },
+    )
+
+
+def _relative_date(ts: int) -> str:
+    """Format a unix timestamp as a relative-date string (e.g. '6 days ago').
+
+    Story 2.8 (FR80). Stdlib only — no humanize/arrow dep (NFR-DEP-50).
+    """
+    import time as _time
+    delta = int(_time.time()) - int(ts)
+    if delta < 0:
+        return "in the future"
+    if delta < 60:
+        return "just now"
+    if delta < 3600:
+        m = delta // 60
+        return f"{m} minute{'s' if m != 1 else ''} ago"
+    if delta < 86400:
+        h = delta // 3600
+        return f"{h} hour{'s' if h != 1 else ''} ago"
+    if delta < 86400 * 30:
+        d = delta // 86400
+        return f"{d} day{'s' if d != 1 else ''} ago"
+    if delta < 86400 * 365:
+        mo = delta // (86400 * 30)
+        return f"{mo} month{'s' if mo != 1 else ''} ago"
+    y = delta // (86400 * 365)
+    return f"{y} year{'s' if y != 1 else ''} ago"
 
 
 def api_records(request):
@@ -179,6 +367,7 @@ _DOC_PAGES: dict[str, str] = {
     "troubleshooting": "Troubleshooting",
     "sectors-and-files": "Sectors and files explained",
     "test-integration": "Test integration",  # Story 1.11 — v0.3
+    "author-filter": "Author filter",  # Story 2.11 — v0.4
 }
 
 

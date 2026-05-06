@@ -77,19 +77,19 @@ development_status:
   # ========================================================================
   # Epic 2: v0.4 — Author attribution (11 stories)
   # ========================================================================
-  epic-2: in-progress
+  epic-2: done
   2-1-authorindex-api-git-blame-porcelain-parsing: done
   2-2-cli-flags-repo-no-author-index-rebuild-author-index: done
   2-3-lazy-index-build-with-stderr-progress: done
   2-4-authors-cache-table-sidecar-sqlite-for-jsonl-csv: done
-  2-5-unknown-author-handling: backlog
-  2-6-authors-sidebar-section-with-ghost-counts: backlog
-  2-7-multi-select-or-url-query-string-show-unknown: backlog
-  2-8-detail-view-authored-by-panel: backlog
-  2-9-diff-sha-view-with-sha-validation: backlog
-  2-10-prd-v0-4-edge-cases-as-tests: backlog
-  2-11-doc-page-docs-author-filter-md: backlog
-  epic-2-retrospective: optional
+  2-5-unknown-author-handling: done
+  2-6-authors-sidebar-section-with-ghost-counts: done
+  2-7-multi-select-or-url-query-string-show-unknown: done
+  2-8-detail-view-authored-by-panel: done
+  2-9-diff-sha-view-with-sha-validation: done
+  2-10-prd-v0-4-edge-cases-as-tests: done
+  2-11-doc-page-docs-author-filter-md: done
+  epic-2-retrospective: done
 
   # ========================================================================
   # Epic 3: v0.5 — Storage core & chain integrity (12 stories)

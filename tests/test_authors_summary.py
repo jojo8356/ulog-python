@@ -115,14 +115,14 @@ def test_summary_unknown_always_last(tmp_path):
     a1 = Author(name="Alice", email="alice@x", sha="a" * 40, ts=1)
     log = _jsonl(tmp_path, [
         {"ts": "x", "level": "INFO", "logger": "x", "msg": "k", "file": "foo.py", "line": 1},
-        # 5 unknown records
+        # 5 unknown records (line numbers start at 1 — Python logging convention)
         *[
             {"ts": "x", "level": "INFO", "logger": "x", "msg": f"u{i}",
              "file": "ext.py", "line": i}
-            for i in range(5)
+            for i in range(1, 6)
         ],
     ])
-    idx = _make_idx(tmp_path, {("foo.py", 1): a1, **{("ext.py", i): None for i in range(5)}})
+    idx = _make_idx(tmp_path, {("foo.py", 1): a1, **{("ext.py", i): None for i in range(1, 6)}})
     summary = compute_authors_summary(JSONLAdapter(log), idx=idx)
     # Last entry must be (None, 5) regardless of higher count.
     assert summary.entries[-1] == (None, 5)

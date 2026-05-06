@@ -53,6 +53,12 @@ class AuthorIndex:
         cached = self._cache_lookup(file)
         if cached is not None and line in cached.blames:
             return cached.blames[line]
+        # Negative-cache short-circuit: file was missing at build time
+        # (mtime == 0.0). Don't re-attempt — record the line as None
+        # and return without spawning a subprocess.
+        if cached is not None and cached.mtime == 0.0:
+            cached.blames[line] = None
+            return None
         # Cache miss for this line — re-blame the file (cheap because
         # one fork covers all lines via -L). For now blame the single
         # requested line; build_for_pairs() is the batched path.
@@ -87,13 +93,27 @@ class AuthorIndex:
             return None
 
     def _cache_lookup(self, file: str) -> _FileCache | None:
-        """Return cache entry if mtime unchanged; else drop and return None."""
+        """Return cache entry if mtime unchanged; else drop and return None.
+
+        Special case (negative cache): when the cached entry was built
+        for a file that NEVER existed in `repo_root` (mtime stored as
+        0.0 by build_for_pairs / author_for), don't re-attempt the
+        blame on every lookup. This avoids an O(N) subprocess storm
+        for records referencing files outside the repo (e.g.
+        `pytest_plugin.py` records when --repo points elsewhere).
+        """
         cached = self._cache.get(file)
         if cached is None:
             return None
         current = self._mtime(file)
         if current is None:
-            # File vanished — drop the cache entry.
+            # File doesn't exist on disk under repo_root.
+            if cached.mtime == 0.0:
+                # Negative cache — file was already missing at build
+                # time. Keep the entry; all lookups return None without
+                # re-blaming.
+                return cached
+            # File USED to exist, now vanished — invalidate.
             self._cache.pop(file, None)
             return None
         if current != cached.mtime:
@@ -272,38 +292,65 @@ class AuthorsSummary:
         return [(a, c) for a, c in self.entries if a is not None]
 
 
+_AUTHORS_SUMMARY_CACHE: tuple[tuple[float, int], AuthorsSummary] | None = None
+
+
+def _adapter_db_mtime(adapter: "Adapter") -> float:
+    """Best-effort source-file mtime for cache invalidation. 0.0 on failure."""
+    from .adapters import CSVAdapter, JSONLAdapter, SQLiteAdapter
+
+    try:
+        if isinstance(adapter, SQLiteAdapter):
+            url = str(adapter._engine.url)
+            if url.startswith("sqlite:///"):
+                return os.stat(url[len("sqlite:///"):]).st_mtime
+        if isinstance(adapter, (JSONLAdapter, CSVAdapter)):
+            src = getattr(adapter, "_source_path", None)
+            if src is not None:
+                return os.stat(src).st_mtime
+    except OSError:
+        pass
+    return 0.0
+
+
+def invalidate_authors_summary_cache() -> None:
+    """Drop the memoized AuthorsSummary so the next call recomputes.
+    Called by `set_global_index` and explicitly by tests."""
+    global _AUTHORS_SUMMARY_CACHE
+    _AUTHORS_SUMMARY_CACHE = None
+
+
 def compute_authors_summary(
     adapter: "Adapter",
     idx: AuthorIndex | None,
 ) -> AuthorsSummary:
-    """Aggregate the loaded records into per-author counts (Story 2.5).
+    """Aggregate records into per-author counts (Story 2.5 + PRD-v0.4.1 perf).
 
-    When `idx is None` (indexer disabled or no .git/), every record
-    falls into the `<unknown>` bucket. Otherwise each record's (file,
-    line) is resolved via `idx.author_for(...)`; None resolutions go
-    to `<unknown>` as well.
+    PRD-v0.4.1 optimizations:
+    1. Memoized at module level keyed by (db_mtime, id(idx)).
+    2. Iterates `adapter.file_line_record_counts()` (≤ unique pairs)
+       instead of all records.
 
-    Returns an AuthorsSummary with entries sorted by count descending,
-    `<unknown>` last regardless of count.
+    When `idx is None`, every record falls into `<unknown>`. Otherwise
+    each unique (file, line) is resolved via `idx.author_for(...)` once
+    and the count for that pair flows to that bucket.
     """
-    from .adapters import Filters
+    global _AUTHORS_SUMMARY_CACHE
+
+    cache_key = (_adapter_db_mtime(adapter), id(idx) if idx is not None else 0)
+    if _AUTHORS_SUMMARY_CACHE is not None and _AUTHORS_SUMMARY_CACHE[0] == cache_key:
+        return _AUTHORS_SUMMARY_CACHE[1]
 
     counts: dict[Author | None, int] = defaultdict(int)
-    page = 1
-    page_size = 1000
-    while True:
-        result = adapter.query(Filters(), page=page, page_size=page_size)
-        if not result.records:
-            break
-        for r in result.records:
-            if idx is None:
-                counts[None] += 1
-            else:
-                a = idx.author_for(r.file, r.line)
-                counts[a] += 1
-        if len(result.records) < page_size:
-            break
-        page += 1
+    if idx is None:
+        # Sum all record counts under <unknown> in one pass.
+        for _f, _l, n in adapter.file_line_record_counts():
+            counts[None] += n
+    else:
+        # One author_for per unique pair, multiplied by its record count.
+        for f, l, n in adapter.file_line_record_counts():
+            a = idx.author_for(f, l)
+            counts[a] += n
 
     known_sorted = sorted(
         ((a, c) for a, c in counts.items() if a is not None),
@@ -312,7 +359,9 @@ def compute_authors_summary(
     entries: list[tuple[Author | None, int]] = list(known_sorted)
     if None in counts:
         entries.append((None, counts[None]))
-    return AuthorsSummary(entries=tuple(entries))
+    summary = AuthorsSummary(entries=tuple(entries))
+    _AUTHORS_SUMMARY_CACHE = (cache_key, summary)
+    return summary
 
 
 # ---- Module-level singleton (Story 2.3) ----------------------------------
@@ -329,9 +378,11 @@ def get_global_index() -> AuthorIndex | None:
 
 def set_global_index(idx: AuthorIndex | None) -> None:
     """Set the module-level singleton. Used by `build_index_at_startup`
-    and by tests."""
+    and by tests. Invalidates the cached AuthorsSummary so the next
+    request recomputes against the new index."""
     global _AUTHOR_INDEX
     _AUTHOR_INDEX = idx
+    invalidate_authors_summary_cache()
 
 
 def build_index_at_startup(

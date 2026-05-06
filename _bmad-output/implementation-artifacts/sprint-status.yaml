@@ -89,6 +89,7 @@ development_status:
   2-9-diff-sha-view-with-sha-validation: done
   2-10-prd-v0-4-edge-cases-as-tests: done
   2-11-doc-page-docs-author-filter-md: done
+  2-13-perf-hotpath-authors-summary-memoize: done
   epic-2-retrospective: done
 
   # ========================================================================

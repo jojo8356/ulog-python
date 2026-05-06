@@ -151,6 +151,16 @@ class Adapter:
         """
         raise NotImplementedError
 
+    def file_line_record_counts(self) -> Iterable[tuple[str, int, int]]:
+        """Yield (file, line, count) for each unique pair.
+
+        PRD-v0.4.1 — used by AuthorsSummary aggregation. Walking unique
+        pairs (and multiplying by per-pair counts) is asymptotically
+        cheaper than walking every record. SQL adapters get GROUP BY
+        for free; in-memory adapters use Counter.
+        """
+        raise NotImplementedError
+
 
 # ---- SQLite (SQL via SQLAlchemy core) ------------------------------------
 
@@ -489,6 +499,16 @@ class SQLiteAdapter(Adapter):
                 if f and isinstance(l, int) and l > 0:
                     yield (str(f), int(l))
 
+    def file_line_record_counts(self) -> Iterable[tuple[str, int, int]]:
+        """SQL GROUP BY (file, line) → (file, line, count). PRD-v0.4.1 perf."""
+        from sqlalchemy import func, select
+        t = self._table
+        with self._engine.connect() as conn:
+            stmt = select(t.c.file, t.c.line, func.count().label("n")).group_by(t.c.file, t.c.line)
+            for f, l, n in conn.execute(stmt):
+                if f and isinstance(l, int) and l > 0:
+                    yield (str(f), int(l), int(n))
+
 
 # ---- JSONL ---------------------------------------------------------------
 
@@ -536,6 +556,16 @@ class JSONLAdapter(Adapter):
                 if pair not in seen:
                     seen.add(pair)
                     yield pair
+
+    def file_line_record_counts(self) -> Iterable[tuple[str, int, int]]:
+        """In-memory Counter over records (PRD-v0.4.1 perf)."""
+        from collections import Counter as _C
+        c: _C[tuple[str, int]] = _C()
+        for r in self._records:
+            if r.file and r.line > 0:
+                c[(r.file, r.line)] += 1
+        for (f, l), n in c.items():
+            yield (f, l, n)
 
     def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
         """JSONL adapter stub — v0.3 doesn't implement test-summary aggregation
@@ -598,6 +628,16 @@ class CSVAdapter(Adapter):
                 if pair not in seen:
                     seen.add(pair)
                     yield pair
+
+    def file_line_record_counts(self) -> Iterable[tuple[str, int, int]]:
+        """In-memory Counter over records (PRD-v0.4.1 perf)."""
+        from collections import Counter as _C
+        c: _C[tuple[str, int]] = _C()
+        for r in self._records:
+            if r.file and r.line > 0:
+                c[(r.file, r.line)] += 1
+        for (f, l), n in c.items():
+            yield (f, l, n)
 
     def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
         """CSV adapter stub — v0.3 doesn't implement test-summary aggregation

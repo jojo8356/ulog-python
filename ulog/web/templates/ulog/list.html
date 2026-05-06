@@ -61,17 +61,21 @@
               <span class="font-mono text-xs flex-1">Slowest top 10</span>
             </label>
           </div>
-          {# Test list grouped by file. Tests are pre-sorted by adapter (AC7) —
-             `regroup` requires contiguity-by-grouper which `(file, name)` sort
-             already guarantees. #}
+          {% comment %}
+            Test list grouped by file. Tests are pre-sorted by adapter (AC7) —
+            `regroup` requires contiguity-by-grouper which `(file, name)` sort
+            already guarantees.
+          {% endcomment %}
           <div class="space-y-1 max-h-60 overflow-y-auto">
             {% regroup test_summary by file as tests_by_file %}
             {% for file_group in tests_by_file %}
-              {# UX: open the first 5 file groups by default, collapse the rest.
-                 On a 50-file project this avoids dumping hundreds of rows.
-                 Note: the conditional includes the trailing space so the
-                 closed-state markup is `<details class=...>` (no double-space)
-                 — review patch P2. #}
+              {% comment %}
+                UX: open the first 5 file groups by default, collapse the rest.
+                On a 50-file project this avoids dumping hundreds of rows.
+                Note: the conditional includes the trailing space so the
+                closed-state markup is `<details class=...>` (no double-space)
+                — review patch P2.
+              {% endcomment %}
               <details {% if forloop.counter <= 5 %}open {% endif %}class="text-xs">
                 <summary class="font-mono text-slate-600 dark:text-slate-400 cursor-pointer truncate"
                          title="{{ file_group.grouper }}">

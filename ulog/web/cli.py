@@ -45,6 +45,53 @@ def _open_browser_when_ready(host: str, port: int, delay_s: float = 1.0) -> None
     t.start()
 
 
+def _walk_for_git_root(start: Path) -> Path | None:
+    """Walk parents (including `start` itself) until a directory with
+    a `.git/` subdirectory is found. Returns None if filesystem root
+    is reached without finding one."""
+    for d in [start, *start.parents]:
+        if (d / ".git").is_dir():
+            return d
+    return None
+
+
+def _resolve_repo_flag(args: argparse.Namespace, cwd: Path) -> tuple[Path | None, str | None]:
+    """Resolve the effective --repo value.
+
+    Returns (repo_root, warning_message). repo_root is None when
+    indexing should be skipped (no .git/ found and no explicit flag).
+    warning_message is the exact stderr line to print, or None.
+    """
+    if args.no_author_index:
+        return None, None  # explicit skip — no warning
+    if args.repo is not None:
+        explicit = Path(args.repo).resolve()
+        if not (explicit / ".git").is_dir():
+            return explicit, (
+                f"ulog-web: --repo {args.repo} has no .git/ subdirectory; "
+                "records will show <unknown>"
+            )
+        return explicit, None
+    auto = _walk_for_git_root(cwd)
+    if auto is None:
+        return None, (
+            "ulog-web: no git repo detected (cwd has no .git/ ancestor); "
+            "records will show <unknown> author. Use --repo PATH or "
+            "--no-author-index to silence."
+        )
+    return auto, None
+
+
+def _set_env_for_django(repo: Path | None, disabled: bool, rebuild: bool) -> None:
+    """Populate env vars so the Django process can pick up the flags."""
+    if disabled:
+        os.environ["ULOG_AUTHOR_INDEX_DISABLED"] = "1"
+    elif repo is not None:
+        os.environ["ULOG_AUTHOR_REPO"] = str(repo)
+    if rebuild:
+        os.environ["ULOG_AUTHOR_INDEX_REBUILD"] = "1"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="ulog-web",
@@ -67,6 +114,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-open", action="store_true",
         help="Don't auto-open a browser tab.",
+    )
+    parser.add_argument(
+        "--repo", default=None,
+        help="Git repo root for author attribution. Default: walk parents "
+             "of cwd until .git/ is found.",
+    )
+    index_group = parser.add_mutually_exclusive_group()
+    index_group.add_argument(
+        "--no-author-index", action="store_true",
+        help="Skip the author indexer; hides the Authors sidebar.",
+    )
+    index_group.add_argument(
+        "--rebuild-author-index", action="store_true",
+        help="Force rebuild of the author cache (drops the existing one).",
     )
     args = parser.parse_args(argv)
 
@@ -92,6 +153,26 @@ def main(argv: list[str] | None = None) -> int:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ulog.web.settings")
     os.environ["ULOG_LOGS_PATH"] = str(args.path.resolve())
     os.environ["ULOG_LOGS_KIND"] = kind
+
+    # Resolve author-index flags + emit any warning.
+    repo, warning = _resolve_repo_flag(args, Path.cwd())
+    if warning:
+        print(warning, file=sys.stderr)
+    _set_env_for_django(repo, args.no_author_index, args.rebuild_author_index)
+
+    # Build the author index at startup (Story 2.3 / FR71). Failures
+    # don't abort the CLI — records just show <unknown> in the UI.
+    if repo is not None and not args.no_author_index:
+        try:
+            from .viewer.adapters import get_adapter
+            from .viewer.blame import build_index_at_startup
+
+            build_index_at_startup(get_adapter(args.path), repo)
+        except Exception as e:
+            print(
+                f"ulog-web: author index build failed: {e}; records will show <unknown>",
+                file=sys.stderr,
+            )
 
     import django
     django.setup()

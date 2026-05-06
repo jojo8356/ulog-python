@@ -136,6 +136,15 @@ class Adapter:
     def get(self, record_id: int) -> Record | None:
         raise NotImplementedError
 
+    def unique_file_line_pairs(self) -> Iterable[tuple[str, int]]:
+        """Yield distinct (file, line) pairs across all records.
+
+        Story 2.3 (FR71) — used by the author indexer at startup. Each
+        adapter gets to use the most efficient extraction path
+        (SQL DISTINCT, in-memory dedup, etc.).
+        """
+        raise NotImplementedError
+
 
 # ---- SQLite (SQL via SQLAlchemy core) ------------------------------------
 
@@ -463,6 +472,17 @@ class SQLiteAdapter(Adapter):
                     return row
         return None
 
+    def unique_file_line_pairs(self) -> Iterable[tuple[str, int]]:
+        """Distinct (file, line) pairs via a single `SELECT DISTINCT` (Story 2.3)."""
+        from sqlalchemy import select
+        t = self._table
+        with self._engine.connect() as conn:
+            stmt = select(t.c.file, t.c.line).distinct()
+            for row in conn.execute(stmt):
+                f, l = row
+                if f and isinstance(l, int) and l > 0:
+                    yield (str(f), int(l))
+
 
 # ---- JSONL ---------------------------------------------------------------
 
@@ -471,6 +491,7 @@ class JSONLAdapter(Adapter):
     """JSON-Line file adapter — loads the whole file into memory, filters in-process."""
 
     def __init__(self, path: Path) -> None:
+        self._source_path = path  # Story 2.4: cache_path_for needs this
         self._records: list[Record] = []
         for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             line = line.strip()
@@ -500,6 +521,16 @@ class JSONLAdapter(Adapter):
             1 for r in self._records if r.context.get("test_id") == test_id
         )
 
+    def unique_file_line_pairs(self) -> Iterable[tuple[str, int]]:
+        """In-memory dedup of (file, line) pairs (Story 2.3)."""
+        seen: set[tuple[str, int]] = set()
+        for r in self._records:
+            if r.file and r.line > 0:
+                pair = (r.file, r.line)
+                if pair not in seen:
+                    seen.add(pair)
+                    yield pair
+
     def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
         """JSONL adapter stub — v0.3 doesn't implement test-summary aggregation
         for non-SQLite formats (Story 1.6 deferred). Returns None so the
@@ -512,6 +543,7 @@ class JSONLAdapter(Adapter):
 
 class CSVAdapter(Adapter):
     def __init__(self, path: Path) -> None:
+        self._source_path = path  # Story 2.4: cache_path_for needs this
         self._records: list[Record] = []
         with path.open(encoding="utf-8", newline="") as fh:
             reader = csv.DictReader(fh)
@@ -550,6 +582,16 @@ class CSVAdapter(Adapter):
         return sum(
             1 for r in self._records if r.context.get("test_id") == test_id
         )
+
+    def unique_file_line_pairs(self) -> Iterable[tuple[str, int]]:
+        """In-memory dedup (Story 2.3) — same shape as JSONL."""
+        seen: set[tuple[str, int]] = set()
+        for r in self._records:
+            if r.file and r.line > 0:
+                pair = (r.file, r.line)
+                if pair not in seen:
+                    seen.add(pair)
+                    yield pair
 
     def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
         """CSV adapter stub — v0.3 doesn't implement test-summary aggregation

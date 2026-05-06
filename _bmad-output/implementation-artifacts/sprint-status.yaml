@@ -77,11 +77,11 @@ development_status:
   # ========================================================================
   # Epic 2: v0.4 — Author attribution (11 stories)
   # ========================================================================
-  epic-2: backlog
-  2-1-authorindex-api-git-blame-porcelain-parsing: backlog
-  2-2-cli-flags-repo-no-author-index-rebuild-author-index: backlog
-  2-3-lazy-index-build-with-stderr-progress: backlog
-  2-4-authors-cache-table-sidecar-sqlite-for-jsonl-csv: backlog
+  epic-2: in-progress
+  2-1-authorindex-api-git-blame-porcelain-parsing: done
+  2-2-cli-flags-repo-no-author-index-rebuild-author-index: done
+  2-3-lazy-index-build-with-stderr-progress: done
+  2-4-authors-cache-table-sidecar-sqlite-for-jsonl-csv: done
   2-5-unknown-author-handling: backlog
   2-6-authors-sidebar-section-with-ghost-counts: backlog
   2-7-multi-select-or-url-query-string-show-unknown: backlog

@@ -64,7 +64,7 @@ development_status:
   1-9-programmatic-test-event-api-for-non-pytest-runners: done
   1-10-xdist-windows-nfs-edge-cases: done
   1-11-doc-page-docs-test-integration-md: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   # ========================================================================
   # Epic 2: v0.4 — Author attribution (11 stories)

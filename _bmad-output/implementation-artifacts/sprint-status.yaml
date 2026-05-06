@@ -52,7 +52,7 @@ development_status:
   # ========================================================================
   # Epic 1: v0.3 — Test integration (11 stories)
   # ========================================================================
-  epic-1: in-progress
+  epic-1: done
   1-1-pytest-plugin-entry-point-registration: done
   1-2-test-event-recording-start-outcome-finish: done
   1-3-test-id-stability-for-parametrized-tests: done
@@ -63,7 +63,7 @@ development_status:
   1-8-detail-view-test-context-panel: done
   1-9-programmatic-test-event-api-for-non-pytest-runners: done
   1-10-xdist-windows-nfs-edge-cases: done
-  1-11-doc-page-docs-test-integration-md: ready-for-dev
+  1-11-doc-page-docs-test-integration-md: done
   epic-1-retrospective: optional
 
   # ========================================================================

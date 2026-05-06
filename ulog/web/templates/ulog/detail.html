@@ -44,6 +44,68 @@
     </div>
     {% endif %}
 
+    {# Story 1.8 — Test context panel (FR66). Hidden when record has no test_id. #}
+    {% if test_id %}
+    <div>
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5"
+          title="This record was emitted during a test run; click below to filter the records list to the full test.">
+        {% lucide "flask-conical" size=12 %}
+        <span>Test context</span>
+      </h2>
+      <div class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm space-y-2">
+        {# Test name + outcome badge — when test_summary_row is None, fall back gracefully. #}
+        <div class="flex items-center gap-2 flex-wrap">
+          {% if test_summary_row %}
+            {% if test_summary_row.outcome == "passed" %}
+              <span class="text-green-600 dark:text-green-400" title="passed">✓</span>
+            {% elif test_summary_row.outcome == "failed" %}
+              <span class="text-red-600 dark:text-red-400" title="failed">✗</span>
+            {% elif test_summary_row.outcome == "errored" %}
+              <span class="text-red-600 dark:text-red-400" title="errored">🔥</span>
+            {% elif test_summary_row.outcome == "skipped" %}
+              <span class="text-amber-500 dark:text-amber-400" title="skipped">⊘</span>
+            {% else %}
+              <span class="text-slate-400" title="{{ test_summary_row.outcome }}">?</span>
+            {% endif %}
+            <span class="font-mono text-xs">{{ test_summary_row.outcome }}</span>
+            <span class="font-mono text-xs text-slate-500 dark:text-slate-400">·</span>
+            <span class="font-mono text-xs tabular-nums">
+              {% include "ulog/_test_duration.html" with seconds=test_summary_row.duration_s %}
+            </span>
+          {% else %}
+            <span class="text-slate-400" title="no outcome record found for this test_id">?</span>
+            <span class="font-mono text-xs text-slate-500 italic">outcome unknown</span>
+          {% endif %}
+        </div>
+
+        {# Test ID (full path::name) #}
+        <div class="font-mono text-xs break-all" title="{{ test_id }}">
+          {{ test_id }}
+        </div>
+
+        {# Phase (only when this record IS the outcome record — has phase in context) #}
+        {% if record.context.phase %}
+          <div class="font-mono text-xs text-slate-500 dark:text-slate-400">
+            phase: {{ record.context.phase }}
+          </div>
+        {% endif %}
+
+        {# Total records count + jump links #}
+        <div class="flex items-center gap-3 flex-wrap pt-1 text-xs">
+          <span class="text-slate-500 dark:text-slate-400">{{ test_record_count }} records</span>
+          <a href="{% url 'ulog-list' %}?test_id={{ test_id|urlencode }}"
+             class="text-blue-600 dark:text-blue-400 hover:underline">
+            view all records for this test →
+          </a>
+          <a href="{% url 'ulog-list' %}?test_id={{ test_id|urlencode }}&level=ERROR&level=WARNING"
+             class="text-red-600 dark:text-red-400 hover:underline">
+            errors+warnings only →
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     {% if record.exc %}
     <div>
       <h2 class="text-xs uppercase font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">

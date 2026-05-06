@@ -48,6 +48,12 @@ def _parse_filters(request) -> Filters:
         bound=bound,
         ts_from=qs.get("from", "").strip(),
         ts_to=qs.get("to", "").strip(),
+        # Story 1.6 (FR63 / FR64) — checkbox quick filters from the Tests sidebar.
+        # Accept "1" / "true" / "on" (HTML form-checkbox conventions) as truthy.
+        failed_only=qs.get("failed_only", "").strip().lower() in ("1", "true", "on"),
+        slowest_only=qs.get("slowest_only", "").strip().lower() in ("1", "true", "on"),
+        # Story 1.7 (FR65) — click-to-filter test_id from the TESTS sidebar.
+        test_id=qs.get("test_id", "").strip(),
     )
 
 
@@ -66,6 +72,19 @@ def list_view(request):
 
     total_pages = max(1, (result.total + result.page_size - 1) // result.page_size)
 
+    # Story 1.7 — build a query-string fragment EXCLUDING `test_id` and `page`
+    # so clicking a test in the TESTS sidebar (a) replaces the active test
+    # rather than stacking, and (b) doesn't preserve a stale `page=N` value
+    # that would land the user on an empty page of the (typically smaller)
+    # filtered set.
+    qs_dict = request.GET.copy()
+    qs_dict.pop("test_id", None)
+    qs_dict.pop("page", None)
+    qs_minus_test_id_encoded = qs_dict.urlencode()
+    qs_minus_test_id = (
+        f"&{qs_minus_test_id_encoded}" if qs_minus_test_id_encoded else ""
+    )
+
     ctx = {
         "logs_path": settings.ULOG_LOGS_PATH,
         "filters": filters,
@@ -77,21 +96,47 @@ def list_view(request):
         "files": files,
         "level_summary": level_summary,
         "bound_keys": result.bound_keys,
+        # Story 1.6 — TESTS sidebar: list of TestSummaryRow, empty if no
+        # `ulog.test` records exist (template renders nothing in that case).
+        "test_summary": result.test_summary,
+        # Story 1.7 — query-string fragment carrying every CURRENT filter
+        # except test_id and page; consumed by the sidebar's click-to-filter
+        # anchor so non-test_id filters survive the click.
+        "qs_minus_test_id": qs_minus_test_id,
         "qs": request.GET.urlencode(),
     }
     return render(request, "ulog/list.html", ctx)
 
 
 def detail_view(request, record_id: int):
-    """Full record detail page (FR37)."""
+    """Full record detail page (FR37) + Story 1.8 Test context panel (FR66)."""
     adapter = _adapter_or_404()
     record = adapter.get(record_id)
     if record is None:
         raise Http404(f"record {record_id} not found")
+
+    # Story 1.8 — if this record carries test_id, look up the matching
+    # TestSummaryRow + total record count for the panel. None / 0 when no
+    # test_id; template hides the panel block in that case.
+    # `record.context` always exists as a dict (default_factory=dict on the
+    # Record dataclass) — direct .get() call without None guard (review patch P2).
+    test_id = record.context.get("test_id")
+    test_summary_row = None
+    test_record_count = 0
+    if test_id:
+        test_summary_row = adapter.get_test_summary_row(test_id)
+        test_record_count = adapter.count_records_for_test_id(test_id)
+
     return render(
         request,
         "ulog/detail.html",
-        {"record": record, "logs_path": settings.ULOG_LOGS_PATH},
+        {
+            "record": record,
+            "logs_path": settings.ULOG_LOGS_PATH,
+            "test_id": test_id,
+            "test_summary_row": test_summary_row,
+            "test_record_count": test_record_count,
+        },
     )
 
 
@@ -102,6 +147,7 @@ def api_records(request):
     page = max(1, int(request.GET.get("page", "1") or "1"))
     result = adapter.query(filters, page=page, page_size=100)
 
+    from dataclasses import asdict
     return JsonResponse({
         "records": [
             {
@@ -116,6 +162,10 @@ def api_records(request):
         "level_counts": result.level_counts,
         "file_counts": result.file_counts,
         "sector_counts": result.sector_counts,
+        # Story 1.6 — Test sidebar data for the JS-driven UI (FR62).
+        # `asdict` works on frozen dataclasses; all TestSummaryRow fields
+        # are JSON-serializable primitives.
+        "test_summary": [asdict(r) for r in result.test_summary],
     })
 
 

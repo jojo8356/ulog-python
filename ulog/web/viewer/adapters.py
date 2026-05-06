@@ -46,13 +46,42 @@ class Filters:
     bound: dict[str, str] = field(default_factory=dict)  # context key=value
     ts_from: str = ""  # ISO-8601
     ts_to: str = ""
+    # Story 1.6 (FR63 / FR64) — quick-filter checkboxes from the Tests sidebar.
+    failed_only: bool = False
+    slowest_only: bool = False
+    # Story 1.7 (FR65) — when non-empty, restrict records to those whose
+    # context.test_id equals this value. Covers BOTH plugin records
+    # (`logger='ulog.test'`) AND propagated app records (any logger that
+    # inherited `test_id` via Story 1.4's bound-context mechanism).
+    test_id: str = ""
 
     def is_empty(self) -> bool:
         return (
             not self.levels and not self.loggers and not self.files
             and not self.search and not self.bound
             and not self.ts_from and not self.ts_to
+            and not self.failed_only and not self.slowest_only
+            and not self.test_id
         )
+
+
+@dataclass(frozen=True)
+class TestSummaryRow:
+    """One row in the TESTS sidebar (Story 1.6, FR62).
+
+    Aggregated by ``SQLiteAdapter._build_test_summary`` from records where
+    ``logger='ulog.test'`` AND ``context.outcome IS NOT NULL`` (the body
+    verdict records, NOT ``test started`` or traceback ERRORs)."""
+    test_id: str         # e.g. "tests/test_audio.py::test_render[44100]"
+    file: str            # the part before `::` — e.g. "tests/test_audio.py"
+    name: str            # the part after the first `::` — e.g. "test_render[44100]"
+    outcome: str         # "passed" / "failed" / "skipped" / "errored"
+    duration_s: float    # raw seconds; template formats to ms/s
+
+
+# FR64 — "Slowest top N" cap. Module-level constant so the WHERE / ORDER BY
+# logic in `query()` and the test assertions in test_web.py share one source.
+SLOWEST_TOP_N = 10
 
 
 @dataclass
@@ -67,6 +96,7 @@ class QueryResult:
     file_counts: dict[str, int]    # file → count, all data
     level_counts: dict[str, int]   # level → count, all data
     bound_keys: list[str]          # auto-detected bound-context keys
+    test_summary: list[TestSummaryRow] = field(default_factory=list)  # Story 1.6 — empty when no test records
 
 
 def detect_kind(path: Path) -> str:
@@ -148,6 +178,42 @@ class SQLiteAdapter(Adapter):
 
         for k, v in filters.bound.items():
             clauses.append(func.json_extract(t.c.context, f"$.{k}") == v)
+
+        # Story 1.6 — quick filters from the Tests sidebar. ORDER BY override
+        # for `slowest_only` lives in `query()` (search "FR64 ORDER BY override"
+        # there) — this method only adds WHERE clauses.
+        # The structurally identical `clauses.append(...)` patterns above
+        # already trigger SQLAlchemy stub `ColumnElement[bool]` vs
+        # `BinaryExpression[bool]` mypy noise — pre-existing project pattern,
+        # see Story 1.1's debug log. Wrapping each filter's WHERE in `and_(...)`
+        # keeps the noise to one line per quick-filter rather than 2-3.
+        if filters.failed_only:
+            # FR63: limit to plugin outcome records flagged failed/errored.
+            clauses.append(and_(  # type: ignore[arg-type]
+                t.c.logger == "ulog.test",
+                func.json_extract(t.c.context, "$.outcome").in_(
+                    ("failed", "errored")
+                ),
+            ))
+        if filters.slowest_only:
+            # FR64: only plugin outcome records with a measurable duration —
+            # skipped tests have `duration_s=0` by pytest convention.
+            clauses.append(and_(  # type: ignore[arg-type]
+                t.c.logger == "ulog.test",
+                func.json_extract(t.c.context, "$.duration_s").is_not(None),
+                func.json_extract(t.c.context, "$.outcome").in_(
+                    ("passed", "failed", "errored")
+                ),
+            ))
+        if filters.test_id:
+            # FR65 (Story 1.7): restrict to records carrying this test_id in
+            # context. Single equality matches both plugin records
+            # (`logger='ulog.test'`) AND app records that inherited test_id
+            # via Story 1.4's bound-context propagation — same column path.
+            clauses.append(
+                func.json_extract(t.c.context, "$.test_id") == filters.test_id  # type: ignore[arg-type]
+            )
+
         return and_(*clauses) if clauses else None
 
     def query(self, filters: Filters, page: int = 1, page_size: int = 100) -> QueryResult:
@@ -167,9 +233,15 @@ class SQLiteAdapter(Adapter):
         t = self._table
         full_where = self._base_filters(filters)
         # Build per-axis "all filters except this one" where-clauses.
-        where_no_levels = self._base_filters(_replace(filters, levels=[]))
-        where_no_loggers = self._base_filters(_replace(filters, loggers=[]))
-        where_no_files = self._base_filters(_replace(filters, files=[]))
+        # Story 1.7 review patch P1: each per-axis ghost-count must strip
+        # ``test_id`` too — otherwise an active test_id filter scopes the
+        # level/logger/file ghost counts to that test only, breaking the
+        # PRD-v0.2.1 UX contract ("what would I get with this still active").
+        # The base axes (levels/loggers/files) are stripped per their own
+        # purpose; test_id leaks across all three without this extra strip.
+        where_no_levels = self._base_filters(_replace(filters, levels=[], test_id=""))
+        where_no_loggers = self._base_filters(_replace(filters, loggers=[], test_id=""))
+        where_no_files = self._base_filters(_replace(filters, files=[], test_id=""))
 
         with self._engine.begin() as conn:
             # Total count uses the FULL filter (matches the records list).
@@ -179,14 +251,32 @@ class SQLiteAdapter(Adapter):
             total = conn.execute(stmt).scalar() or 0
 
             # Page rows use the FULL filter.
-            stmt = (
-                select(t)
-                .order_by(t.c.id.desc())
-                .limit(page_size)
-                .offset((page - 1) * page_size)
-            )
-            if full_where is not None:
-                stmt = stmt.where(full_where)
+            # Story 1.6 — FR64 ORDER BY override: when `slowest_only` is on,
+            # the records list becomes a bounded top-N by duration_s DESC.
+            # Pagination is conceptually disabled (page=1, no offset) and
+            # `total` is clamped at SLOWEST_TOP_N.
+            if filters.slowest_only:
+                stmt = (
+                    select(t)
+                    .order_by(
+                        func.json_extract(t.c.context, "$.duration_s").desc()
+                    )
+                    .limit(SLOWEST_TOP_N)
+                )
+                if full_where is not None:
+                    stmt = stmt.where(full_where)
+                # Force single-page UI: no offset, total clamps at the cap.
+                page = 1
+                total = min(total, SLOWEST_TOP_N)
+            else:
+                stmt = (
+                    select(t)
+                    .order_by(t.c.id.desc())
+                    .limit(page_size)
+                    .offset((page - 1) * page_size)
+                )
+                if full_where is not None:
+                    stmt = stmt.where(full_where)
             rows = list(conn.execute(stmt))
 
             # Per-axis counts use the "all filters except this axis" where-clause.
@@ -201,13 +291,85 @@ class SQLiteAdapter(Adapter):
             # actually in scope).
             bound_keys = self._distinct_bound_keys(conn, full_where)
 
+            # Story 1.6 — FR62: build the per-test summary unconditionally
+            # (it's empty when no `ulog.test` records exist, which makes the
+            # template hide the section entirely).
+            test_summary = self._build_test_summary(conn)
+
         records = [self._row_to_record(r) for r in rows]
         sector_counts = _build_sector_counts(logger_counts)
         return QueryResult(
             records=records, total=total, page=page, page_size=page_size,
             sector_counts=sector_counts, file_counts=file_counts,
             level_counts=level_counts, bound_keys=bound_keys,
+            test_summary=test_summary,
         )
+
+    def _build_test_summary(self, conn: Any) -> list[TestSummaryRow]:
+        """Aggregate one row per distinct test_id from plugin outcome records.
+
+        We pick records where ``logger='ulog.test'`` AND ``context.outcome IS
+        NOT NULL`` — that selects the body-verdict records (Story 1.2's
+        ``_emit_outcome_records`` output) and excludes ``test started`` and
+        traceback ERROR records (which lack the `outcome` key).
+
+        For tests that ran multiple times under a rerun plugin, we keep the
+        LAST seen outcome (highest id) — that's what the user cares about
+        ("did it eventually pass?"). Sort by id ASC and let Python's dict
+        overwrite-on-duplicate-key give us that behavior cheaply.
+
+        Returned rows are sorted by `(file, name)` so the template's
+        `{% regroup ... by file %}` sees contiguous file blocks (AC7).
+        """
+        # Use the SQLAlchemy `select()` builder rather than raw `text()` —
+        # keeps the query injection-safe by construction and consistent with
+        # the rest of this file's pattern (review patch P1).
+        from sqlalchemy import select, func
+        t = self._table
+        json_test_id = func.json_extract(t.c.context, "$.test_id")
+        json_outcome = func.json_extract(t.c.context, "$.outcome")
+        json_duration_s = func.json_extract(t.c.context, "$.duration_s")
+        stmt = (
+            select(
+                json_test_id.label("test_id"),
+                json_outcome.label("outcome"),
+                json_duration_s.label("duration_s"),
+            )
+            .where(t.c.logger == "ulog.test")
+            .where(json_outcome.is_not(None))
+            .order_by(t.c.id.asc())
+        )
+
+        latest_by_test_id: dict[str, tuple[str, float]] = {}
+        for row in conn.execute(stmt):
+            tid = row.test_id
+            if not tid:
+                continue
+            # Outcome is one of the four documented strings (passed/failed/
+            # skipped/errored). Empty-string is a defensive defect — promote
+            # to "unknown" so the template's else-branch picks it up rather
+            # than silently mislabeling as "passed" (review patch P3).
+            outcome = row.outcome if row.outcome else "unknown"
+            try:
+                duration_s = float(row.duration_s) if row.duration_s is not None else 0.0
+            except (TypeError, ValueError):
+                duration_s = 0.0
+            latest_by_test_id[tid] = (outcome, duration_s)
+
+        rows: list[TestSummaryRow] = []
+        for tid, (outcome, duration_s) in latest_by_test_id.items():
+            file_part, sep, name_part = tid.partition("::")
+            if not sep or not name_part:  # malformed nodeid — skip defensively
+                continue
+            rows.append(TestSummaryRow(
+                test_id=tid, file=file_part, name=name_part,
+                outcome=outcome, duration_s=duration_s,
+            ))
+        # AC7: sort by file then by name (alphabetical within file). regroup
+        # in the template requires file-grouped contiguity which file-first
+        # sort guarantees.
+        rows.sort(key=lambda r: (r.file, r.name))
+        return rows
 
     def _count_by(self, conn, col, where) -> dict[str, int]:
         from sqlalchemy import select, func
@@ -258,6 +420,49 @@ class SQLiteAdapter(Adapter):
             return None
         return self._row_to_record(row)
 
+    def count_records_for_test_id(self, test_id: str) -> int:
+        """Count records where context.test_id == test_id (Story 1.8 / FR66).
+
+        Includes both plugin records (logger='ulog.test') and Story 1.4-
+        propagated app records — same single-equality clause used by Story 1.7.
+        """
+        from sqlalchemy import select, func
+        if not test_id:
+            return 0
+        t = self._table
+        # Read-only path — `connect()` rather than `begin()` (review patch P1).
+        with self._engine.connect() as conn:
+            stmt = (
+                select(func.count())
+                .select_from(t)
+                .where(
+                    func.json_extract(t.c.context, "$.test_id") == test_id
+                )
+            )
+            return int(conn.execute(stmt).scalar() or 0)
+
+    def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
+        """Find the TestSummaryRow for a given test_id (Story 1.8 / FR66).
+
+        Returns None when no outcome record exists for this test_id (e.g. a
+        crashed session that emitted app records but never wrote the outcome).
+        Story 1.8's detail-view panel handles None gracefully ("outcome unknown").
+
+        TODO(v0.4 NFR-PERF): direct SELECT WHERE json_extract(...) = ? would
+        be O(1) at the SQL level; current O(N) over `_build_test_summary` is
+        fine for typical sessions (100-2000 tests).
+        """
+        if not test_id:
+            return None
+        # Use `connect()` (not `begin()`) — this is a read-only path; opening
+        # a write-eligible transaction would unnecessarily serialize concurrent
+        # readers on SQLite (review patch P1).
+        with self._engine.connect() as conn:
+            for row in self._build_test_summary(conn):
+                if row.test_id == test_id:
+                    return row
+        return None
+
 
 # ---- JSONL ---------------------------------------------------------------
 
@@ -284,6 +489,21 @@ class JSONLAdapter(Adapter):
         for r in self._records:
             if r.id == record_id:
                 return r
+        return None
+
+    def count_records_for_test_id(self, test_id: str) -> int:
+        """Count records bound to test_id (Story 1.8). Counts both plugin and
+        Story 1.4-propagated app records via the shared context.test_id key."""
+        if not test_id:
+            return 0
+        return sum(
+            1 for r in self._records if r.context.get("test_id") == test_id
+        )
+
+    def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
+        """JSONL adapter stub — v0.3 doesn't implement test-summary aggregation
+        for non-SQLite formats (Story 1.6 deferred). Returns None so the
+        detail-view panel falls back to "outcome unknown" gracefully."""
         return None
 
 
@@ -321,6 +541,19 @@ class CSVAdapter(Adapter):
         for r in self._records:
             if r.id == record_id:
                 return r
+        return None
+
+    def count_records_for_test_id(self, test_id: str) -> int:
+        """Count records bound to test_id (Story 1.8) — same shape as JSONL."""
+        if not test_id:
+            return 0
+        return sum(
+            1 for r in self._records if r.context.get("test_id") == test_id
+        )
+
+    def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
+        """CSV adapter stub — v0.3 doesn't implement test-summary aggregation
+        for non-SQLite formats. Returns None; panel falls back gracefully."""
         return None
 
 
@@ -375,6 +608,10 @@ def _filter_and_paginate(
         for k, v in ff.bound.items():
             if str(r.context.get(k, "")) != v:
                 return False
+        # Story 1.7 (FR65) — single-equality test_id filter applies to both
+        # plugin records and propagated app records (same context.test_id key).
+        if ff.test_id and r.context.get("test_id") != ff.test_id:
+            return False
         return True
 
     # Full filter — for records list + total + bound_keys
@@ -383,10 +620,10 @@ def _filter_and_paginate(
     start = (page - 1) * page_size
     page_records = list(reversed(full_filtered))[start:start + page_size]
 
-    # Per-axis ghost-count datasets
-    no_levels_filtered = [r for r in records if keep(r, _replace(f, levels=[]))]
-    no_loggers_filtered = [r for r in records if keep(r, _replace(f, loggers=[]))]
-    no_files_filtered = [r for r in records if keep(r, _replace(f, files=[]))]
+    # Per-axis ghost-count datasets — strip test_id too (review patch P1).
+    no_levels_filtered = [r for r in records if keep(r, _replace(f, levels=[], test_id=""))]
+    no_loggers_filtered = [r for r in records if keep(r, _replace(f, loggers=[], test_id=""))]
+    no_files_filtered = [r for r in records if keep(r, _replace(f, files=[], test_id=""))]
 
     level_counts = Counter(r.level for r in no_levels_filtered)
     file_counts = Counter(r.file for r in no_files_filtered)

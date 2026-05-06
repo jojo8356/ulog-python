@@ -38,6 +38,77 @@
         </div>
       </div>
 
+      {# TESTS sidebar (Story 1.6 — FR62-64). Hidden when no test records exist. #}
+      {% if test_summary %}
+        <div>
+          <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
+              title="Tests collected from `logger='ulog.test'` records. Use the quick filters below to triage.">
+            {% lucide "flask-conical" size=14 %}
+            <span>Tests</span>
+          </h3>
+          {# Quick filters — FR63 + FR64 #}
+          <div class="space-y-1 mb-2">
+            <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded">
+              <input type="checkbox" name="failed_only" value="1"
+                     {% if filters.failed_only %}checked{% endif %}
+                     class="rounded text-red-600 focus:ring-red-500 flex-shrink-0">
+              <span class="font-mono text-xs flex-1">Failed only</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded">
+              <input type="checkbox" name="slowest_only" value="1"
+                     {% if filters.slowest_only %}checked{% endif %}
+                     class="rounded text-amber-600 focus:ring-amber-500 flex-shrink-0">
+              <span class="font-mono text-xs flex-1">Slowest top 10</span>
+            </label>
+          </div>
+          {# Test list grouped by file. Tests are pre-sorted by adapter (AC7) —
+             `regroup` requires contiguity-by-grouper which `(file, name)` sort
+             already guarantees. #}
+          <div class="space-y-1 max-h-60 overflow-y-auto">
+            {% regroup test_summary by file as tests_by_file %}
+            {% for file_group in tests_by_file %}
+              {# UX: open the first 5 file groups by default, collapse the rest.
+                 On a 50-file project this avoids dumping hundreds of rows.
+                 Note: the conditional includes the trailing space so the
+                 closed-state markup is `<details class=...>` (no double-space)
+                 — review patch P2. #}
+              <details {% if forloop.counter <= 5 %}open {% endif %}class="text-xs">
+                <summary class="font-mono text-slate-600 dark:text-slate-400 cursor-pointer truncate"
+                         title="{{ file_group.grouper }}">
+                  {{ file_group.grouper }}
+                </summary>
+                <ul class="ml-3 mt-1 space-y-0.5">
+                  {% for t in file_group.list %}
+                    <li class="flex items-center gap-2 px-1">
+                      {% if t.outcome == "passed" %}
+                        <span class="text-green-600 dark:text-green-400" title="passed">✓</span>
+                      {% elif t.outcome == "failed" %}
+                        <span class="text-red-600 dark:text-red-400" title="failed">✗</span>
+                      {% elif t.outcome == "errored" %}
+                        <span class="text-red-600 dark:text-red-400" title="errored">🔥</span>
+                      {% elif t.outcome == "skipped" %}
+                        <span class="text-amber-500 dark:text-amber-400" title="skipped">⊘</span>
+                      {% else %}
+                        <span class="text-slate-400" title="{{ t.outcome }}">?</span>
+                      {% endif %}
+                      <a href="?test_id={{ t.test_id|urlencode }}{{ qs_minus_test_id }}"
+                         {% if filters.test_id == t.test_id %}data-active-test="true"{% endif %}
+                         class="font-mono flex-1 min-w-0 truncate hover:underline {% if filters.test_id == t.test_id %}font-bold text-blue-600 dark:text-blue-400{% endif %}"
+                         title="Click to filter records to this test ({{ t.test_id }})">
+                        {{ t.name }}
+                      </a>
+                      <span class="ml-2 text-slate-500 dark:text-slate-400 tabular-nums text-xs flex-shrink-0">
+                        {% include "ulog/_test_duration.html" with seconds=t.duration_s %}
+                      </span>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
       {# Sectors (logger-name tree) — FR44 #}
       <div>
         <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"

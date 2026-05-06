@@ -61,7 +61,7 @@ development_status:
   1-6-tests-sidebar-list-failed-only-slowest-top-10: done
   1-7-click-test-name-to-filter-records-by-test-id: done
   1-8-detail-view-test-context-panel: done
-  1-9-programmatic-test-event-api-for-non-pytest-runners: ready-for-dev
+  1-9-programmatic-test-event-api-for-non-pytest-runners: done
   1-10-xdist-windows-nfs-edge-cases: backlog
   1-11-doc-page-docs-test-integration-md: backlog
   epic-1-retrospective: optional

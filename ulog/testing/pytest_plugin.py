@@ -19,6 +19,9 @@ The plugin is OFF by default unless either:
 from __future__ import annotations
 
 import logging
+import os
+import sys
+from pathlib import Path
 from typing import Any, Generator
 
 import pytest
@@ -118,6 +121,11 @@ def pytest_configure(config: pytest.Config) -> None:
         # FR67: wire up SQL persistence transparently. Use the user's literal
         # path string in the URL so leading "./" or absolute paths round-trip.
         ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{ulog_db}")
+
+    # Story 1.10 — xdist + Windows + NFS handling. Runs AFTER auto-setup so
+    # it sees the active SQL handler (whether host-configured or auto-set-up
+    # by Story 1.5). No-op when not under xdist or when plugin is disabled.
+    _apply_xdist_storage_strategy(config)
 
 
 def _get_enabled(config: pytest.Config) -> bool:
@@ -454,3 +462,251 @@ def pytest_terminal_summary(
     # red, bold). Yellow signals "look here" without the alarm of red — fits
     # FR69's "informational summary" framing.
     terminalreporter.write_line(line, yellow=bool(failed_or_errored))
+
+
+# ============================================================================
+# Story 1.10 — xdist + Windows + NFS edge cases (NFR-PORT-10)
+# ============================================================================
+#
+# When pytest-xdist is active, multiple worker subprocesses concurrently
+# write to the SQL handler's SQLite DB. Default (DELETE) journal mode
+# serializes writers; under contention we'd see `database is locked`
+# errors. The strategy:
+#
+#   1. Detect xdist via env vars (PYTEST_XDIST_WORKER, _TESTRUNUID).
+#   2. On Windows + xdist: unconditionally swap SQL → JSONL (file-locking
+#      semantics on Windows are unreliable for SQLite under multi-process).
+#   3. On Linux/macOS + xdist + NFS: swap (network FS doesn't support
+#      reliable SQLite locking).
+#   4. On Linux/macOS + xdist + local FS: enable PRAGMA journal_mode=WAL
+#      so concurrent writes proceed without serialization.
+
+
+_NETWORK_FS_TYPES_LINUX = {
+    "nfs", "nfs4", "cifs", "smbfs", "smb3",
+    "fuse.sshfs", "9p", "ceph",
+}
+_NETWORK_FS_TYPES_MACOS = {"nfs", "smbfs", "afpfs", "webdav"}
+
+
+def _xdist_active() -> bool:
+    """Return True if pytest-xdist is running (worker env vars present)."""
+    return bool(
+        os.environ.get("PYTEST_XDIST_WORKER")
+        or os.environ.get("PYTEST_XDIST_TESTRUNUID")
+    )
+
+
+def _is_network_fs_linux(path: Path) -> bool:
+    """Linux: parse /proc/self/mountinfo for the path's filesystem type."""
+    try:
+        with open("/proc/self/mountinfo") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return False
+    best_match = ("", "")  # (mountpoint, fstype)
+    path_str = str(path)
+    for line in lines:
+        parts = line.split()
+        try:
+            sep_idx = parts.index("-")
+            mountpoint = parts[4]
+            fstype = parts[sep_idx + 1]
+        except (ValueError, IndexError):
+            continue
+        # Special-case the root mount `/`: every path lives under it,
+        # so `path_str.startswith("/" + "/")` would never be true.
+        is_match = (
+            mountpoint == "/"
+            or path_str == mountpoint
+            or path_str.startswith(mountpoint + "/")
+        )
+        if is_match and len(mountpoint) > len(best_match[0]):
+            best_match = (mountpoint, fstype)
+        elif best_match[0] == "" and mountpoint == "/":
+            best_match = (mountpoint, fstype)  # root-mount fallback
+    return best_match[1] in _NETWORK_FS_TYPES_LINUX
+
+
+def _is_network_fs_macos(path: Path) -> bool:
+    """macOS: parse `mount` output for the path's filesystem type."""
+    import subprocess
+    try:
+        output = subprocess.run(
+            ["mount"], capture_output=True, text=True, timeout=2.0
+        ).stdout
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+    best_match = ("", "")
+    path_str = str(path)
+    for line in output.splitlines():
+        # Format: <device> on <mountpoint> (<fstype>, ...)
+        try:
+            _, _, rest = line.partition(" on ")
+            mountpoint, _, paren = rest.partition(" (")
+            fstype = paren.split(",", 1)[0].strip()
+        except Exception:  # noqa: BLE001
+            continue
+        is_match = (
+            mountpoint == "/"
+            or path_str == mountpoint
+            or path_str.startswith(mountpoint + "/")
+        )
+        if is_match and len(mountpoint) > len(best_match[0]):
+            best_match = (mountpoint, fstype)
+    return best_match[1] in _NETWORK_FS_TYPES_MACOS
+
+
+def _is_network_fs_windows(path: Path) -> bool:
+    """Windows: GetDriveTypeW returns 4 for DRIVE_REMOTE.
+    Conservative: if the ctypes call fails, return True so xdist+Windows
+    always falls back to JSONL (per AC4)."""
+    try:
+        import ctypes
+        DRIVE_REMOTE = 4
+        drive = str(path)[:3]  # e.g. "C:\\"
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        # ctypes returns Any; cast to bool explicitly to keep mypy clean.
+        return bool(kernel32.GetDriveTypeW(drive) == DRIVE_REMOTE)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _is_network_fs(path: "str | Path") -> bool:
+    """Detect whether `path` lives on a network filesystem (NFS / CIFS / SMB).
+
+    Uses stdlib only (no psutil dep). Per-platform dispatch:
+      - Linux: /proc/self/mountinfo
+      - Windows: GetDriveTypeW (DRIVE_REMOTE = 4)
+      - macOS: `mount` command output
+      - Other: False (best-effort, assume local).
+
+    Errors / unknown paths → False (conservative — local fs assumption).
+    """
+    try:
+        resolved = Path(path).resolve()
+    except (OSError, ValueError):
+        return False
+
+    if sys.platform == "win32":
+        return _is_network_fs_windows(resolved)
+    if sys.platform == "darwin":
+        return _is_network_fs_macos(resolved)
+    return _is_network_fs_linux(resolved)
+
+
+def _swap_sql_for_jsonl(reason: str) -> None:
+    """Detach all `_ulog_managed` SQL handlers and reinstall as JSONL at
+    the same path stem. Prints a single warning to stderr.
+
+    `reason` is included in the warning text (e.g. 'xdist+NFS', 'xdist+
+    Windows', 'WAL mode unavailable').
+    """
+    import ulog
+    from ulog.handlers.sql import SQLHandler
+
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        if not isinstance(handler, SQLHandler):
+            continue
+        if not getattr(handler, "_ulog_managed", False):
+            continue
+        url = getattr(handler, "_url", "")
+        if not url.startswith("sqlite:///"):
+            continue
+        sqlite_path = url[len("sqlite:///"):]
+        jsonl_path = sqlite_path.rsplit(".", 1)[0] + ".jsonl"
+        print(
+            f"ulog: {reason} detected — falling back from SQLite to "
+            f"JSONL at {jsonl_path}",
+            file=sys.stderr,
+        )
+        # Detach + close the SQL handler. Wrapped in try/except so a
+        # broken handler doesn't prevent the JSONL replacement.
+        try:
+            handler.flush()
+            handler.close()
+        except Exception:  # noqa: BLE001
+            pass
+        root.removeHandler(handler)
+        # Reinstall via setup — its idempotency removes any other managed
+        # handlers and installs the JSONL one cleanly.
+        ulog.setup(handlers=["json"], json_path=jsonl_path)
+        return  # only one ulog SQL handler at a time per project convention
+
+
+def _enable_wal_mode_or_fallback() -> bool:
+    """For local-FS xdist: enable PRAGMA journal_mode=WAL on the SQL
+    handler's engine. Returns True if WAL was enabled successfully.
+
+    On failure (read-only DB, exotic filesystem), falls back to JSONL.
+
+    Reentrancy note (review patch C1): we MUST NOT call
+    `_swap_sql_for_jsonl` from inside the `with handler._engine.connect()
+    as conn:` block — the swap closes the engine, and on `with`-exit
+    SQLAlchemy would try to release a connection to a disposed pool.
+    Capture the failure boolean inside the `try`, exit the connection
+    context cleanly, THEN dispatch the fallback.
+    """
+    from ulog.handlers.sql import SQLHandler
+
+    root = logging.getLogger()
+    target_handler = None
+    for handler in list(root.handlers):
+        if not isinstance(handler, SQLHandler):
+            continue
+        if not getattr(handler, "_ulog_managed", False):
+            continue
+        target_handler = handler
+        break
+    if target_handler is None:
+        return False
+
+    wal_failed = False
+    try:
+        with target_handler._engine.connect() as conn:
+            conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+    except Exception:  # noqa: BLE001 — fall back on any PRAGMA failure
+        wal_failed = True
+    if wal_failed:
+        _swap_sql_for_jsonl("WAL mode unavailable")
+        return False
+    return True
+
+
+def _apply_xdist_storage_strategy(config: pytest.Config) -> None:
+    """Story 1.10 entry point — called from `pytest_configure` AFTER the
+    auto-setup branch (Story 1.5). No-op when not under xdist or when
+    plugin is disabled.
+
+    Dispatches: Windows+xdist → JSONL swap; NFS+xdist → JSONL swap;
+    local+xdist → WAL mode (or JSONL fallback if PRAGMA fails).
+    """
+    if not _get_enabled(config):
+        return  # AC5: gated off
+    if not _xdist_active():
+        return  # AC3: not under xdist — nothing to do
+
+    from ulog.handlers.sql import SQLHandler
+
+    # Find the active SQL handler (host-configured OR auto-set-up by us)
+    sql_path = None
+    for h in logging.getLogger().handlers:
+        if isinstance(h, SQLHandler) and getattr(h, "_ulog_managed", False):
+            url = getattr(h, "_url", "")
+            if url.startswith("sqlite:///"):
+                sql_path = url[len("sqlite:///"):]
+                break
+
+    if sql_path is None:
+        return  # nothing to swap (e.g. JSONL handler already in use)
+
+    if sys.platform == "win32":
+        # AC4: Windows + xdist always falls back to JSONL.
+        _swap_sql_for_jsonl("xdist+Windows")
+    elif _is_network_fs(sql_path):
+        # AC1: NFS / CIFS detected — fall back.
+        _swap_sql_for_jsonl("xdist+NFS")
+    else:
+        # AC2: local FS — enable WAL mode (or JSONL if WAL fails).
+        _enable_wal_mode_or_fallback()

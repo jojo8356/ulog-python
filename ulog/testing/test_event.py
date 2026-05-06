@@ -39,12 +39,12 @@ import logging
 import time
 import traceback
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Any, Iterator
 
 # Lazy import — `ulog.testing` is part of `ulog`, so direct import at
 # module top would create a partial-import edge if `ulog/__init__.py`
 # itself reaches into this submodule. Keep `ulog` deferred to first use.
-def _ulog():
+def _ulog() -> Any:
     import ulog
     return ulog
 

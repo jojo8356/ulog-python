@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import sys
 from pathlib import Path
 
 import pytest
@@ -1286,3 +1287,235 @@ def test_summary_errored_counts_as_failed_for_display(
     output = result.stdout.str() + result.stderr.str()
     # 1 passed + 1 errored → displayed as "1 passed, 1 failed, 0 skipped"
     assert "ulog: 2 tests, 1 passed, 1 failed, 0 skipped" in output, output
+
+
+# ============================================================================
+# Story 1.10 — xdist + Windows + NFS edge cases (NFR-PORT-10)
+# ============================================================================
+
+
+def test_xdist_active_detects_worker_env(monkeypatch):
+    """AC7 — `_xdist_active()` returns True when xdist env vars are set."""
+    from ulog.testing.pytest_plugin import _xdist_active
+
+    monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+    monkeypatch.delenv("PYTEST_XDIST_TESTRUNUID", raising=False)
+    assert _xdist_active() is False
+
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
+    assert _xdist_active() is True
+    monkeypatch.delenv("PYTEST_XDIST_WORKER")
+
+    monkeypatch.setenv("PYTEST_XDIST_TESTRUNUID", "abc123")
+    assert _xdist_active() is True
+
+
+def test_is_network_fs_returns_false_for_local_paths(tmp_path):
+    """`_is_network_fs` returns False for clearly-local paths on Linux/macOS.
+    Skipped on Windows where conservative fallback is the documented behavior."""
+    from ulog.testing.pytest_plugin import _is_network_fs
+
+    if sys.platform == "win32":
+        pytest.skip("Windows path returns conservative True per AC4")
+    assert _is_network_fs(str(tmp_path)) is False
+
+
+def test_swap_sql_for_jsonl_replaces_handler(tmp_path, capsys):
+    """AC1 / AC4 — `_swap_sql_for_jsonl` detaches the SQL handler and installs
+    a JSONL handler at the same path stem; warning text appears on stderr."""
+    import ulog
+    from ulog.handlers.sql import SQLHandler
+    from ulog.handlers.json_line import JSONLineHandler
+    from ulog.testing.pytest_plugin import _swap_sql_for_jsonl
+
+    db = tmp_path / "x.sqlite"
+    ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
+    assert any(isinstance(h, SQLHandler) for h in logging.getLogger().handlers)
+
+    _swap_sql_for_jsonl("test")
+
+    # SQL handler detached, JSONL attached
+    handlers = logging.getLogger().handlers
+    assert not any(isinstance(h, SQLHandler) for h in handlers)
+    assert any(isinstance(h, JSONLineHandler) for h in handlers)
+
+    # JSONL path is at the same stem with `.jsonl` extension
+    expected_jsonl = tmp_path / "x.jsonl"
+    # The handler stores its target — verify by emitting a record and
+    # confirming the file is created.
+    log = ulog.get_logger("ulog.test")
+    log.info("after swap")
+    for h in logging.getLogger().handlers:
+        if hasattr(h, "flush"):
+            h.flush()
+    assert expected_jsonl.exists(), f"expected JSONL at {expected_jsonl}"
+
+    # Warning text on stderr
+    captured = capsys.readouterr()
+    assert "ulog: test" in captured.err
+    assert "JSONL" in captured.err
+    assert str(expected_jsonl) in captured.err
+
+
+def test_pytest_configure_no_op_when_not_xdist(
+    pytester: pytest.Pytester, tmp_path: Path, monkeypatch
+):
+    """AC3 — without xdist env vars, no swap occurs and no warning is emitted."""
+    monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+    monkeypatch.delenv("PYTEST_XDIST_TESTRUNUID", raising=False)
+
+    db = tmp_path / "logs.sqlite"
+    pytester.makeconftest(_conftest_with_setup(db))
+    pytester.makepyfile("def test_pass(): assert True")
+    result = pytester.runpytest()
+    output = result.stdout.str() + result.stderr.str()
+    # No xdist warning text should appear
+    assert "xdist+" not in output, output
+    assert "WAL mode" not in output, output
+
+
+def test_apply_xdist_storage_strategy_disabled_plugin_no_op(monkeypatch):
+    """AC5 — when the plugin gate is OFF, _apply_xdist_storage_strategy does
+    nothing even with xdist active."""
+    from ulog.testing.pytest_plugin import _apply_xdist_storage_strategy
+
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
+
+    # Build a minimal Config-like object with `_ulog_enabled=False`
+    class FakeConfig:
+        _ulog_enabled = False
+    fake_config = FakeConfig()
+
+    # Should not raise; nothing observable to assert beyond "no exception"
+    _apply_xdist_storage_strategy(fake_config)  # type: ignore[arg-type]
+
+
+def test_swap_sql_for_jsonl_preserves_record_schema(tmp_path):
+    """AC6 — after the swap, records emitted via the JSONL handler have the
+    same shape (logger / level / msg / context) as before."""
+    import ulog
+    from ulog.testing.pytest_plugin import _swap_sql_for_jsonl
+
+    db = tmp_path / "x.sqlite"
+    ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
+    _swap_sql_for_jsonl("test")
+
+    log = ulog.get_logger("myapp")
+    ulog.bind(test_id="t1")
+    log.info("after swap", extra={"k": "v"})
+    ulog.unbind("test_id")
+    for h in logging.getLogger().handlers:
+        if hasattr(h, "flush"):
+            h.flush()
+
+    jsonl_path = tmp_path / "x.jsonl"
+    assert jsonl_path.exists()
+    lines = jsonl_path.read_text().strip().splitlines()
+    assert len(lines) >= 1
+    record = json.loads(lines[-1])
+    # Schema check: standard fields present. Note that the JSON formatter
+    # MERGES bound contextvars at the TOP LEVEL of the record (not under a
+    # "context" sub-key like the SQL handler), so `test_id` is checked
+    # directly on the record root.
+    assert record["logger"] == "myapp"
+    assert record["level"] == "INFO"
+    assert record["msg"] == "after swap"
+    assert record.get("test_id") == "t1"
+
+
+def test_pytest_configure_swaps_for_jsonl_on_xdist_nfs(
+    pytester: pytest.Pytester, tmp_path: Path, monkeypatch
+):
+    """AC1 — xdist + simulated NFS detection → SQL→JSONL swap."""
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
+    # Patch _is_network_fs to return True regardless of actual filesystem
+    import ulog.testing.pytest_plugin as plugin_mod
+    monkeypatch.setattr(plugin_mod, "_is_network_fs", lambda p: True)
+    # On Windows, _apply_xdist_storage_strategy hits the win32 branch first
+    # (before _is_network_fs is even called). Patch sys.platform too.
+    monkeypatch.setattr(plugin_mod.sys, "platform", "linux")
+
+    db = tmp_path / "logs.sqlite"
+    pytester.makeconftest(_conftest_with_setup(db))
+    pytester.makepyfile("def test_pass(): assert True")
+    result = pytester.runpytest()
+    output = result.stdout.str() + result.stderr.str()
+
+    assert "xdist+NFS" in output, output
+    # The JSONL file at the same stem should exist after the swap
+    jsonl_path = tmp_path / "logs.jsonl"
+    assert jsonl_path.exists(), f"expected JSONL fallback at {jsonl_path}"
+
+
+def test_pytest_configure_enables_wal_on_xdist_local(
+    pytester: pytest.Pytester, tmp_path: Path, monkeypatch
+):
+    """AC2 — xdist + local FS → PRAGMA journal_mode=WAL persists."""
+    import sqlite3 as _sqlite
+
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
+    import ulog.testing.pytest_plugin as plugin_mod
+    monkeypatch.setattr(plugin_mod, "_is_network_fs", lambda p: False)
+    monkeypatch.setattr(plugin_mod.sys, "platform", "linux")  # avoid Windows branch
+
+    db = tmp_path / "logs.sqlite"
+    pytester.makeconftest(_conftest_with_setup(db))
+    # Emit at least one record so WAL is materialized on disk
+    pytester.makepyfile("def test_pass(): assert True")
+    result = pytester.runpytest()
+    assert result.ret == 0
+    assert db.exists(), "DB should exist after the test session"
+
+    # Inspect journal_mode via a fresh sqlite3 connection
+    conn = _sqlite.connect(str(db))
+    try:
+        mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+    finally:
+        conn.close()
+    assert mode.lower() == "wal", f"expected wal mode; got {mode!r}"
+
+
+def test_pytest_configure_falls_back_when_wal_fails(tmp_path, monkeypatch, capsys):
+    """AC2 second clause — if PRAGMA journal_mode=WAL raises, the JSONL
+    fallback fires with 'WAL mode unavailable' warning."""
+    import ulog
+    import ulog.testing.pytest_plugin as plugin_mod
+    from ulog.handlers.sql import SQLHandler
+
+    monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw0")
+    monkeypatch.setattr(plugin_mod, "_is_network_fs", lambda p: False)
+    monkeypatch.setattr(plugin_mod.sys, "platform", "linux")
+
+    db = tmp_path / "logs.sqlite"
+    ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
+
+    # Patch the SQL handler's engine.connect to raise
+    sql_handler = next(
+        h for h in logging.getLogger().handlers if isinstance(h, SQLHandler)
+    )
+    original_engine = sql_handler._engine
+
+    class FakeEngine:
+        def connect(self):
+            raise RuntimeError("simulated PRAGMA failure")
+        # Provide dispose so close() doesn't crash later
+        def dispose(self):
+            original_engine.dispose()
+
+    sql_handler._engine = FakeEngine()  # type: ignore[assignment]
+
+    # Build a minimal Config-like object
+    class FakeConfig:
+        _ulog_enabled = True
+    plugin_mod._apply_xdist_storage_strategy(FakeConfig())  # type: ignore[arg-type]
+
+    captured = capsys.readouterr()
+    assert "WAL mode unavailable" in captured.err, captured.err
+    # JSONL fallback should be in place
+    jsonl_path = tmp_path / "logs.jsonl"
+    # The file may not exist yet (no record emitted) but the handler IS attached
+    from ulog.handlers.json_line import JSONLineHandler
+    assert any(
+        isinstance(h, JSONLineHandler)
+        for h in logging.getLogger().handlers
+    )

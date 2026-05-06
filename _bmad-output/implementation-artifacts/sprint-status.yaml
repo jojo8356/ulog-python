@@ -62,8 +62,8 @@ development_status:
   1-7-click-test-name-to-filter-records-by-test-id: done
   1-8-detail-view-test-context-panel: done
   1-9-programmatic-test-event-api-for-non-pytest-runners: done
-  1-10-xdist-windows-nfs-edge-cases: backlog
-  1-11-doc-page-docs-test-integration-md: backlog
+  1-10-xdist-windows-nfs-edge-cases: done
+  1-11-doc-page-docs-test-integration-md: ready-for-dev
   epic-1-retrospective: optional
 
   # ========================================================================

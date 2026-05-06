@@ -1061,3 +1061,77 @@ def test_detail_view_total_records_count_matches_test_id_records(tmp_path):
     assert "3 records" in body, (
         f"expected '3 records' in detail page body; got snippet: {body[2000:3000]}"
     )
+
+
+# ============================================================================
+# Story 1.11 — Doc page /docs/test-integration/ (NFR-DOC-10)
+# ============================================================================
+
+
+def test_test_integration_doc_page_renders(sqlite_fixture):
+    """AC1, AC3 — page renders with 200 + structural elements + required sections."""
+    client = _make_django_client(sqlite_fixture)
+    resp = client.get("/docs/test-integration/")
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    # AC3: structural elements
+    assert "<h1" in body
+    assert "<h2" in body
+    assert "<pre" in body and "<code" in body
+    # AC1: required sections
+    assert "Install" in body
+    assert "CLI flags" in body
+    assert "Test event schema" in body
+    assert "worked example" in body or "Find failed tests" in body
+
+
+def test_test_integration_doc_page_listed_in_index(sqlite_fixture):
+    """AC2 — /docs/ index lists the new page with a clickable link."""
+    client = _make_django_client(sqlite_fixture)
+    resp = client.get("/docs/")
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert "Test integration" in body
+    assert "/docs/test-integration/" in body
+
+
+def test_test_integration_doc_page_includes_conftest_example(sqlite_fixture):
+    """AC4 — canonical conftest recipe (verbatim per PRD-v0.3 §5.1)."""
+    client = _make_django_client(sqlite_fixture)
+    resp = client.get("/docs/test-integration/")
+    body = resp.content.decode()
+    assert "ulog.setup(" in body
+    # The in-house renderer HTML-escapes single quotes; check both forms
+    # to be robust against the escaping convention.
+    assert (
+        "handlers=[&#x27;sql&#x27;]" in body
+        or "handlers=[&#39;sql&#39;]" in body
+        or "handlers=['sql']" in body
+    )
+    assert "sql_url=" in body
+
+
+def test_test_integration_doc_page_includes_summary_line_example(sqlite_fixture):
+    """AC5 — exact-format summary line from PRD §2.1.6 / Story 1.5."""
+    client = _make_django_client(sqlite_fixture)
+    resp = client.get("/docs/test-integration/")
+    body = resp.content.decode()
+    assert "ulog: 412 tests, 409 passed, 3 failed, 0 skipped" in body
+    assert "ulog-web" in body
+
+
+def test_test_integration_doc_page_includes_test_event_example(sqlite_fixture):
+    """AC6 — programmatic API example present."""
+    client = _make_django_client(sqlite_fixture)
+    resp = client.get("/docs/test-integration/")
+    body = resp.content.decode()
+    assert "from ulog.testing import test_event" in body
+    assert "with test_event(" in body
+    assert "ev.outcome(" in body
+
+
+def test_test_integration_unknown_subpage_404(sqlite_fixture):
+    """The page slug is 'test-integration'; anything else 404s."""
+    client = _make_django_client(sqlite_fixture)
+    resp = client.get("/docs/test-integration-WRONG/")
+    assert resp.status_code == 404

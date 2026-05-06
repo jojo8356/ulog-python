@@ -178,6 +178,7 @@ _DOC_PAGES: dict[str, str] = {
     "api": "Python API reference",
     "troubleshooting": "Troubleshooting",
     "sectors-and-files": "Sectors and files explained",
+    "test-integration": "Test integration",  # Story 1.11 — v0.3
 }
 
 

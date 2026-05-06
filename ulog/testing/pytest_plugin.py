@@ -4,8 +4,10 @@ Story 1.1 owns: option registration + gating decision (``config._ulog_enabled``)
 Story 1.2 owns: lifecycle hooks (``pytest_runtest_protocol`` +
 ``pytest_runtest_makereport``) that emit ``test started`` / ``test outcome``
 records, plus a separate ERROR record on failure carrying the traceback.
-Stories 1.3-1.5 own: parametrize verification, propagation contract tests,
-summary output.
+Story 1.3 owns: stable test_id contract via ``_make_test_id`` (FR55).
+Story 1.4 owns: propagation contract tests (FR59-61) — pure tests, no code here.
+Story 1.5 owns: --ulog-db auto-setup + --ulog-summary one-line session summary
++ -q suppression (FR67/FR69).
 
 The plugin is OFF by default unless either:
   (a) a host ``conftest.py`` has called ``ulog.setup(...)`` (i.e.
@@ -60,7 +62,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 @pytest.hookimpl(trylast=True)
 def pytest_configure(config: pytest.Config) -> None:
-    """Compute the gating decision and store it on ``config._ulog_enabled``.
+    """Compute the gating decision, optionally auto-setup, and initialize the
+    session counter on ``config``.
 
     ``trylast=True`` is critical: pytest schedules entry-point plugins'
     ``pytest_configure`` BEFORE the user's ``conftest.py`` ``pytest_configure``.
@@ -68,21 +71,83 @@ def pytest_configure(config: pytest.Config) -> None:
     sees their own configure run AFTER ours, and our gate (which reads
     ``ulog.is_configured()``) would always be False — disabling the plugin
     even though the user intended to enable it.
+
+    Story 1.5 additions:
+      - FR67 auto-setup: when the gate enables AND the host did NOT already
+        configure ``ulog.setup``, AND ``--ulog-db`` was passed, call
+        ``ulog.setup(handlers=['sql'], sql_url=...)`` here exactly once.
+      - ``_ulog_db_path`` stash: only the CLI value AND only when auto-setup
+        actually fired — guarantees the summary line's ``→ ulog-web <path>``
+        suffix points at where records actually went (no host-path leak).
+      - ``_ulog_session_stats`` counter: 4-way (passed/failed/skipped/errored)
+        for ``pytest_terminal_summary`` to render at session end.
     """
     import ulog  # lazy: only on pytest config
+    ulog_db = config.getoption("ulog_db")
+    host_already_configured = ulog.is_configured()
     enabled = (
         not config.getoption("ulog_disable")
-        and (
-            ulog.is_configured()
-            or bool(config.getoption("ulog_db"))
-        )
+        and (host_already_configured or bool(ulog_db))
     )
+    auto_setup_fired = (
+        enabled and not host_already_configured and bool(ulog_db)
+    )
+    # IMPORTANT ORDERING (review patch P1): set the gate + stash + stats dict
+    # BEFORE attempting auto-setup. If `ulog.setup` raises (bad path, missing
+    # SQLAlchemy, locked DB), the exception still propagates — but downstream
+    # hooks see a coherent `_ulog_enabled` / `_ulog_session_stats` rather than
+    # falling back to the `getattr(..., default)` form which would silently
+    # disable the plugin without explanation.
     config._ulog_enabled = enabled  # type: ignore[attr-defined]
+    # AC7: stash the CLI-provided path ONLY when auto-setup will be attempted.
+    # If host configured (we don't know their URL) → omit the suffix later
+    # rather than mislead. If gate disabled → no summary at all anyway.
+    config._ulog_db_path = ulog_db if auto_setup_fired else None  # type: ignore[attr-defined]
+    # FR69: 4-way internal counter; the rendered line collapses errored→failed.
+    # Only initialize when the plugin is actually enabled — keeps disabled-run
+    # state minimal and prevents a hypothetical future caller from finding a
+    # populated dict in a disabled session (review patch P5).
+    if enabled:
+        config._ulog_session_stats = {  # type: ignore[attr-defined]
+            "passed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "errored": 0,
+        }
+    if auto_setup_fired:
+        # FR67: wire up SQL persistence transparently. Use the user's literal
+        # path string in the URL so leading "./" or absolute paths round-trip.
+        ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{ulog_db}")
 
 
 def _get_enabled(config: pytest.Config) -> bool:
     """Helper consumed by Story 1.2+ hooks. Defaults False if attr missing."""
     return bool(getattr(config, "_ulog_enabled", False))
+
+
+def _make_test_id(item: pytest.Item) -> str:
+    """Return the stable test_id for a pytest item per PRD-v0.3 FR55.
+
+    The contract is whatever pytest's ``Item.nodeid`` produces under the
+    project's collection layout — we don't post-process it. In practice
+    that means:
+
+      - Non-parametrized: ``"tests/path.py::test_name"``.
+      - Parametrized: ``"tests/path.py::test_name[param-id]"`` — pytest's
+        dash-joined parametrize ID is preserved verbatim, including
+        user-supplied ``ids=[...]`` and ``ids=callable`` forms.
+      - Class methods: ``"tests/path.py::TestCls::test_method[param]"``.
+      - Path component is rootdir-relative and uses forward slashes on
+        Linux/macOS (the supported CI surface for v0.3); Windows behavior
+        is exercised separately in Story 1.10.
+      - Stable across runs given the same test source.
+
+    Implementation: ``item.nodeid``. We capture this as a single named call
+    so the FR55 contract has one definition rather than a literal sprinkled
+    across the protocol hook (Story 1.2), the propagation tests (Story 1.4),
+    the programmatic API (Story 1.9), and the replay generator (Story 4.3).
+    """
+    return item.nodeid
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -103,7 +168,7 @@ def pytest_runtest_protocol(
         return
 
     import ulog  # lazy: only on enabled path
-    test_id = item.nodeid
+    test_id = _make_test_id(item)  # FR55 — see _make_test_id docstring (Story 1.3 contract)
     log = ulog.get_logger("ulog.test")
 
     ulog.bind(test_id=test_id)
@@ -181,6 +246,13 @@ def _emit_outcome_records(item: pytest.Item, log: logging.Logger) -> None:
     # Surface that as `errored` rather than silently emitting `passed` with
     # zero duration (review finding M2).
     if not reports:
+        # FR69: increment session counter BEFORE the log.error call (review
+        # patch P2). If `log.error` itself raises (broken SQL handler, etc.),
+        # the surrounding try/except in `pytest_runtest_protocol` swallows
+        # the exception so unbind still runs — but the counter would
+        # otherwise be skipped, undercounting the summary. Bumping first
+        # keeps counts honest even in degraded states.
+        _bump_session_stats(item.config, "errored")
         log.error(
             "test errored",
             extra={"outcome": "errored", "duration_s": 0.0, "phase": "setup"},
@@ -189,6 +261,11 @@ def _emit_outcome_records(item: pytest.Item, log: logging.Logger) -> None:
 
     final_outcome, final_phase, failure_report = _classify(reports)
     duration_s = sum(r.duration for r in reports.values())
+
+    # FR69: increment counter on the body verdict BEFORE emit (review patch P2).
+    # Not the optional traceback, not the optional teardown ERROR — those are
+    # not the body's verdict.
+    _bump_session_stats(item.config, final_outcome)
 
     level = (
         logging.ERROR if final_outcome in ("failed", "errored") else logging.INFO
@@ -219,6 +296,19 @@ def _emit_outcome_records(item: pytest.Item, log: logging.Logger) -> None:
             f"teardown failed: {td_exc['msg']}",
             extra={"phase": "teardown", "exc": td_exc},
         )
+        # No counter increment here — teardown failure is orthogonal to the
+        # body verdict per AC4 of Story 1.2 (body outcome stays as-classified).
+
+
+def _bump_session_stats(config: pytest.Config, outcome: str) -> None:
+    """Increment the FR69 session counter for ``outcome`` (Story 1.5).
+
+    Defensive: uses ``getattr`` with a default so a hypothetical caller that
+    invokes ``_emit_outcome_records`` before ``pytest_configure`` populated the
+    attribute (e.g. an exotic plugin dispatch) doesn't crash."""
+    stats = getattr(config, "_ulog_session_stats", None)
+    if stats is not None and outcome in stats:
+        stats[outcome] += 1
 
 
 def _classify(
@@ -308,3 +398,59 @@ def _longrepr_to_exc(
     if not tb_lines or tb_lines == [""]:
         tb_lines = ["<no traceback>"]
     return {"type": exc_type, "msg": exc_msg, "tb": tb_lines}
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_terminal_summary(
+    terminalreporter: Any, exitstatus: int, config: pytest.Config
+) -> None:
+    """Print a one-line ulog summary at session end (FR69, Story 1.5).
+
+    Format (PRD-v0.3 §2.1.6):
+        ulog: N tests, X passed, Y failed, Z skipped → ulog-web <db> to triage
+
+    The internal 4-way counter (passed/failed/skipped/errored) collapses
+    ``errored`` into ``failed`` for the rendered line so the user-facing
+    summary matches the PRD's 3-bucket display.
+
+    Suppressed when:
+      - The plugin gate is OFF (``_get_enabled(config) is False``) — covers
+        ``--ulog-disable`` and the no-host-no-cli-flag default-OFF case.
+      - The user passed ``-q`` / ``--quiet`` (``verbose < 0``).
+      - ``--ulog-summary`` is explicitly OFF (currently store_true → defaults
+        True; the negation is unreachable today but the check is defensive
+        for future option-negation flags).
+      - The session ran zero items (``--collect-only`` lands here).
+    """
+    if not _get_enabled(config):
+        return
+    if config.getoption("verbose") < 0:
+        return
+    if not config.getoption("ulog_summary"):
+        return
+
+    stats = getattr(config, "_ulog_session_stats", None)
+    if stats is None:
+        return
+    total = sum(stats.values())
+    if total == 0:
+        # Covers --collect-only AND any session where no items reached
+        # _emit_outcome_records (e.g. collection error). Avoid noisy
+        # "ulog: 0 tests" output.
+        return
+
+    passed = stats["passed"]
+    skipped = stats["skipped"]
+    # Internal counter is 4-way; rendered line is 3-way per PRD-v0.3 §2.1.6.
+    failed_or_errored = stats["failed"] + stats["errored"]
+
+    db_path = getattr(config, "_ulog_db_path", None)
+    suffix = f" → ulog-web {db_path} to triage" if db_path else ""
+    line = (
+        f"ulog: {total} tests, {passed} passed, "
+        f"{failed_or_errored} failed, {skipped} skipped{suffix}"
+    )
+    # write_line uses pytest's TerminalReporter `**markup` kwargs (yellow,
+    # red, bold). Yellow signals "look here" without the alarm of red — fits
+    # FR69's "informational summary" framing.
+    terminalreporter.write_line(line, yellow=bool(failed_or_errored))

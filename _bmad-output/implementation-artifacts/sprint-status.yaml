@@ -50,7 +50,13 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # ========================================================================
-  # Epic 1: v0.3 — Test integration (11 stories)
+  # Epic 1: v0.3 — Test integration (11 stories + 2 post-retro patches)
+  # 1-12 added 2026-05-06: post-retro test-isolation patch (test-only,
+  # zero production touch). Discovered during browser-QA prep when running
+  # the suite under `pytest --ulog-db`.
+  # 1-13 added 2026-05-06: SQL handler CREATE TABLE race fix (~12 prod
+  # lines + real-subprocess regression test). Surfaced when verifying
+  # Story 1.10 under real `pytest -n auto` with shared --ulog-db.
   # ========================================================================
   epic-1: done
   1-1-pytest-plugin-entry-point-registration: done
@@ -64,6 +70,8 @@ development_status:
   1-9-programmatic-test-event-api-for-non-pytest-runners: done
   1-10-xdist-windows-nfs-edge-cases: done
   1-11-doc-page-docs-test-integration-md: done
+  1-12-test-isolation-when-plugin-active: done
+  1-13-sql-handler-create-table-race: done
   epic-1-retrospective: done
 
   # ========================================================================

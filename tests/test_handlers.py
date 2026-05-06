@@ -15,6 +15,13 @@ import ulog
 
 @pytest.fixture(autouse=True)
 def _isolate():
+    """Clear bound state at SETUP and teardown.
+
+    Setup-side clear prevents the outer pytest plugin's test_id bind
+    (active under `--ulog-db`) from leaking into the SQL handler's
+    `context` JSON column when these tests assert on its exact shape.
+    """
+    ulog.clear()
     yield
     for h in list(logging.getLogger().handlers):
         if getattr(h, "_ulog_managed", False):
@@ -194,6 +201,67 @@ def test_sql_persists_exception(tmp_path):
     assert exc["type"] == "ValueError"
     assert exc["msg"] == "nope"
     engine.dispose()
+
+
+# ---- SQL handler concurrent bootstrap (Story 1.13) -----------------------
+
+
+def test_sql_handler_no_race_under_concurrent_bootstrap(tmp_path):
+    """Story 1.13 regression — when multiple processes bootstrap a SQL
+    handler against the same shared DB simultaneously (real-world
+    `pytest -n auto --ulog-db <shared>` scenario), the CREATE TABLE
+    race must NOT produce 'Logging error' stderr noise. The loser of
+    the race catches OperationalError('table already exists') and
+    falls through to column-verify."""
+    import subprocess
+    import sys
+    import textwrap
+
+    db = tmp_path / "race.sqlite"
+
+    # Each subprocess bootstraps a SQL handler against the SHARED db
+    # and emits one record. With 4 concurrent procs, the CREATE TABLE
+    # race fires nearly every time on a fresh DB.
+    script = textwrap.dedent(
+        f"""
+        import logging, ulog
+        ulog.setup(handlers=['sql'], sql_url='sqlite:///{db}', sql_batch_size=1)
+        logging.getLogger().info('hello from worker')
+        for h in logging.getLogger().handlers:
+            h.flush()
+        """
+    )
+
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c", script],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        for _ in range(4)
+    ]
+    stderrs = []
+    for p in procs:
+        _out, err = p.communicate(timeout=15)
+        assert p.returncode == 0, f"worker subprocess failed: {err.decode()}"
+        stderrs.append(err.decode())
+
+    combined = "\n".join(stderrs)
+    assert "Logging error" not in combined, (
+        f"CREATE TABLE race produced stderr noise:\n{combined}"
+    )
+    assert "OperationalError" not in combined, (
+        f"OperationalError leaked to stderr:\n{combined}"
+    )
+
+    # All 4 records should have persisted (no record was lost to the race).
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(f"sqlite:///{db}", future=True)
+    with engine.begin() as conn:
+        n = conn.execute(text("SELECT COUNT(*) FROM logs")).scalar()
+    engine.dispose()
+    assert n == 4, f"expected 4 records persisted, got {n}"
 
 
 # ---- Multi-handler setup -------------------------------------------------

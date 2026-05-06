@@ -18,6 +18,14 @@ import ulog
 
 @pytest.fixture(autouse=True)
 def _isolate():
+    """Clear bound state at SETUP and teardown.
+
+    Setup-side clear stops the outer pytest plugin's test_id bind
+    (active under `--ulog-db`) from polluting records emitted by
+    sqlite_fixture and breaking tests that assert on records WITHOUT
+    test_id.
+    """
+    ulog.clear()
     yield
     for h in list(logging.getLogger().handlers):
         if getattr(h, "_ulog_managed", False):
@@ -30,8 +38,12 @@ def _isolate():
 
 
 @pytest.fixture
-def sqlite_fixture(tmp_path) -> Path:
-    """Build a small SQLite fixture covering the filter axes."""
+def sqlite_fixture(_isolate, tmp_path) -> Path:
+    """Build a small SQLite fixture covering the filter axes.
+
+    Depends on _isolate so the outer plugin's test_id bind is wiped
+    before any record is emitted into the fixture DB.
+    """
     db = tmp_path / "logs.sqlite"
     ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
     ulog.get_logger("myapp.web").info("user on /home")

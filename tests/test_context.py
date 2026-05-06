@@ -12,6 +12,14 @@ import ulog
 
 @pytest.fixture(autouse=True)
 def _isolate():
+    """Clear bound state at SETUP and teardown.
+
+    The setup-side clear is required so an OUTER pytest run with
+    `--ulog-db` (which activates the ulog plugin and binds
+    test_id=<nodeid> for each test via pytest_runtest_protocol) does
+    not leak that bind into assertions on get_bound() shape.
+    """
+    ulog.clear()
     yield
     ulog.clear()
     for h in list(logging.getLogger().handlers):

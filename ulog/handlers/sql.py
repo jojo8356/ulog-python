@@ -161,12 +161,29 @@ class SQLHandler(logging.Handler):
 
     def _verify_or_create_schema(self) -> None:
         from sqlalchemy import inspect
+        from sqlalchemy.exc import OperationalError
 
         inspector = inspect(self._engine)
         if self._table_name not in inspector.get_table_names():
             # Fresh DB — create our schema.
-            self._metadata.create_all(self._engine)
-            return
+            #
+            # Race window: under multi-process bootstrap (xdist workers
+            # sharing one --ulog-db, or any multi-process app sharing a
+            # SQL handler), worker A and B may both see the table as
+            # missing, both call create_all, and the loser raises
+            # OperationalError("table already exists"). The table DOES
+            # exist after the race, so we just fall through to the
+            # column-verify path on retry.
+            try:
+                self._metadata.create_all(self._engine)
+                return
+            except OperationalError as exc:
+                if "already exists" not in str(exc).lower():
+                    raise
+                # Re-inspect: the winning worker created the table.
+                inspector = inspect(self._engine)
+                if self._table_name not in inspector.get_table_names():
+                    raise  # not the race we expected
         # Existing table — verify columns match.
         existing_cols = {col["name"] for col in inspector.get_columns(self._table_name)}
         expected_cols = {c.name for c in self._table.columns}

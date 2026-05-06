@@ -15,7 +15,13 @@ from ulog.testing import test_event
 @pytest.fixture(autouse=True)
 def _isolate():
     """Strip _ulog_managed handlers and clear bound context between tests
-    (mirrors tests/test_setup.py and tests/test_web.py patterns)."""
+    (mirrors tests/test_setup.py and tests/test_web.py patterns).
+
+    Clears bound state at SETUP too, so an OUTER pytest plugin run with
+    `--ulog-db` (which binds test_id for each outer test via
+    pytest_runtest_protocol) does not leak its bind into these tests'
+    assertions on test_event scoping."""
+    ulog.clear()
     yield
     for h in list(logging.getLogger().handlers):
         if getattr(h, "_ulog_managed", False):

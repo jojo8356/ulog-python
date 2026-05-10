@@ -205,8 +205,24 @@ def main(argv: list[str] | None = None) -> int:
     from django.core.wsgi import get_wsgi_application
 
     handler = StaticFilesHandler(get_wsgi_application())
-    try:
+
+    def _serve() -> None:
         run(args.host, port, handler, threading=True)
+
+    # In --debug mode, wrap in Django's autoreloader: any .py change
+    # under the project (views, models, settings, the cli itself, etc.)
+    # forks a fresh process. Templates and static files reload per-
+    # request anyway when DEBUG=True (no restart needed).
+    try:
+        if args.debug:
+            from django.utils.autoreload import run_with_reloader
+            print(
+                f"ulog-web: --debug active → autoreload on .py changes",
+                file=sys.stderr,
+            )
+            run_with_reloader(_serve)
+        else:
+            _serve()
     except KeyboardInterrupt:
         pass
     return 0

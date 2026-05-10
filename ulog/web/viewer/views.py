@@ -238,7 +238,16 @@ def qa_view(request):
     """
     if not getattr(settings, "DEBUG", False):
         raise Http404("debug-only page; relaunch with `ulog-web --debug`")
-    return render(request, "ulog/qa.html", {"logs_path": settings.ULOG_LOGS_PATH})
+    # Load EN+FR strings for the JS-side i18n switcher.
+    strings_path = Path(__file__).resolve().parent.parent / "qa_strings.json"
+    try:
+        qa_strings = json.loads(strings_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        qa_strings = {"en": {}, "fr": {}}
+    return render(request, "ulog/qa.html", {
+        "logs_path": settings.ULOG_LOGS_PATH,
+        "qa_strings_json": qa_strings,
+    })
 
 
 def diff_view(request, sha: str):

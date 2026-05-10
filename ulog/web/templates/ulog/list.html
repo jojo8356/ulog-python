@@ -309,12 +309,16 @@
           <td class="py-1.5 px-2 font-mono text-xs text-right tabular-nums text-slate-500 dark:text-slate-400 whitespace-nowrap">
             {{ r.context.duration_s|test_duration_fmt }}
           </td>
-          <td class="py-1.5 px-2 min-w-0">
-            <span class="block truncate" title="{{ r.msg }}">{{ r.msg|truncatechars:120 }}</span>
+          {# `max-w-0` is the canonical hack to make `truncate` work
+             inside a `table-fixed` <td> without an explicit width:
+             the cell takes the remaining table space, but the children
+             can finally truncate against a definite container width. #}
+          <td class="py-1.5 px-2 max-w-0">
+            <div class="truncate" title="{{ r.msg }}">{{ r.msg|truncatechars:120 }}</div>
             {% if r.context %}
-              <span class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate block">
+              <div class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate">
                 {% for k, v in r.context.items %}{{ k }}={{ v }}  {% endfor %}
-              </span>
+              </div>
             {% endif %}
           </td>
         </tr>

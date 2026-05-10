@@ -50,6 +50,9 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                # Custom processor — exposes `debug` in every template
+                # (drives the QA-link visibility in the header).
+                "ulog.web.context_processors.debug_flag",
             ],
             # Make {% lucide "name" %} available in every template
             # without per-file `{% load lucide %}`.

@@ -1,0 +1,303 @@
+{% extends 'ulog/base.html' %}
+
+{% block title %}ULog — QA checklist{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto p-4 md:p-6" data-qa-root="true">
+
+  {# Header — title + progress + reset #}
+  <div class="mb-4 flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-xl font-bold flex items-center gap-2">
+        {% lucide "clipboard-check" size=22 %}
+        QA manual checklist
+      </h1>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        Epic 1 (v0.3 Test integration) + Epic 2 (v0.4 Author attribution) + perf v0.4.1.
+        State persisted client-side (localStorage). Visible only when <code>ULOG_DEBUG=1</code>.
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="text-sm text-slate-600 dark:text-slate-300 tabular-nums">
+        <span id="qa-progress-done">0</span> / <span id="qa-progress-total">0</span> done
+        (<span id="qa-progress-pct">0</span>%)
+      </div>
+      <button id="qa-reset" type="button"
+              class="px-3 py-1 rounded text-xs bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700">
+        Reset all
+      </button>
+    </div>
+  </div>
+
+  {# Progress bar #}
+  <div class="h-1.5 bg-slate-200 dark:bg-slate-800 rounded mb-6 overflow-hidden">
+    <div id="qa-progress-bar" class="h-full bg-emerald-500 transition-all" style="width: 0%"></div>
+  </div>
+
+  {# ====== 0. Setup ====== #}
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2">
+      {% lucide "circle-play" size=18 %}
+      0. Setup
+    </h2>
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-3">
+      Generate a realistic demo DB then launch the viewer.
+    </p>
+    <pre class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-xs mb-3 overflow-x-auto"><code>cd ~/Documents/programmation/projets/autres/ulog-python
+source .venv/bin/activate
+python3 scripts/seed_demo_db.py /tmp/ulog-demo
+ulog-web --repo /tmp/ulog-demo /tmp/ulog-demo/logs.sqlite</code></pre>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="setup-1" label="Script seed_demo_db.py runs without error" %}
+      {% include "ulog/_qa_item.html" with id="setup-2" label="DB > 5 MB (ls -lh /tmp/ulog-demo/logs.sqlite)" %}
+      {% include "ulog/_qa_item.html" with id="setup-3" label="Stderr shows author-indexer progress lines" %}
+      {% include "ulog/_qa_item.html" with id="setup-4" label="No stack trace at startup" %}
+    </ul>
+    <p class="text-xs text-amber-700 dark:text-amber-400 mt-2">
+      ⚠ If you forget <code>--repo</code>, auto-detect targets the ulog-python repo (cwd) → all records become <code>&lt;unknown&gt;</code>.
+    </p>
+  </section>
+
+  {# ====== 1. Epic 1 ====== #}
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+      {% lucide "flask-conical" size=18 %}
+      1. Epic 1 — Test integration (v0.3)
+    </h2>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">1.1 TESTS sidebar (Story 1.6 / FR62)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e1-1.1-1" label="Section 'TESTS' visible (between Files and main pane), with icon" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-2" label="Tests grouped by file (tests/checkout.py, tests/login.py...)" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-3" label="First 5 file groups expanded by default; rest collapsed" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-4" label="Each test shows: outcome icon (✓/✗/🔥/⊘) + name + formatted duration (ms/s)" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-5" label="Mix of outcomes visible: passed, failed, errored, skipped" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-6" label="No raw {# ... #} comment text leaking above the section" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">1.2 Quick filters (Story 1.6 / FR63-FR64)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e1-1.2-1" label="'Failed only' checkbox filters list to failed/errored tests" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.2-2" label="'Slowest top 10' filters list to 10 slowest tests by duration" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.2-3" label="Both checkboxes can be combined" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.2-4" label="Unchecking restores full list" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">1.3 Click test name → filter (Story 1.7 / FR65)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e1-1.3-1" label="Click test name → URL becomes /?test_id=tests%2F..." %}
+      {% include "ulog/_qa_item.html" with id="e1-1.3-2" label="Records list filters to records emitted during this test (incl. propagated app records)" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.3-3" label="Active test visually distinct in sidebar (background or bold)" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.3-4" label="Other filters preserved when clicking a test (level, search, etc.)" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">1.4 Detail view 'Test context' panel (Story 1.8 / FR66)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e1-1.4-1" label="Click any test record → 'Test context' panel between Context and Exception" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.4-2" label="Panel shows: outcome icon + name + duration" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.4-3" label="Test ID (full path) shown" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.4-4" label="2 links: 'view all records for this test' + 'errors+warnings only'" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.4-5" label="Records without test_id → panel hidden" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">1.5 Doc page /docs/test-integration/ (Story 1.11)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e1-1.5-1" label="/docs/test-integration/ returns 200 and renders" link_url="/docs/test-integration/" link_text="open" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.5-2" label="Sections present: Install, CLI flags, Schema, Worked example, Programmatic API, Troubleshooting" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.5-3" label="conftest.py example in rendered code block (no raw markdown)" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.5-4" label="Listed in /docs/ index" link_url="/docs/" link_text="open" %}
+    </ul>
+  </section>
+
+  {# ====== 2. Epic 2 ====== #}
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-purple-600 dark:text-purple-400">
+      {% lucide "user" size=18 %}
+      2. Epic 2 — Author attribution (v0.4)
+    </h2>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">2.1 AUTHORS sidebar (Story 2.6 / FR76)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.1-1" label="'AUTHORS' block visible between Files and Time range" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.1-2" label="8 author names listed (Alice Chen, Bob Martin, etc.)" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.1-3" label="Each row: name + truncated email + count" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.1-4" label="<unknown> entry at the end (~1100 test records)" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.1-5" label="'Show unknown' checkbox at bottom (checked by default)" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">2.2 Multi-select OR + URL persistence (Story 2.7 / FR77)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.2-1" label="Tick one author → records filtered" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.2-2" label="Tick 2 authors → records from either (OR semantics)" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.2-3" label="URL contains ?author=...&author=... after submit" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.2-4" label="Reload preserves selection" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">2.3 Show unknown toggle (FR78)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.3-1" label="Uncheck 'Show unknown' → unknown records disappear" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.3-2" label="Recheck → they come back" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.3-3" label="URL changes to ?show_unknown=0 when off" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">2.4 Detail view 'Authored by' panel (Story 2.8 / FR80)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.4-1" label="Open any record → 'Authored by' panel between Test context and Exception" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.4-2" label="Format: <Name> <email truncated 40 chars> · <7-char short-sha>" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.4-3" label="Line 'committed X days/hours/minutes ago'" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.4-4" label="2 links: 'view all records from this author' + 'view diff: <sha>'" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">2.5 /diff/&lt;sha&gt;/ view (Story 2.9 / FR81 / NFR-SEC-30)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.5-1" label="'view diff' link → page renders with full git show output in <pre> monospace" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.5-2" label="'← back to records' link in header" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.5-3" label="HTML-escaped (test with a commit msg containing < or >)" %}
+    </ul>
+    <p class="text-xs text-slate-600 dark:text-slate-400 mt-2 mb-1">Security tests (paste in URL bar):</p>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.5-sec-1" label="/diff/abc/ (too short) → 400 Bad Request" link_url="/diff/abc/" link_text="try" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.5-sec-2" label="/diff/abc;rm/ (shell chars) → 400" link_url="/diff/abc;rm/" link_text="try" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.5-sec-3" label="/diff/0000...0000/ (valid hex but unreachable) → 404" link_url="/diff/0000000000000000000000000000000000000000/" link_text="try" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">2.6 Doc page /docs/author-filter/ (Story 2.11)</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.6-1" label="/docs/author-filter/ renders" link_url="/docs/author-filter/" link_text="open" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.6-2" label="Sections: How it works, CLI flags, <unknown> semantics, Code vs commit author, Worked example, Performance, Security, Troubleshooting" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5">2.7 CLI flags (Story 2.2) — terminal tests</h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e2-2.7-1" label="--no-author-index → AUTHORS block hidden, instant startup" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.7-2" label="--rebuild-author-index → drops cache, reblames from scratch" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.7-3" label="cd /tmp && ulog-web ... → no .git/ found, stderr warning, AUTHORS hidden" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.7-4" label="--no-author-index --rebuild-author-index → argparse error (mutually exclusive)" %}
+    </ul>
+  </section>
+
+  {# ====== 3. Perf ====== #}
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+      {% lucide "gauge" size=18 %}
+      3. Perf v0.4.1 — page load &lt; 3s (PRD-v0.4.1)
+    </h2>
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">
+      Run in another terminal (replace NNNNN with your viewer port):
+    </p>
+    <pre class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-xs mb-3 overflow-x-auto"><code>time curl -sS -o /dev/null http://127.0.0.1:NNNNN/                              # cold
+time curl -sS -o /dev/null http://127.0.0.1:NNNNN/                              # warm
+time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/?level=ERROR'                # filter
+time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/?author=alice@globex.io'    # author filter
+time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/?page=10'                    # pagination
+time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/r/100/'                      # detail</code></pre>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-perf-1" label="Cold cache (1st request) < 1s" %}
+      {% include "ulog/_qa_item.html" with id="e3-perf-2" label="Warm cache (2nd+) < 200ms" %}
+      {% include "ulog/_qa_item.html" with id="e3-perf-3" label="Filter level/sector/file < 200ms" %}
+      {% include "ulog/_qa_item.html" with id="e3-perf-4" label="Author filter < 2s" %}
+      {% include "ulog/_qa_item.html" with id="e3-perf-5" label="Pagination < 200ms" %}
+      {% include "ulog/_qa_item.html" with id="e3-perf-6" label="Detail view < 100ms" %}
+      {% include "ulog/_qa_item.html" with id="e3-perf-7" label="No response > 3s on any path" %}
+    </ul>
+  </section>
+
+  {# ====== 4. Cross-epic regressions ====== #}
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-slate-600 dark:text-slate-300">
+      {% lucide "history" size=18 %}
+      4. v0.1 / v0.2 features still work
+    </h2>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e4-reg-1" label="Levels sidebar (DEBUG/INFO/WARNING/ERROR/CRITICAL) with ghost counts" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-2" label="Sectors sidebar (logger names) — multi-select OR" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-3" label="Files sidebar — multi-select OR" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-4" label="Search msg — substring match" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-5" label="Time range filter (from/to ISO-8601)" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-6" label="Bound fields filter (?bound=tenant_id=tenant_001)" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-7" label="Pagination buttons (prev/next at bottom)" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-8" label="Tutorial overlay on first launch (FR38)" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-9" label="Dark mode toggle in header — preference persisted" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-10" label="/api/records/ returns valid JSON" link_url="/api/records/" link_text="open" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-11" label="Detail view shows: ts, level, logger, msg, file:line, context, exception (when present)" %}
+    </ul>
+  </section>
+
+  {# ====== 5. Stability ====== #}
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-rose-600 dark:text-rose-400">
+      {% lucide "shield-check" size=18 %}
+      5. Stability watchpoints
+    </h2>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e5-sta-1" label="Reload page 20× → Django process stays under 200 MB RES" %}
+      {% include "ulog/_qa_item.html" with id="e5-sta-2" label="No 'Logging error' or 'OperationalError' on stderr while navigating" %}
+      {% include "ulog/_qa_item.html" with id="e5-sta-3" label="No git blame subprocess respawning on idle navigation (only at startup)" %}
+    </ul>
+  </section>
+
+  {# ====== Sign-off ====== #}
+  <section class="mb-4 p-4 rounded border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+    <h2 class="text-base font-semibold mb-2 flex items-center gap-2">
+      {% lucide "circle-check" size=18 %}
+      Sign-off
+    </h2>
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">
+      When all sections are green (or bugs noted to Claude), tell Claude:
+    </p>
+    <ul class="text-sm space-y-1 list-disc pl-5">
+      <li>"<b>QA done, bugs:</b> ..." → Claude files the patches</li>
+      <li>"<b>QA 100% green</b>" → Claude starts Epic 3 (v0.5 chain integrity)</li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+  (() => {
+    const KEY_PREFIX = 'ulogQA:';
+    const root = document.querySelector('[data-qa-root="true"]');
+    if (!root) return;
+
+    const checkboxes = root.querySelectorAll('input[type="checkbox"][data-qa-id]');
+    const totalEl   = document.getElementById('qa-progress-total');
+    const doneEl    = document.getElementById('qa-progress-done');
+    const pctEl     = document.getElementById('qa-progress-pct');
+    const barEl     = document.getElementById('qa-progress-bar');
+    const resetBtn  = document.getElementById('qa-reset');
+
+    totalEl.textContent = String(checkboxes.length);
+
+    const updateProgress = () => {
+      const done = Array.from(checkboxes).filter(cb => cb.checked).length;
+      const pct  = checkboxes.length === 0 ? 0 : Math.round((done * 100) / checkboxes.length);
+      doneEl.textContent = String(done);
+      pctEl.textContent  = String(pct);
+      barEl.style.width  = pct + '%';
+    };
+
+    // Restore from localStorage + wire change handlers.
+    checkboxes.forEach(cb => {
+      const id = cb.dataset.qaId;
+      const stored = localStorage.getItem(KEY_PREFIX + id);
+      if (stored === '1') cb.checked = true;
+      cb.addEventListener('change', () => {
+        if (cb.checked) localStorage.setItem(KEY_PREFIX + id, '1');
+        else            localStorage.removeItem(KEY_PREFIX + id);
+        updateProgress();
+      });
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (!confirm('Reset all checkboxes? This wipes localStorage state for the QA checklist.')) return;
+      checkboxes.forEach(cb => {
+        cb.checked = false;
+        localStorage.removeItem(KEY_PREFIX + cb.dataset.qaId);
+      });
+      updateProgress();
+    });
+
+    updateProgress();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+{# QA checklist item — checkbox + label + optional inline link. Persisted via JS in qa.html. #}
+<li>
+  <label class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 px-1.5 py-0.5 rounded">
+    <input type="checkbox" data-qa-id="{{ id }}" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">
+    <span class="flex-1">
+      {{ label }}
+      {% if link_url %}
+        <a href="{{ link_url }}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline text-xs ml-1">[{{ link_text|default:"open" }} ↗]</a>
+      {% endif %}
+    </span>
+  </label>
+</li>

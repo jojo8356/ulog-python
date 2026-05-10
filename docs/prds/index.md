@@ -15,6 +15,7 @@ Chaque ligne pointe vers le PRD complet.
 | v0.5.0 | [PRD-v0.5-forensic-archive.md](./PRD-v0.5-forensic-archive.md) | Forensic black box — immutable chain, replay, correlate, incidents ledger | draft v1 | 706 |
 | v0.6.0 | [PRD-v0.6-static-export.md](./PRD-v0.6-static-export.md) | Static HTML export — `ulog export-html` for archival/distribution (compliance, GitHub Releases, Pages) | draft v1 | 600 |
 | v0.7.0 | [PRD-v0.7-test-execution-stack.md](./PRD-v0.7-test-execution-stack.md) | "EXPLAIN ANALYZE for tests" — span-based execution timeline + waterfall in viewer + `ulog explain` CLI | draft v1 | 380 |
+| v0.8.0 | [PRD-v0.8-modern-frontend-stack.md](./PRD-v0.8-modern-frontend-stack.md) | Modern frontend stack — Tailwind CLI standalone (CSS <10KB) + Alpine.js (declarative JS) + HTMX (partial swaps). Replaces CDN runtime + ad-hoc inline JS. Supersedes Story 8-1. | draft v1 | 460 |
 
 ## Filiation
 
@@ -27,6 +28,7 @@ PRD-v0.1-core.md
     └── PRD-v0.5-forensic-archive.md   (draft v1 — emerged from brainstorming session 2026-05-04)
         └── PRD-v0.6-static-export.md  (draft v1 — `ulog export-html` for archival/distribution)
             └── PRD-v0.7-test-execution-stack.md  (draft v1 — span timeline / waterfall / `ulog explain`)
+                └── PRD-v0.8-modern-frontend-stack.md  (draft v1 — Tailwind CLI + Alpine.js + HTMX, supersedes Story 8-1)
 ```
 
 ## Conventions

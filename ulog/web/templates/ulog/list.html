@@ -1,4 +1,5 @@
 {% extends 'ulog/base.html' %}
+{% load ulog_filters %}
 
 {% block title %}ULog — {{ total }} records{% endblock %}
 
@@ -273,22 +274,25 @@
     </div>
 
     {% if records %}
-    <table class="w-full text-sm">
+    {# Wrapper: horizontal scroll on narrow viewports so the table never overflows the main pane. #}
+    <div class="overflow-x-auto -mx-2 md:mx-0">
+    <table class="text-sm w-full min-w-[1024px] table-fixed">
       <thead class="text-left text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
         <tr>
-          <th class="py-2 pr-2 w-44" title="ISO-8601 UTC timestamp from record.created">TS</th>
-          <th class="py-2 pr-2 w-20" title="Severity level (DEBUG/INFO/WARNING/ERROR/CRITICAL)">Level</th>
-          <th class="py-2 pr-2 w-56" title="Logger name (logging.getLogger argument)">Logger</th>
-          <th class="py-2 pr-2 w-44" title="Source file:line of the log call">File</th>
-          <th class="py-2" title="Message (truncated; click row for full text)">Message</th>
+          <th class="py-2 px-2 w-44" title="ISO-8601 UTC timestamp from record.created">TS</th>
+          <th class="py-2 px-2 w-20" title="Severity level (DEBUG/INFO/WARNING/ERROR/CRITICAL)">Level</th>
+          <th class="py-2 px-2 w-44" title="Logger name (logging.getLogger argument)">Logger</th>
+          <th class="py-2 px-2 w-40" title="Source file:line of the log call">File</th>
+          <th class="py-2 px-2 w-20 text-right tabular-nums" title="Test record duration (context.duration_s); empty for non-test records">Time</th>
+          <th class="py-2 px-2" title="Message (truncated; click row for full text)">Message</th>
         </tr>
       </thead>
       <tbody>
         {% for r in records %}
         <tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
             onclick="window.location.href='{% url 'ulog-detail' r.id %}?qs={{ qs|urlencode }}';">
-          <td class="py-1.5 pr-2 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ r.ts }}</td>
-          <td class="py-1.5 pr-2">
+          <td class="py-1.5 px-2 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ r.ts }}</td>
+          <td class="py-1.5 px-2">
             <span class="inline-block w-20 text-center text-xs font-mono px-1 py-0.5 rounded
               {% if r.level == 'CRITICAL' %}bg-red-600 text-white font-semibold dark:bg-red-700 dark:text-white
               {% elif r.level == 'ERROR' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
@@ -298,11 +302,14 @@
               {{ r.level }}
             </span>
           </td>
-          <td class="py-1.5 pr-2 font-mono text-xs truncate" title="{{ r.logger }}">{{ r.logger }}</td>
-          <td class="py-1.5 pr-2 font-mono text-xs text-slate-500 dark:text-slate-400" title="{{ r.file }}:{{ r.line }}">
+          <td class="py-1.5 px-2 font-mono text-xs truncate" title="{{ r.logger }}">{{ r.logger }}</td>
+          <td class="py-1.5 px-2 font-mono text-xs text-slate-500 dark:text-slate-400 truncate" title="{{ r.file }}:{{ r.line }}">
             {{ r.file|truncatechars:24 }}:{{ r.line }}
           </td>
-          <td class="py-1.5">
+          <td class="py-1.5 px-2 font-mono text-xs text-right tabular-nums text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            {{ r.context.duration_s|test_duration_fmt }}
+          </td>
+          <td class="py-1.5 px-2 min-w-0">
             <span class="block truncate" title="{{ r.msg }}">{{ r.msg|truncatechars:120 }}</span>
             {% if r.context %}
               <span class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate block">
@@ -314,6 +321,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
       <p class="text-slate-500 dark:text-slate-400 italic">No records match the current filters.</p>
     {% endif %}

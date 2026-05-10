@@ -81,6 +81,8 @@
       {% include "ulog/_qa_item.html" with id="e1-1.1-4" label="Each test shows: outcome icon (✓/✗/🔥/⊘) + name + formatted duration (ms/s)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.1-5" label="Mix of outcomes visible: passed, failed, errored, skipped" %}
       {% include "ulog/_qa_item.html" with id="e1-1.1-6" label="No raw {# ... #} comment text leaking above the section" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-7" label="Records table has a 'Time' column showing context.duration_s formatted (ms / s) for test records, empty for non-test" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-8" label="On narrow viewport (<1024px), the records table scrolls horizontally inside its pane — no overflow, no overlapping tooltips, no clipped Message column" %}
     </ul>
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-1-2-title">1.2 Quick filters (Story 1.6 / FR63-FR64)</h3>

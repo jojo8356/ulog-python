@@ -421,7 +421,19 @@ class SQLiteAdapter(Adapter):
         return sorted(keys)
 
     def _row_to_record(self, row) -> Record:
-        ts = row.ts.isoformat(timespec="seconds") + "Z" if row.ts else ""
+        # ULog stores timestamps as tz-aware UTC datetimes (sql.py uses
+        # datetime.fromtimestamp(record.created, tz=timezone.utc)). The
+        # naive isoformat() + "Z" pattern produces "+00:00Z" — invalid
+        # ISO-8601 (double TZ designator) AND visually bloats the column.
+        # Strip the "+00:00" suffix when present, then append the "Z"
+        # designator. UTC-only contract is documented in the wire spec.
+        if row.ts:
+            iso = row.ts.isoformat(timespec="seconds")
+            if iso.endswith("+00:00"):
+                iso = iso[:-6]
+            ts = iso + "Z"
+        else:
+            ts = ""
         ctx = row.context
         if isinstance(ctx, str):
             ctx = json.loads(ctx) if ctx else {}

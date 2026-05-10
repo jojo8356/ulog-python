@@ -91,3 +91,25 @@ def test_qa_link_in_header_only_when_debug(sqlite_fixture):
     resp = client.get("/")
     body = resp.content.decode("utf-8")
     assert "/_qa/" not in body
+
+
+def test_debug_bar_visible_when_debug_on(sqlite_fixture):
+    """The debug bar with 'Open QA checklist' button is visible across
+    all pages when --debug is active."""
+    client = _make_django_client(sqlite_fixture, debug=True)
+    for path in ("/", "/r/1/", "/docs/"):
+        resp = client.get(path)
+        assert resp.status_code == 200, f"{path} returned {resp.status_code}"
+        body = resp.content.decode("utf-8")
+        assert 'data-debug-bar="true"' in body, f"debug bar missing on {path}"
+        assert "DEBUG MODE" in body, f"debug-mode label missing on {path}"
+        assert "Open QA checklist" in body, f"QA button missing on {path}"
+
+
+def test_debug_bar_hidden_when_debug_off(sqlite_fixture):
+    """No debug bar in production-mode page renders."""
+    client = _make_django_client(sqlite_fixture, debug=False)
+    resp = client.get("/")
+    body = resp.content.decode("utf-8")
+    assert 'data-debug-bar="true"' not in body
+    assert "DEBUG MODE" not in body

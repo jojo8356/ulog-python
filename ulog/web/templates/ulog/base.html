@@ -87,6 +87,54 @@
     </nav>
 </header>
 
+{% if debug %}
+{# Debug bar — visible only when launched with `ulog-web --debug`. #}
+{# Hidden on the QA page itself to avoid the recursion of "go to QA" while ON QA. #}
+<div id="ulog-debug-bar"
+     class="bg-amber-100 dark:bg-amber-900/40 border-b border-amber-300 dark:border-amber-700 px-4 py-2 text-sm flex items-center justify-between gap-4 flex-wrap"
+     data-debug-bar="true">
+    <div class="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+        {% lucide "bug" size=16 %}
+        <span class="font-semibold">DEBUG MODE</span>
+        <span class="text-xs opacity-70 hidden sm:inline">— launched with <code>--debug</code></span>
+    </div>
+    <div class="flex items-center gap-3">
+        <span class="text-xs text-amber-800 dark:text-amber-200 tabular-nums">
+            QA: <span id="debug-bar-progress">0 / 0</span> done
+        </span>
+        <a href="{% url 'ulog-qa' %}"
+           class="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-semibold flex items-center gap-1.5 text-xs shadow-sm">
+            {% lucide "clipboard-check" size=14 %}
+            <span>Open QA checklist →</span>
+        </a>
+    </div>
+</div>
+<script>
+  // Read QA progress from localStorage (no server round-trip).
+  (() => {
+    const bar = document.getElementById('debug-bar-progress');
+    if (!bar) return;
+    let total = 0, done = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('ulogQA:')) { total++; if (localStorage.getItem(k) === '1') done++; }
+    }
+    // localStorage only sees CHECKED ones. Show "done" with no total
+    // until user visits /_qa/ once (then we know the universe).
+    const cached = localStorage.getItem('ulogQA:_total');
+    const knownTotal = cached ? parseInt(cached, 10) : 0;
+    bar.textContent = (knownTotal > 0)
+      ? `${done} / ${knownTotal}`
+      : `${done} so far`;
+  })();
+  // Hide the debug bar when ON the QA page (we already see progress there).
+  if (window.location.pathname === '/_qa/') {
+    const bar = document.getElementById('ulog-debug-bar');
+    if (bar) bar.style.display = 'none';
+  }
+</script>
+{% endif %}
+
 {% block content %}{% endblock %}
 
 <script>

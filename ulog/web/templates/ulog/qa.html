@@ -267,6 +267,9 @@ time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/r/100/'                      
     const resetBtn  = document.getElementById('qa-reset');
 
     totalEl.textContent = String(checkboxes.length);
+    // Cache the universe size so the debug-bar on other pages can
+    // display "X / total" instead of just "X so far".
+    localStorage.setItem('ulogQA:_total', String(checkboxes.length));
 
     const updateProgress = () => {
       const done = Array.from(checkboxes).filter(cb => cb.checked).length;

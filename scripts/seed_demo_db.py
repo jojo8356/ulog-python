@@ -357,6 +357,43 @@ def generate_log_db(
                 None, json.dumps(started_ctx),
             ))
 
+            # Story 1.4 propagation simulation: 1-4 app records emitted
+            # DURING the test body inherit `test_id` via the bound-context
+            # ContextVar. They look like normal app logs, just enriched
+            # with the test_id key in their context.
+            n_app = random.randint(1, 4)
+            for _ in range(n_app):
+                app_ts_offset = random.uniform(0, max(duration, 0.001))
+                app_ts = (base_ts + timedelta(seconds=app_ts_offset)).isoformat()
+                app_svc = random.choice(services)
+                app_fname = random.choice(SERVICES[app_svc])
+                app_line = random.randint(1, file_to_lines[app_fname])
+                app_logger = LOGGER_PREFIXES[app_svc]
+                app_level = random.choices(levels, weights=level_w, k=1)[0]
+                app_msg = random.choice(MESSAGES_BY_LEVEL[app_level])
+                try:
+                    if "%s" in app_msg and "%d" in app_msg:
+                        app_msg = app_msg % (random.choice(users), random.randint(10, 500))
+                    elif "%d" in app_msg:
+                        app_msg = app_msg % (random.randint(1, 9999),)
+                    elif "%s" in app_msg:
+                        app_msg = app_msg % (random.choice(users),)
+                    elif "%.1f" in app_msg:
+                        app_msg = app_msg % (random.uniform(60, 99),)
+                except TypeError:
+                    pass
+                app_ctx = {
+                    "test_id": test_id,
+                    "phase": "call",
+                    "tenant_id": random.choice(tenants),
+                    "request_id": f"req_{random.randint(10**8, 10**9 - 1):x}",
+                }
+                rows.append((
+                    app_ts, app_level, app_logger, app_msg,
+                    app_fname, app_line,
+                    None, json.dumps(app_ctx),
+                ))
+
             # outcome record (line 281 for passed, line 211 for traceback)
             outcome_ts = (base_ts + timedelta(seconds=duration)).isoformat()
             outcome_ctx = {

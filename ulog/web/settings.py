@@ -40,6 +40,19 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
 ]
 
+# Optional dev convenience: when DEBUG is on AND the user installed
+# `pip install ulog[web-dev]` (or django-browser-reload directly),
+# wire the browser-reload middleware so .py / template / static
+# changes auto-refresh the open browser tab. Silently skipped when
+# the package is absent — keeps the [web]-only install clean.
+if DEBUG:
+    try:
+        import django_browser_reload  # noqa: F401
+        INSTALLED_APPS.append("django_browser_reload")
+        MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
+    except ImportError:
+        pass
+
 ROOT_URLCONF = "ulog.web.urls"
 
 TEMPLATES = [

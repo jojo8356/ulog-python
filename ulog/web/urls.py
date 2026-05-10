@@ -1,8 +1,9 @@
 """ULog viewer URL routes."""
 from __future__ import annotations
 
+from django.conf import settings
 from django.http import HttpResponse
-from django.urls import path
+from django.urls import include, path
 
 from .viewer import views
 
@@ -22,3 +23,13 @@ urlpatterns = [
     # rather than 404-spamming the request log.
     path("favicon.ico", lambda r: HttpResponse(status=204), name="ulog-favicon"),
 ]
+
+# Optional dev convenience: wire django-browser-reload's events
+# endpoint when DEBUG is on AND the package is installed. Silent
+# no-op otherwise — keeps the [web]-only install clean.
+if settings.DEBUG:
+    try:
+        import django_browser_reload  # noqa: F401
+        urlpatterns += [path("__reload__/", include("django_browser_reload.urls"))]
+    except ImportError:
+        pass

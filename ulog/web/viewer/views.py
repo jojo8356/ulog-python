@@ -232,12 +232,12 @@ def _validate_sha(sha: str) -> bool:
 def qa_view(request):
     """Debug-only QA checklist page (Epic 1 + Epic 2 + perf v0.4.1).
 
-    404 unless `settings.DEBUG` is True (i.e. user launched with
-    `ULOG_DEBUG=1`). All state is client-side (localStorage) — no
-    server persistence, no DB writes. The page is a dev-time tool.
+    404 unless `settings.DEBUG` is True (i.e. user launched the viewer
+    with `ulog-web --debug`). All state is client-side (localStorage)
+    — no server persistence, no DB writes. The page is a dev-time tool.
     """
     if not getattr(settings, "DEBUG", False):
-        raise Http404("debug-only page; set ULOG_DEBUG=1 to enable")
+        raise Http404("debug-only page; relaunch with `ulog-web --debug`")
     return render(request, "ulog/qa.html", {"logs_path": settings.ULOG_LOGS_PATH})
 
 

@@ -117,3 +117,21 @@ def test_argparse_no_index_and_rebuild_are_mutually_exclusive():
         main(["--no-author-index", "--rebuild-author-index", "/tmp/whatever.sqlite"])
     # argparse exits 2 on usage errors
     assert exc.value.code == 2
+
+
+def test_argparse_accepts_debug_flag():
+    """`--debug` is a valid flag; sets args.debug = True."""
+    import argparse
+    from ulog.web.cli import main  # noqa: F401  (imported for side-effects only)
+
+    # Build the same parser shape as main() to assert the flag exists.
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path")
+    parser.add_argument("--debug", action="store_true")
+    ns = parser.parse_args(["--debug", "/tmp/x.sqlite"])
+    assert ns.debug is True
+
+    # Smoke-test main()'s argparse layer accepts the flag (returns 2 on
+    # missing file but the flag must parse cleanly first).
+    rc = main(["--debug", "/tmp/this-does-not-exist.sqlite"])
+    assert rc == 2

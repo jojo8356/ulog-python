@@ -129,6 +129,11 @@ def main(argv: list[str] | None = None) -> int:
         "--rebuild-author-index", action="store_true",
         help="Force rebuild of the author cache (drops the existing one).",
     )
+    parser.add_argument(
+        "--debug", action="store_true",
+        help="Enable Django DEBUG mode + show the /_qa/ checklist link "
+             "in the header. Dev-only — never use against shared logs.",
+    )
     args = parser.parse_args(argv)
 
     if not args.path.exists():
@@ -153,6 +158,10 @@ def main(argv: list[str] | None = None) -> int:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ulog.web.settings")
     os.environ["ULOG_LOGS_PATH"] = str(args.path.resolve())
     os.environ["ULOG_LOGS_KIND"] = kind
+    # `--debug` is the user-facing switch; settings.py reads ULOG_DEBUG
+    # internally because Django settings load before main() returns.
+    if args.debug:
+        os.environ["ULOG_DEBUG"] = "1"
 
     # Resolve author-index flags + emit any warning.
     repo, warning = _resolve_repo_flag(args, Path.cwd())

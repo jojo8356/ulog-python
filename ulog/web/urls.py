@@ -14,8 +14,9 @@ urlpatterns = [
     path("diff/<str:sha>/", views.diff_view, name="ulog-diff"),
     path("docs/", views.docs_index, name="ulog-docs-index"),
     path("docs/<slug:page>/", views.docs_page, name="ulog-docs-page"),
-    # Debug-only QA checklist — visible from the header when ULOG_DEBUG=1.
-    # Returns 404 in production. State persists in browser localStorage.
+    # Debug-only QA checklist — visible from the header when the viewer
+    # was launched with `ulog-web --debug`. Returns 404 otherwise.
+    # State persists in browser localStorage.
     path("_qa/", views.qa_view, name="ulog-qa"),
     # Browser auto-requests /favicon.ico on every page; respond 204
     # rather than 404-spamming the request log.

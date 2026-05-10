@@ -1,6 +1,8 @@
-{# QA checklist item — checkbox + label + optional inline link.
-   Each label/link carries data-i18n-key so the EN/FR switcher in qa.html
-   can swap textContent at runtime without a page reload. #}
+{% comment %}
+  QA checklist item — checkbox + label + optional inline link.
+  Each label/link carries data-i18n-key so the EN/FR switcher in qa.html
+  can swap textContent at runtime without a page reload.
+{% endcomment %}
 <li>
   <label class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 px-1.5 py-0.5 rounded">
     <input type="checkbox" data-qa-id="{{ id }}" class="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500">

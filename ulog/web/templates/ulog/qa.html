@@ -34,27 +34,19 @@
     <div id="qa-progress-bar" class="h-full bg-emerald-500 transition-all" style="width: 0%"></div>
   </div>
 
-  {# ====== 0. Setup ====== #}
-  <section class="mb-8">
-    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2">
-      {% lucide "circle-play" size=18 %}
-      0. Setup
+  {# ====== 0. Setup — fully automated by tests/test_qa_setup_e2e.py ====== #}
+  <section class="mb-8 p-3 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+    <h2 class="font-semibold mb-1 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+      {% lucide "circle-check" size=16 %}
+      §0 Setup — automated
     </h2>
-    <p class="text-sm text-slate-600 dark:text-slate-400 mb-3">
-      Generate a realistic demo DB then launch the viewer.
+    <p class="text-xs text-emerald-800 dark:text-emerald-200">
+      Setup checks (seed script ✓, DB ✓, indexer progress ✓, no stack trace ✓, no-git-repo warning ✓)
+      are now covered by <code>tests/test_qa_setup_e2e.py</code>. Run:
     </p>
-    <pre class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-xs mb-3 overflow-x-auto"><code>cd ~/Documents/programmation/projets/autres/ulog-python
-source .venv/bin/activate
-python3 scripts/seed_demo_db.py /tmp/ulog-demo
-ulog-web --repo /tmp/ulog-demo /tmp/ulog-demo/logs.sqlite</code></pre>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="setup-1" label="Script seed_demo_db.py runs without error" %}
-      {% include "ulog/_qa_item.html" with id="setup-2" label="DB > 5 MB (ls -lh /tmp/ulog-demo/logs.sqlite)" %}
-      {% include "ulog/_qa_item.html" with id="setup-3" label="Stderr shows author-indexer progress lines" %}
-      {% include "ulog/_qa_item.html" with id="setup-4" label="No stack trace at startup" %}
-    </ul>
-    <p class="text-xs text-amber-700 dark:text-amber-400 mt-2">
-      ⚠ If you forget <code>--repo</code>, auto-detect targets the ulog-python repo (cwd) → all records become <code>&lt;unknown&gt;</code>.
+    <pre class="bg-white/60 dark:bg-slate-900/40 rounded p-2 text-xs mt-1 overflow-x-auto"><code>python3 -m pytest tests/test_qa_setup_e2e.py -v</code></pre>
+    <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1">
+      If green → §0 done. Skip to §1 below.
     </p>
   </section>
 

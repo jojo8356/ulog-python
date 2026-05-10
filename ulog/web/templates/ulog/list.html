@@ -293,7 +293,7 @@
             onclick="window.location.href='{% url 'ulog-detail' r.id %}{% if qs %}?qs={{ qs|urlencode }}{% endif %}';">
           <td class="py-1.5 px-3 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ r.ts }}</td>
           <td class="py-1.5 px-3">
-            <span class="inline-block w-20 text-center text-xs font-mono px-1 py-0.5 rounded
+            <span class="inline-block w-20 mr-2 text-center text-xs font-mono px-1 py-0.5 rounded
               {% if r.level == 'CRITICAL' %}bg-red-600 text-white font-semibold dark:bg-red-700 dark:text-white
               {% elif r.level == 'ERROR' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
               {% elif r.level == 'WARNING' %}bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200

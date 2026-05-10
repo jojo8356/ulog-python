@@ -303,6 +303,18 @@ def generate_log_db(
         if random.random() < 0.1:
             ctx["region"] = random.choice(["us-east-1", "eu-west-1", "ap-southeast-1"])
 
+        # Synthetic operation duration — Pareto-ish: 80% fast (1-50ms),
+        # 18% medium (50-200ms), 2% slow (200ms-2s). Lets the viewer
+        # "Time" column show realistic variance.
+        r = random.random()
+        if r < 0.80:
+            duration_s = random.uniform(0.001, 0.05)
+        elif r < 0.98:
+            duration_s = random.uniform(0.05, 0.2)
+        else:
+            duration_s = random.uniform(0.2, 2.0)
+        ctx["duration_s"] = round(duration_s, 6)
+
         # Some ERROR records carry an exception
         exc = None
         if level == "ERROR" and random.random() < 0.5:

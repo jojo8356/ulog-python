@@ -63,6 +63,7 @@ Loki + Grafana résolvent ça mais demandent une infra (Docker, retention policy
 | SC2 | ≥ 3 langages portés (Python, JS, Go) avant tag v2.0. |
 | SC3 | Viewer exportable en HTML statique (Epic 8 / v0.6) → un dev JS pur peut visualiser sans installer Python. |
 | SC4 | "Hello world" en JS / Go : `npm install ulog-js` → 5 lignes de code → record visible dans `ulog-web` lancé depuis n'importe quel autre dev de l'équipe. |
+| SC5 | **Habit preservation** : les fonctions clés (`setup`, `get_logger`, `bind`, `unbind`, `clear`, `context`, `span`) portent le **même nom sémantique** dans tous les ports. Un dev Python qui passe à `ulog-js` retrouve les mêmes verbes — seul le casing s'adapte à la convention locale (cf. §4.4). |
 
 ---
 
@@ -177,7 +178,7 @@ To call yourself a "ULog port", a library MUST provide:
 - Author attribution (the `git blame`-driven enrichment is reader-side; lib only needs to store `file` + `line`).
 - Forensic hash chain (only after the spec freezes in v0.5).
 
-### 4.3 Naming convention
+### 4.3 Naming convention (packages)
 
 | Language | Package name | Repo |
 |---|---|---|
@@ -188,6 +189,78 @@ To call yourself a "ULog port", a library MUST provide:
 | Java | `io.ulog:ulog-core` | TODO |
 
 Each repo's README must link back to the spec doc.
+
+### 4.4 Canonical API names — habits stay across languages
+
+**The rule.** Each port MUST expose the same **semantic verbs** as
+`ulog-py`, with only the casing adapted to the language's native
+convention. A dev who knows the Python API should be able to write
+ULog code in JS / Go / Rust without checking docs — only the casing
+changes, never the verb itself.
+
+**Why.** Cross-language consistency is THE differentiator versus
+"another logging lib per language". Pino's API has nothing in common
+with zap's API which has nothing in common with structlog's API.
+ULog's pitch falls apart if `ulog-js` has `setContext()` while
+`ulog-py` has `bind()` — the user has to relearn for every language.
+
+**The canonical API surface (Python source-of-truth):**
+
+| Concept | Python (`ulog-py`) | JavaScript (`ulog-js`) | Go (`ulog-go`) | Rust (`ulog`) | Java (`ulog-core`) |
+|---|---|---|---|---|---|
+| Configure | `ulog.setup(...)` | `ulog.setup(...)` | `ulog.Setup(...)` | `ulog::setup(...)` | `Ulog.setup(...)` |
+| Get a logger | `ulog.get_logger(name)` | `ulog.getLogger(name)` | `ulog.GetLogger(name)` | `ulog::get_logger(name)` | `Ulog.getLogger(name)` |
+| Bind context | `ulog.bind(k=v, ...)` | `ulog.bind({k: v})` | `ulog.Bind(ctx, "k", v)` | `ulog::bind(("k", v))` | `Ulog.bind("k", v)` |
+| Unbind | `ulog.unbind("k", ...)` | `ulog.unbind("k", ...)` | `ulog.Unbind(ctx, "k")` | `ulog::unbind("k")` | `Ulog.unbind("k")` |
+| Clear all bindings | `ulog.clear()` | `ulog.clear()` | `ulog.Clear(ctx)` | `ulog::clear()` | `Ulog.clear()` |
+| Read bindings | `ulog.get_bound()` | `ulog.getBound()` | `ulog.GetBound(ctx)` | `ulog::get_bound()` | `Ulog.getBound()` |
+| Scoped context | `with ulog.context(k=v):` | `ulog.context({k: v}, () => {...})` | `ulog.Context(ctx, "k", v, func() {...})` | `ulog::context!(...)` | `try (var _ = Ulog.context("k", v)) {...}` |
+| Open a span (v0.7) | `with ulog.span("name"):` | `ulog.span("name", () => {...})` | `ulog.Span(ctx, "name", func() {...})` | `ulog::span!("name", ...)` | `try (var _ = Ulog.span("name")) {...}` |
+| Logger.level call | `log.info(msg, **kw)` | `log.info(msg, ctx?)` | `log.Info(msg, fields...)` | `log.info!(msg)` | `log.info(msg, fields)` |
+| Test event API (v0.3) | `with test_event("name"):` | `testEvent("name", () => {...})` | `TestEvent(ctx, "name", func() {...})` | `test_event!("name", ...)` | (JUnit hook equivalent) |
+
+**Casing rule per language:**
+
+- **Python / Rust** — `snake_case` for functions, kwargs supported.
+- **JavaScript / TypeScript** — `camelCase` for functions, single object arg for "kwargs-like" patterns.
+- **Go** — `PascalCase` for exported. Use `context.Context` as first arg for binding (Go convention).
+- **Java / Kotlin** — `camelCase` methods. Builder pattern OK for setup.
+- **C# / .NET** — `PascalCase` methods.
+
+**Verbs that are NEVER allowed to mutate** (preserve semantic identity):
+
+- `setup` (NOT `init`, NOT `configure`, NOT `boot`)
+- `get_logger` / `getLogger` / `GetLogger` (NOT `logger`, NOT `factory`, NOT `getInstance`)
+- `bind` (NOT `setContext`, NOT `withFields`, NOT `addContext`)
+- `unbind` (NOT `removeContext`, NOT `clearField`)
+- `context` (NOT `withContext`, NOT `scope`, NOT `frame`)
+- `span` (NOT `trace`, NOT `track`, NOT `measure`, NOT `timed_block`)
+- `clear` (NOT `reset`, NOT `purge`, NOT `wipe`)
+
+**Acceptance test for any new port (CI gate):**
+
+A "Rosetta test" file in each port repo that exercises every canonical
+verb in a smoke-test style. Reviewing the file side-by-side with
+`ulog-py`'s equivalent must show 1:1 verb correspondence. If a port
+introduces a verb not in this table, it requires a spec amendment
+(this doc + cross-port discussion).
+
+**Anti-patterns to refuse in code review:**
+
+- A port that renames `bind` to "be more idiomatic" in its language.
+- A port that adds `bindAll`, `bindMany`, `bindStrict` because it
+  feels needed — propose to extend `bind` in the spec instead.
+- A port that uses different verbs based on whether you call it from
+  a logger instance (`log.bind`) vs the module (`ulog.bind`) — both
+  must work and behave identically.
+
+**Documented exception:**
+
+Each language MAY add **non-canonical helpers** in addition to the
+canonical verbs, IF those helpers don't replace canonical ones and
+don't get exposed in the README's "5-line hello world" example.
+Example: `ulog-go` may add a `WithContext(parent, ...)` helper for
+Go's `context.Context` propagation — additive, not a rename of `bind`.
 
 ---
 
@@ -267,7 +340,7 @@ Les PRDs suivantes s'appuient sur cette vision et seront implementées au fur et
 ✅ Doc créé dans `docs/vision-cross-language.md`
 ✅ Architecture en 3 couches diagram inline
 ✅ Wire format spec draft (§3) avec schema SQLite + JSONL + CSV + reserved keys
-✅ Library implementation contract (§4) — write conformance + drop-in + naming
+✅ Library implementation contract (§4) — write conformance + drop-in + naming + canonical API verbs (§4.4)
 ✅ Roadmap par langage (§5)
 ✅ Non-goals lock-in (§7)
 ✅ Lien vers les PRDs futures (§8)
@@ -275,3 +348,4 @@ Les PRDs suivantes s'appuient sur cette vision et seront implementées au fur et
 ## 10. Change log
 
 - **2026-05-10 v1.0** — Initial draft. Pitch + architecture + spec draft + roadmap. Posé comme nord-magnétique pour les Epics 8+ et les ports satellites.
+- **2026-05-10 v1.1** — Added §4.4 *Canonical API names* + SC5 *habit preservation*. Locks the 9 canonical verbs (`setup`, `get_logger`, `bind`, `unbind`, `clear`, `get_bound`, `context`, `span`, `test_event`) with cross-language casing table + anti-pattern list + Rosetta-test acceptance gate. Ensures a Python user reading `ulog-js` / `ulog-go` code recognizes the API on sight.

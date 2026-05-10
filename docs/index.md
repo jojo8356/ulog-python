@@ -30,6 +30,10 @@ generator: bmad-document-project (exhaustive scan)
 - [Data Models](./data-models.md) — SQL `logs` table schema + JSONL/CSV shapes + reserved-keys frozenset
 - [Component Inventory](./component-inventory.md) — formatters / handlers / adapters / views / templates catalog
 
+## Standards
+
+- [Django clean-code standard](./standards/django-clean-code-standard.md) — 7 architectural + 5 hygiene rules + i18n + 10 anti-patterns. Distilled from HackSoft Styleguide + Two Scoops. Applies to ulog and any future Django app (FastAPI mapping table for Cycloth included).
+
 ## Existing documentation (predates DP)
 
 - [`README.md`](../README.md) — install + quick tour

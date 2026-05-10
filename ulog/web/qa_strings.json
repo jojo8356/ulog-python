@@ -19,7 +19,6 @@
     "section-1-5-title": "1.5 Doc page /docs/test-integration/ (Story 1.11)",
 
     "e1-1.1-1": "Section 'Tests' visible in left sidebar between 'Level' and 'Sectors', with flask icon",
-    "e1-1.1-2": "Tests grouped by file (tests/checkout.py, tests/login.py...)",
     "e1-1.1-3": "First 5 file groups expanded by default; rest collapsed",
     "e1-1.1-4": "Each test shows: outcome icon (✓/✗/🔥/⊘) + name + formatted duration (ms/s)",
     "e1-1.1-5": "Mix of outcomes visible: passed, failed, errored, skipped",
@@ -137,7 +136,6 @@
     "section-1-5-title": "1.5 Page de doc /docs/test-integration/ (Story 1.11)",
 
     "e1-1.1-1": "Section 'Tests' visible dans la sidebar gauche entre 'Level' et 'Sectors', avec icône fiole",
-    "e1-1.1-2": "Tests groupés par fichier (tests/checkout.py, tests/login.py...)",
     "e1-1.1-3": "Les 5 premiers groupes dépliés par défaut ; le reste replié",
     "e1-1.1-4": "Chaque test affiche : icône d'outcome (✓/✗/🔥/⊘) + nom + durée formatée (ms/s)",
     "e1-1.1-5": "Mix d'outcomes visibles : passed, failed, errored, skipped",

@@ -290,7 +290,7 @@
       <tbody>
         {% for r in records %}
         <tr class="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer"
-            onclick="window.location.href='{% url 'ulog-detail' r.id %}?qs={{ qs|urlencode }}';">
+            onclick="window.location.href='{% url 'ulog-detail' r.id %}{% if qs %}?qs={{ qs|urlencode }}{% endif %}';">
           <td class="py-1.5 px-2 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ r.ts }}</td>
           <td class="py-1.5 px-2">
             <span class="inline-block w-20 text-center text-xs font-mono px-1 py-0.5 rounded

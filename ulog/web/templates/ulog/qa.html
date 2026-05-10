@@ -95,7 +95,7 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-1-3-title">1.3 Click test name → filter (Story 1.7 / FR65)</h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e1-1.3-1" label="Click test name → URL becomes /?test_id=tests%2F..." %}
+      {% include "ulog/_qa_item.html" with id="e1-1.3-1" label="Click a test name in the sidebar → URL becomes /?test_id=tests/<file>.py%3A%3A<test_name> (slash NOT encoded; '::' encoded as %3A%3A)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.3-2" label="Records list filters to records emitted during this test (incl. propagated app records)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.3-3" label="Active test visually distinct in sidebar (background or bold)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.3-4" label="Other filters preserved when clicking a test (level, search, etc.)" %}

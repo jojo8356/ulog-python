@@ -73,7 +73,7 @@
       <span data-i18n-key="section-1-title">1. Epic 1 — Test integration (v0.3)</span>
     </h2>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-1-1-title">1.1 Tests sidebar (Story 1.6 / FR62)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-1-title">1.1 Tests sidebar (Story 1.6 / FR62)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e1-1.1-1" label="Section 'Tests' visible in left sidebar between 'Level' and 'Sectors', with flask icon" %}
       {% include "ulog/_qa_item.html" with id="e1-1.1-2" label="Tests grouped by file (tests/checkout.py, tests/login.py...)" %}
@@ -85,7 +85,7 @@
       {% include "ulog/_qa_item.html" with id="e1-1.1-8" label="On narrow viewport (<1024px), the records table scrolls horizontally inside its pane — no overflow, no overlapping tooltips, no clipped Message column" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-1-2-title">1.2 Quick filters (Story 1.6 / FR63-FR64)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-2-title">1.2 Quick filters (Story 1.6 / FR63-FR64)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e1-1.2-1" label="'Failed only' checkbox filters list to failed/errored tests" %}
       {% include "ulog/_qa_item.html" with id="e1-1.2-2" label="'Slowest top 10' filters list to 10 slowest tests by duration" %}
@@ -93,7 +93,7 @@
       {% include "ulog/_qa_item.html" with id="e1-1.2-4" label="Unchecking restores full list" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-1-3-title">1.3 Click test name → filter (Story 1.7 / FR65)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-3-title">1.3 Click test name → filter (Story 1.7 / FR65)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e1-1.3-1" label="Click a test name in the sidebar → URL becomes /?test_id=tests/<file>.py%3A%3A<test_name> (slash NOT encoded; '::' encoded as %3A%3A)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.3-2" label="Records list filters to records emitted during this test (incl. propagated app records)" %}
@@ -101,7 +101,7 @@
       {% include "ulog/_qa_item.html" with id="e1-1.3-4" label="Other filters preserved when clicking a test (level, search, etc.)" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-1-4-title">1.4 Detail view 'Test context' panel (Story 1.8 / FR66)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-4-title">1.4 Detail view 'Test context' panel (Story 1.8 / FR66)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e1-1.4-1" label="Click any test record → 'Test context' panel between Context and Exception" %}
       {% include "ulog/_qa_item.html" with id="e1-1.4-2" label="Panel shows: outcome icon + name + duration" %}
@@ -110,7 +110,7 @@
       {% include "ulog/_qa_item.html" with id="e1-1.4-5" label="Records without test_id → panel hidden" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-1-5-title">1.5 Doc page /docs/test-integration/ (Story 1.11)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-5-title">1.5 Doc page /docs/test-integration/ (Story 1.11)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e1-1.5-1" label="/docs/test-integration/ returns 200 and renders" link_url="/docs/test-integration/" link_text="open" %}
       {% include "ulog/_qa_item.html" with id="e1-1.5-2" label="Sections present: Install, CLI flags, Schema, Worked example, Programmatic API, Troubleshooting" %}
@@ -126,7 +126,7 @@
       <span data-i18n-key="section-2-title">2. Epic 2 — Author attribution (v0.4)</span>
     </h2>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-2-1-title">2.1 Authors sidebar (Story 2.6 / FR76)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-1-title">2.1 Authors sidebar (Story 2.6 / FR76)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e2-2.1-1" label="'Authors' block visible in left sidebar between 'Files' and 'Time range', with user icon" %}
       {% include "ulog/_qa_item.html" with id="e2-2.1-2" label="8 author names listed (Alice Chen, Bob Martin, etc.)" %}
@@ -135,7 +135,7 @@
       {% include "ulog/_qa_item.html" with id="e2-2.1-5" label="'Show unknown' checkbox at bottom (checked by default)" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-2-2-title">2.2 Multi-select OR + URL persistence (Story 2.7 / FR77)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-2-title">2.2 Multi-select OR + URL persistence (Story 2.7 / FR77)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e2-2.2-1" label="Tick one author → records filtered" %}
       {% include "ulog/_qa_item.html" with id="e2-2.2-2" label="Tick 2 authors → records from either (OR semantics)" %}
@@ -143,14 +143,14 @@
       {% include "ulog/_qa_item.html" with id="e2-2.2-4" label="Reload preserves selection" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-2-3-title">2.3 Show unknown toggle (FR78)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-3-title">2.3 Show unknown toggle (FR78)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e2-2.3-1" label="Uncheck 'Show unknown' → unknown records disappear" %}
       {% include "ulog/_qa_item.html" with id="e2-2.3-2" label="Recheck → they come back" %}
       {% include "ulog/_qa_item.html" with id="e2-2.3-3" label="URL changes to ?show_unknown=0 when off" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-2-4-title">2.4 Detail view 'Authored by' panel (Story 2.8 / FR80)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-4-title">2.4 Detail view 'Authored by' panel (Story 2.8 / FR80)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e2-2.4-1" label="Open any record → 'Authored by' panel between Test context and Exception" %}
       {% include "ulog/_qa_item.html" with id="e2-2.4-2" label="Format: <Name> <email truncated 40 chars> · <7-char short-sha>" %}
@@ -158,7 +158,7 @@
       {% include "ulog/_qa_item.html" with id="e2-2.4-4" label="2 links: 'view all records from this author' + 'view diff: <sha>'" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-2-5-title">2.5 /diff/&lt;sha&gt;/ view (Story 2.9 / FR81 / NFR-SEC-30)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-5-title">2.5 /diff/&lt;sha&gt;/ view (Story 2.9 / FR81 / NFR-SEC-30)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e2-2.5-1" label="'view diff' link → page renders with full git show output in <pre> monospace" %}
       {% include "ulog/_qa_item.html" with id="e2-2.5-2" label="'← back to records' link in header" %}
@@ -171,13 +171,13 @@
       {% include "ulog/_qa_item.html" with id="e2-2.5-sec-3" label="/diff/0000...0000/ (valid hex but unreachable) → 404" link_url="/diff/0000000000000000000000000000000000000000/" link_text="try" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-2-6-title">2.6 Doc page /docs/author-filter/ (Story 2.11)</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.6-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-6-title">2.6 Doc page /docs/author-filter/ (Story 2.11)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e2-2.6-1" label="/docs/author-filter/ renders" link_url="/docs/author-filter/" link_text="open" %}
       {% include "ulog/_qa_item.html" with id="e2-2.6-2" label="Sections: How it works, CLI flags, <unknown> semantics, Code vs commit author, Worked example, Performance, Security, Troubleshooting" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5" data-i18n-key="section-2-7-title">2.7 CLI flags (Story 2.2) — terminal tests</h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.7-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-7-title">2.7 CLI flags (Story 2.2) — terminal tests</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e2-2.7-1" label="--no-author-index → AUTHORS block hidden, instant startup" %}
       {% include "ulog/_qa_item.html" with id="e2-2.7-2" label="--rebuild-author-index → drops cache, reblames from scratch" %}
@@ -328,7 +328,39 @@ time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/r/100/'                      
         if (cb.checked) localStorage.setItem(KEY_PREFIX + id, '1');
         else            localStorage.removeItem(KEY_PREFIX + id);
         updateProgress();
+        // Update the section toggle's checked/indeterminate state.
+        const sectionPrefix = id.match(/^(e\d+-\d+\.\d+-)/)?.[1];
+        if (sectionPrefix) refreshSectionToggle(sectionPrefix);
       });
+    });
+
+    // ---- Per-section "select all" toggles ----
+    const sectionToggles = root.querySelectorAll('[data-qa-section-toggle]');
+    const refreshSectionToggle = (prefix) => {
+      const toggle = root.querySelector(`[data-qa-section-toggle="${prefix}"]`);
+      if (!toggle) return;
+      const items = root.querySelectorAll(`input[type="checkbox"][data-qa-id^="${prefix}"]`);
+      const checked = Array.from(items).filter(cb => cb.checked).length;
+      if (checked === 0)                     { toggle.checked = false; toggle.indeterminate = false; }
+      else if (checked === items.length)     { toggle.checked = true;  toggle.indeterminate = false; }
+      else                                   { toggle.checked = false; toggle.indeterminate = true; }
+    };
+    sectionToggles.forEach(toggle => {
+      const prefix = toggle.dataset.qaSectionToggle;
+      const items = root.querySelectorAll(`input[type="checkbox"][data-qa-id^="${prefix}"]`);
+      toggle.addEventListener('change', (ev) => {
+        ev.stopPropagation();
+        const target = toggle.checked;  // new desired state
+        items.forEach(cb => {
+          if (cb.checked !== target) {
+            cb.checked = target;
+            cb.dispatchEvent(new Event('change'));  // triggers per-item localStorage save + progress update
+          }
+        });
+        // After dispatching, this toggle won't be indeterminate anymore.
+        toggle.indeterminate = false;
+      });
+      refreshSectionToggle(prefix);  // initial state
     });
 
     resetBtn.addEventListener('click', () => {

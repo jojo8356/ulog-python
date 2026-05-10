@@ -34,6 +34,10 @@ generator: bmad-document-project (exhaustive scan)
 
 - [Django clean-code standard](./standards/django-clean-code-standard.md) — 7 architectural + 5 hygiene rules + i18n + 10 anti-patterns. Distilled from HackSoft Styleguide + Two Scoops. Applies to ulog and any future Django app (FastAPI mapping table for Cycloth included).
 
+## Vision
+
+- [Cross-language vision](./vision-cross-language.md) — "Universal logging system across all languages". Architecture en 3 couches (spec wire format + libs satellites + viewer central). Roadmap des ports JS / Go / Rust / Java. Lock-in des non-goals (no SaaS, no cloud, no distributed).
+
 ## Existing documentation (predates DP)
 
 - [`README.md`](../README.md) — install + quick tour

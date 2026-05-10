@@ -266,7 +266,12 @@
   </aside>
 
   {# === Main list pane (FR36) === #}
-  <main class="flex-1 overflow-y-auto p-4">
+  {% comment %}
+    `min-w-0` is the classic flexbox fix: without it, a flex item
+    refuses to shrink below its content's intrinsic width, so the
+    overflow-x-auto wrapper inside never gets a chance to scroll.
+  {% endcomment %}
+  <main class="flex-1 min-w-0 overflow-y-auto p-4">
     <div class="flex items-center justify-between mb-3">
       <p class="text-sm text-slate-500 dark:text-slate-400">
         {{ total }} record{{ total|pluralize }} (page {{ page }} of {{ total_pages }})

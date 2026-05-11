@@ -18,6 +18,7 @@ Chaque ligne pointe vers le PRD complet.
 | v0.6.0 | [PRD-v0.6-static-export.md](./PRD-v0.6-static-export.md) | Static HTML export — `ulog export-html` for archival/distribution (compliance, GitHub Releases, Pages) | draft v1 | 600 |
 | v0.7.0 | [PRD-v0.7-test-execution-stack.md](./PRD-v0.7-test-execution-stack.md) | "EXPLAIN ANALYZE for tests" — span-based execution timeline + waterfall in viewer + `ulog explain` CLI | draft v1 | 380 |
 | v0.8.0 | [PRD-v0.8-modern-frontend-stack.md](./PRD-v0.8-modern-frontend-stack.md) | Modern frontend stack — Tailwind CLI standalone (CSS <10KB) + Alpine.js (declarative JS) + HTMX (partial swaps). Replaces CDN runtime + ad-hoc inline JS. Supersedes Story 8-1. | draft v1 | 460 |
+| v0.8.1 | [PRD-v0.8.1-docs-syntax-highlight.md](./PRD-v0.8.1-docs-syntax-highlight.md) | Patch — code syntax highlighting in `/docs/*` via Prism.js (CSS-variable theme, dark-mode aware). Backed by [benchmarks/syntax-highlighter-2026.md](./benchmarks/syntax-highlighter-2026.md). | draft v1 | 302 |
 
 ## Filiation
 
@@ -33,6 +34,7 @@ PRD-v0.1-core.md
         └── PRD-v0.6-static-export.md  (draft v1 — `ulog export-html` for archival/distribution)
             └── PRD-v0.7-test-execution-stack.md  (draft v1 — span timeline / waterfall / `ulog explain`)
                 └── PRD-v0.8-modern-frontend-stack.md  (draft v1 — Tailwind CLI + Alpine.js + HTMX, supersedes Story 8-1)
+                    └── PRD-v0.8.1-docs-syntax-highlight.md  (draft v1 — Prism.js code highlighting, backed by benchmarks/syntax-highlighter-2026.md)
 ```
 
 ## Conventions

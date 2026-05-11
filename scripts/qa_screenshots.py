@@ -176,7 +176,10 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
             "path": "/?qa_screenshot=1",
             "kind": "locator",
             "selector": "aside",  # the entire left sidebar
-            "desc": "Sidebar only — confirms 5 first <details> open + rest collapsed",
+            "viewport_h": 8000,   # let the aside extend past the default
+                                  # 1200px viewport so we capture all the
+                                  # way down to the last test file group
+            "desc": "Sidebar only — full height end-to-end (no truncation)",
         },
         "item-1.1-5-full": {
             "path": "/?qa_screenshot=1",
@@ -215,11 +218,11 @@ def _capture_all(catalog: dict[str, dict], port: int, out_dir: Path) -> int:
                 url = f"http://127.0.0.1:{port}{path}"
                 out_path = out_dir / f"{slug}.png"
 
-                # Per-shot viewport
+                # Per-shot viewport (override via spec["viewport_h"])
                 if kind == "narrow":
                     viewport = {"width": 900, "height": 700}
                 else:
-                    viewport = {"width": 1920, "height": 1200}
+                    viewport = {"width": 1920, "height": spec.get("viewport_h", 1200)}
 
                 ctx = browser.new_context(viewport=viewport)
                 page = ctx.new_page()

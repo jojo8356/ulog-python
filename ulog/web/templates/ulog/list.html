@@ -190,6 +190,15 @@
               </label>
             {% endif %}
           {% endfor %}
+          {% comment %}
+            Hidden field MUST precede the checkbox so the QueryDict
+            last-value-wins rule keeps the checked state truthy.
+            Without it, unchecking the checkbox submits NO show_unknown
+            field at all (browser omits unchecked checkboxes), then the
+            backend's `qs.get("show_unknown", "1")` default kicks in →
+            unchecking silently has no effect (FR78 dead).
+          {% endcomment %}
+          <input type="hidden" name="show_unknown" value="0">
           <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded mt-1 pt-1 border-t border-slate-200 dark:border-slate-700">
             <input type="checkbox" name="show_unknown" value="1"
                    {% if filters.show_unknown %}checked{% endif %}

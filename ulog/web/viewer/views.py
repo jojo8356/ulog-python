@@ -119,11 +119,17 @@ def list_view(request: HttpRequest) -> HttpResponse:
     # what would be added if you toggled THAT author. Compute against
     # filters MINUS the author axis itself.
     authors_summary = None
+    record_authors: dict[int, object] = {}
     if idx is not None:
         # ghost_filters is conceptually filters minus the author axis;
         # compute_authors_summary walks the adapter ignoring author state.
         ghost_filters = replace(filters, authors=[])  # noqa: F841
         authors_summary = compute_authors_summary(adapter, idx)
+        # Per-row author resolution for the new "Author" column. Cache
+        # hit rate is high because compute_authors_summary above has
+        # already warmed every (file, line) pair the records reference.
+        for r in result.records:
+            record_authors[r.id] = idx.author_for(r.file, r.line)
 
     # Build a flat sorted sector list for the template
     sectors = sorted(result.sector_counts.items(), key=lambda kv: kv[0])
@@ -161,6 +167,9 @@ def list_view(request: HttpRequest) -> HttpResponse:
         # Story 2.6 (FR76/FR79) — author sidebar data; None when indexer
         # is disabled or no .git/ — template hides the block in that case.
         "authors_summary": authors_summary,
+        # Per-row author for the records-table "Author" column. Empty
+        # dict when no idx (the column then renders as "—").
+        "record_authors": record_authors,
         # Story 1.7 — query-string fragment carrying every CURRENT filter
         # except test_id and page; consumed by the sidebar's click-to-filter
         # anchor so non-test_id filters survive the click.

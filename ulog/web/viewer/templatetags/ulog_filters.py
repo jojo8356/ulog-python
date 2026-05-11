@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from django import template
 
 register = template.Library()
+
+
+@register.filter(name="dict_get")  # type: ignore[untyped-decorator]
+def dict_get(d: object, key: object) -> Any:
+    """Look up `key` in `d` (a dict-like). Returns None if missing
+    or if `d` isn't a Mapping. Used to render a per-row Author column
+    without mutating the Record dataclass:
+    `{{ record_authors|dict_get:r.id }}`."""
+    if not isinstance(d, dict):
+        return None
+    return d.get(key)
 
 
 @register.filter(name="test_duration_fmt")  # type: ignore[untyped-decorator]

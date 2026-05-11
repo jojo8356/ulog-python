@@ -295,12 +295,13 @@
       the pagination, so its scrollbars stay viewport-anchored.
     {% endcomment %}
     <div class="overflow-auto -mx-2 md:mx-0 flex-1 min-h-0">
-    <table class="text-sm w-full min-w-[1024px] table-fixed">
+    <table class="text-sm w-full min-w-[1152px] table-fixed">
       <thead class="text-left text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
         <tr>
           <th class="py-2 px-2 w-44" title="ISO-8601 UTC timestamp from record.created">TS</th>
           <th class="py-2 px-2 w-28" title="Severity level (DEBUG/INFO/WARNING/ERROR/CRITICAL)">Level</th>
-          <th class="py-2 px-2 w-44" title="Logger name (logging.getLogger argument)">Logger</th>
+          <th class="py-2 px-2 w-40" title="Logger name (logging.getLogger argument)">Logger</th>
+          <th class="py-2 px-2 w-36" title="Author of the source line (git blame); — when no indexer or untracked file">Author</th>
           <th class="py-2 px-2 w-40" title="Source file:line of the log call">File</th>
           <th class="py-2 px-2 w-20 text-right tabular-nums" title="Test record duration (context.duration_s); empty for non-test records">Time</th>
           <th class="py-2 px-2" title="Message (truncated; click row for full text)">Message</th>
@@ -322,6 +323,16 @@
             </span>
           </td>
           <td class="py-1.5 px-2 font-mono text-xs truncate" title="{{ r.logger }}">{{ r.logger }}</td>
+          {% with author=record_authors|dict_get:r.id %}
+            <td class="py-1.5 px-2 text-xs truncate"
+                title="{% if author %}{{ author.name }} <{{ author.email }}>{% else %}no author resolved{% endif %}">
+              {% if author %}
+                {{ author.name|truncatechars:18 }}
+              {% else %}
+                <span class="text-slate-400 dark:text-slate-600 italic">—</span>
+              {% endif %}
+            </td>
+          {% endwith %}
           <td class="py-1.5 px-2 font-mono text-xs text-slate-500 dark:text-slate-400 truncate" title="{{ r.file }}:{{ r.line }}">
             {{ r.file|truncatechars:24 }}:{{ r.line }}
           </td>

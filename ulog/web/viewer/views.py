@@ -86,7 +86,13 @@ def list_view(request: HttpRequest) -> HttpResponse:
         assert idx is not None  # narrowed by author_filter_active above
         full = adapter.query(filters, page=1, page_size=10_000_000)
         selected = set(filters.authors)
-        unknown_ticked = "<unknown>" in selected
+        # `Show unknown` is the master gate for null-author rows. When it's
+        # off, the `<unknown>` author checkbox in the sidebar is irrelevant —
+        # nullify it here so the row below doesn't reintroduce the records
+        # the user just asked to hide. (The UI also auto-unchecks the
+        # `<unknown>` row when Show-unknown flips off, but this backend
+        # guard means a stale URL or a JS-disabled browser still behaves.)
+        unknown_ticked = "<unknown>" in selected and filters.show_unknown
         kept = []
         for r in full.records:
             a = idx.author_for(r.file, r.line)

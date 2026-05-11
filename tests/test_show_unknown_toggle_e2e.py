@@ -432,3 +432,113 @@ def test_checked_submission_url_contains_one(page):
     page.wait_for_load_state("networkidle")
     # show_unknown=1 must be present.
     assert "show_unknown=1" in page.url, page.url
+
+
+# ============================================================================
+# 8. "Show unknown" overrides the `<unknown>` author selection
+#    Regression scenario from the user-reported bug: ticking Charlie +
+#    `<unknown>` while leaving Show-unknown OFF used to keep the 1060
+#    unknown records visible — the author-checkbox ignored the master
+#    toggle. Backend now nullifies <unknown> in selected when
+#    show_unknown=False, and the UI auto-syncs the two checkboxes so
+#    the user never sees that contradictory state in the first place.
+# ============================================================================
+
+
+def _first_known_author_email(page, viewer: int) -> str:
+    """Return any known-author email present in the seed (first row of
+    the Authors sidebar — its `<input name=author value=...>` carries
+    the email)."""
+    page.goto(f"http://127.0.0.1:{viewer}/?qa_screenshot=1", wait_until="networkidle")
+    return page.evaluate(
+        """
+        () => {
+          const cb = document.querySelector(
+            'input[name="author"]:not([value="<unknown>"])'
+          );
+          return cb ? cb.value : '';
+        }
+        """
+    )
+
+
+def test_show_unknown_off_overrides_unknown_author_selection(page, viewer):
+    """User-reported bug: with `?author=<some-author>&author=%3Cunknown%3E
+    &show_unknown=0`, the table previously showed that author's records
+    AND all unknown records — the unknown-author tick re-introduced what
+    Show-unknown asked to hide. Backend now drops <unknown> from the
+    effective selection when show_unknown=False."""
+    email = _first_known_author_email(page, viewer)
+    assert email, "seed has no known authors"
+    page.goto(
+        f"http://127.0.0.1:{viewer}/?author={email}"
+        f"&author=%3Cunknown%3E&show_unknown=0&qa_screenshot=1",
+        wait_until="networkidle",
+    )
+    authors = _table_authors(page)
+    assert authors, "no records rendered for the picked author"
+    # The combination must NOT bring back '—' rows.
+    assert all(a != "—" for a in authors), (
+        f"show_unknown=0 ignored when <unknown> ticked — unknown rows leaked: {authors[:5]}"
+    )
+
+
+def test_ui_sync_uncheck_show_unknown_unchecks_unknown_author(page):
+    """Mutual-sync UI guard: when the user unticks Show-unknown, the
+    `<unknown>` author checkbox flips off too. Prevents arriving at
+    the contradictory state in the first place."""
+    show_cb = _show_unknown_checkbox(page)
+    unknown_author = page.locator('input[type="checkbox"][name="author"][value="<unknown>"]')
+    # Start: both true (the default state + ticking <unknown> author).
+    unknown_author.check()
+    assert unknown_author.is_checked() is True
+    # Now uncheck Show-unknown → <unknown> author should auto-uncheck.
+    show_cb.uncheck()
+    assert unknown_author.is_checked() is False, (
+        "unchecking Show-unknown didn't auto-uncheck <unknown> author"
+    )
+
+
+def test_ui_sync_check_unknown_author_checks_show_unknown(page):
+    """Mutual-sync UI guard, reverse direction: ticking the `<unknown>`
+    author checkbox auto-ticks Show-unknown too — so the row the user
+    just asked to include doesn't get hidden by a stale toggle."""
+    show_cb = _show_unknown_checkbox(page)
+    unknown_author = page.locator('input[type="checkbox"][name="author"][value="<unknown>"]')
+    # Start by unchecking Show-unknown.
+    show_cb.uncheck()
+    # Sync should have flipped the author checkbox too. Re-uncheck it
+    # explicitly to set up the test condition (Show-unknown OFF,
+    # <unknown> OFF).
+    if unknown_author.is_checked():
+        unknown_author.uncheck()
+    assert show_cb.is_checked() is False
+    assert unknown_author.is_checked() is False
+    # Now check the <unknown> author → Show-unknown should auto-check.
+    unknown_author.check()
+    assert show_cb.is_checked() is True, "ticking <unknown> author didn't auto-check Show-unknown"
+
+
+def test_known_plus_unknown_no_show_unknown_returns_only_known_count(page, viewer):
+    """End-to-end version of the user-reported bug, scoped to the count.
+    Author X has N records blamed; <unknown> has K. With show_unknown=0
+    the result must be N (only X), NOT N+K (X plus leaked unknowns)."""
+    email = _first_known_author_email(page, viewer)
+    assert email, "seed has no known authors"
+    # First, see how many records this author alone has (show_unknown=1).
+    page.goto(
+        f"http://127.0.0.1:{viewer}/?author={email}&qa_screenshot=1",
+        wait_until="networkidle",
+    )
+    known_only = _total_count(page)
+    # Then the bug-trigger URL: same author + <unknown> + show_unknown=0.
+    page.goto(
+        f"http://127.0.0.1:{viewer}/?author={email}"
+        f"&author=%3Cunknown%3E&show_unknown=0&qa_screenshot=1",
+        wait_until="networkidle",
+    )
+    combined = _total_count(page)
+    assert combined == known_only, (
+        f"show_unknown=0 ignored: expected {known_only} (known author only), "
+        f"got {combined} (known + leaked unknowns)"
+    )

@@ -66,6 +66,13 @@ def _discover_ids(demo_dir: Path) -> dict[str, object]:
         if row:
             out["record_with_test_id"] = int(row[0])
             out["sample_test_id"] = str(row[1])
+        # AC e1-1.4-5: detail view of a non-test record must hide the
+        # TEST CONTEXT panel. Pick an id whose context.test_id IS NULL.
+        row_no_test = conn.execute(
+            "SELECT id FROM logs WHERE json_extract(context, '$.test_id') IS NULL LIMIT 1"
+        ).fetchone()
+        if row_no_test:
+            out["record_without_test_id"] = int(row_no_test[0])
     proc = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=demo_dir,
@@ -98,6 +105,7 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
     test_qs = _qs_test_id(str(ids.get("sample_test_id", "")))
     rec_id = ids.get("record_with_test_id", 1)
     first_id = ids.get("first_record_id", 1)
+    no_test_id = ids.get("record_without_test_id", first_id)
     sha = ids["sha"]
 
     return {
@@ -106,6 +114,11 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
             "path": f"/r/{rec_id}/?qa_screenshot=1",
             "kind": "full",
             "desc": "Detail view with Test context + Authored by panels",
+        },
+        "item-1.4-5": {
+            "path": f"/r/{no_test_id}/?qa_screenshot=1",
+            "kind": "full",
+            "desc": "Detail view of a non-test record — TEST CONTEXT panel absent (proves AC e1-1.4-5)",
         },
         "section-1-5": {
             "path": "/docs/test-integration/?qa_screenshot=1",

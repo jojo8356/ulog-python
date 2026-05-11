@@ -15,6 +15,7 @@ Chaque ligne pointe vers le PRD complet.
 | v0.4.1 | [PRD-v0.4.1-viewer-perf-hotpath.md](./PRD-v0.4.1-viewer-perf-hotpath.md) | Patch — authors-summary memoization + SQL GROUP BY (page-load < 3s) | implementing | — |
 | v0.4.2 | [PRD-v0.4.2-docs-quality.md](./PRD-v0.4.2-docs-quality.md) | Docs refresh post-Epic 2 + per-page TOC accordion + markdown renderer extension (tables/ol/em/blockquote/hr) + per-Epic QA master checkbox | draft v1 | 489 |
 | v0.4.3 | [PRD-v0.4.3-team-page.md](./PRD-v0.4.3-team-page.md) | `/team/` directory page — per-author cards with GitHub link inference, tests/records/files-owned counts, drill-down at `/team/<email>/`. Builds on v0.4 AuthorIndex; zero new runtime dep. | draft v1 | 429 |
+| v0.4.4 | [PRD-v0.4.4-perf-sub-second.md](./PRD-v0.4.4-perf-sub-second.md) | Patch — every page-load path under 1s (search + filters + cold cache). SQL JOIN author filter, opt-in SQLite FTS5 search, startup pre-warm. Tightens v0.4.1 budgets. | draft v1 | 411 |
 | v0.5.0 | [PRD-v0.5-forensic-archive.md](./PRD-v0.5-forensic-archive.md) | Forensic black box — immutable chain, replay, correlate, incidents ledger | draft v1 | 706 |
 | v0.6.0 | [PRD-v0.6-static-export.md](./PRD-v0.6-static-export.md) | Static HTML export — `ulog export-html` for archival/distribution (compliance, GitHub Releases, Pages) | draft v1 | 600 |
 | v0.7.0 | [PRD-v0.7-test-execution-stack.md](./PRD-v0.7-test-execution-stack.md) | "EXPLAIN ANALYZE for tests" — span-based execution timeline + waterfall in viewer + `ulog explain` CLI | draft v1 | 380 |
@@ -31,7 +32,8 @@ PRD-v0.1-core.md
     ├── PRD-v0.4-commit-author-filter.md
     │   ├── PRD-v0.4.1-viewer-perf-hotpath.md  (patch — authors-summary memoization)
     │   ├── PRD-v0.4.2-docs-quality.md         (patch — docs refresh + TOC accordion + markdown extension + Epic QA toggle)
-    │   └── PRD-v0.4.3-team-page.md            (feature — /team/ directory with cards + drill-down + GitHub link)
+    │   ├── PRD-v0.4.3-team-page.md            (feature — /team/ directory with cards + drill-down + GitHub link)
+    │   └── PRD-v0.4.4-perf-sub-second.md      (patch — every page-load path < 1s: SQL JOIN authors + FTS5 search + startup pre-warm)
     └── PRD-v0.5-forensic-archive.md   (draft v1 — emerged from brainstorming session 2026-05-04)
         └── PRD-v0.6-static-export.md  (draft v1 — `ulog export-html` for archival/distribution)
             └── PRD-v0.7-test-execution-stack.md  (draft v1 — span timeline / waterfall / `ulog explain`)

@@ -417,8 +417,29 @@ def compute_authors_summary(
             a = idx.author_for(f, ln)
             counts[a] += n
 
+    # Story 2.6 sidebar identity = email. `Author` is hashed on
+    # (name, email, sha, ts) so a contributor with multiple commits
+    # in the blame surfaces as N distinct entries — wrong for the
+    # human-facing "Authors" listing. Roll up per email: sum counts,
+    # keep the most-recent commit (max ts) as the row's representative
+    # so the "Authored by" panel still shows a valid short-sha.
+    by_email: dict[str, tuple[Author, int]] = {}
+    for a, c in counts.items():
+        if a is None:
+            continue
+        existing = by_email.get(a.email)
+        if existing is None:
+            by_email[a.email] = (a, c)
+        else:
+            rep, n = existing
+            # Keep the author record with the most recent ts as the
+            # representative (latest contribution drives the relative
+            # date the detail-view panel shows).
+            new_rep = a if a.ts > rep.ts else rep
+            by_email[a.email] = (new_rep, n + c)
+
     known_sorted = sorted(
-        ((a, c) for a, c in counts.items() if a is not None),
+        by_email.values(),
         key=lambda pair: (-pair[1], pair[0].email, pair[0].name),
     )
     entries: list[tuple[Author | None, int]] = list(known_sorted)

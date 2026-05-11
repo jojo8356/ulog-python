@@ -88,7 +88,6 @@
     "e4-reg-6": "Bound fields filter (?bound=tenant_id=tenant_001)",
     "e4-reg-7": "Pagination buttons (prev/next at bottom)",
     "e4-reg-9": "Dark mode toggle in header — preference persisted",
-    "e4-reg-11": "Detail view shows: ts, level, logger, msg, file:line, context, exception (when present)",
 
     "section-5-title": "§5 Stability watchpoints — automated",
     "section-5-desc": "20-reload RSS < 200 MB ✓, no Logging error / OperationalError on stderr during navigation ✓, git blame indexer doesn't respawn on idle navigation ✓ — all covered by tests/test_stability_e2e.py. Run:",
@@ -191,7 +190,6 @@
     "e4-reg-6": "Filtre bound fields (?bound=tenant_id=tenant_001)",
     "e4-reg-7": "Boutons pagination (prev/next en bas)",
     "e4-reg-9": "Toggle dark mode dans le header — préférence persistée",
-    "e4-reg-11": "Vue détail affiche : ts, level, logger, msg, file:line, context, exception (si présent)",
 
     "section-5-title": "§5 Watchpoints stabilité — automatisé",
     "section-5-desc": "Reload 20× → RSS < 200 MB ✓, pas de Logging error / OperationalError sur stderr pendant la navigation ✓, l'indexer git blame ne respawn pas pendant la navigation idle ✓ — couvert par tests/test_stability_e2e.py. Lance :",

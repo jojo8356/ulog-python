@@ -259,7 +259,14 @@
         flag propagation.
       {% endcomment %}
       {% include "ulog/_qa_item.html" with id="e4-reg-9" label="Dark mode toggle in header — preference persisted" %}
-      {% include "ulog/_qa_item.html" with id="e4-reg-11" label="Detail view shows: ts, level, logger, msg, file:line, context, exception (when present)" %}
+      {% comment %}
+        e4-reg-11 (Detail view shows: ts/level/logger/msg/file:line/
+        context/exception) — fully automated by
+        tests/test_detail_view_e2e.py: 12 tests cover the 6 always-
+        rendered fields + Context conditional + Exception conditional +
+        back-link + 404 path. Picks sample records via SQL so the suite
+        stays seed-agnostic.
+      {% endcomment %}
     </ul>
   </section>
 

@@ -145,12 +145,20 @@
       {% include "ulog/_qa_item.html" with id="e2-2.2-4" label="Reload preserves selection" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-3-title">2.3 Show unknown toggle (FR78)</span></h3>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e2-2.3-1" label="Uncheck 'Show unknown' → unknown records disappear" screenshot="section-2-3" %}
-      {% include "ulog/_qa_item.html" with id="e2-2.3-2" label="Recheck → they come back" %}
-      {% include "ulog/_qa_item.html" with id="e2-2.3-3" label="URL changes to ?show_unknown=0 when off" %}
-    </ul>
+    {# 2.3 Show unknown toggle (FR78) — fully automated by tests/test_show_unknown_toggle_e2e.py #}
+    <div class="mt-4 p-3 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+      <h3 class="font-semibold mb-1 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+        {% lucide "circle-check" size=16 %}
+        <span data-i18n-key="section-2-3-title">2.3 Show unknown toggle (FR78) — automated</span>
+      </h3>
+      <p class="text-xs text-emerald-800 dark:text-emerald-200" data-i18n-key="section-2-3-desc">
+        Uncheck hides unknowns ✓, recheck restores them ✓, URL carries <code>show_unknown=0</code> when off ✓ — all covered by <code>tests/test_show_unknown_toggle_e2e.py</code> (19 Playwright tests including deep-linking, reload, author cross-filter and the form-contract regression guard). Run:
+      </p>
+      <pre class="bg-white/60 dark:bg-slate-900/40 rounded p-2 text-xs mt-1 overflow-x-auto"><code>python3 -m pytest tests/test_show_unknown_toggle_e2e.py -v</code></pre>
+      <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1" data-i18n-key="section-2-3-footer">
+        If green → §2.3 done. Skip to §2.4 below.
+      </p>
+    </div>
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-4-title">2.4 Detail view 'Authored by' panel (Story 2.8 / FR80)</span></h3>
     <ul class="space-y-1.5 text-sm">

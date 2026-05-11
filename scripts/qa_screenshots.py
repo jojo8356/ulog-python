@@ -168,11 +168,10 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
             "auto_height": True,
             "desc": "Full sidebar — proves Authors block sits between Files and Time range (AC e2-2.1-1)",
         },
-        "section-2-3": {
-            "path": "/?show_unknown=0&qa_screenshot=1",
-            "kind": "viewport",
-            "desc": "Show unknown OFF — unknown records hidden",
-        },
+        # section-2-3 retired — §2.3 "Show unknown" toggle is now
+        # automated by tests/test_show_unknown_toggle_e2e.py and the QA
+        # page renders it as an "automated" notice (no manual checkbox,
+        # no reference screenshot needed).
         "section-4": {
             "path": "/?qa_screenshot=1",
             "kind": "viewport",

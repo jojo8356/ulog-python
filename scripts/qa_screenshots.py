@@ -243,15 +243,21 @@ def main() -> int:
             except Exception as e:  # noqa: BLE001
                 print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
 
-        # Tall-viewport captures (full Tests sidebar visible at once)
+        # Tall-viewport captures (full Tests sidebar visible at once).
+        # We use a deliberately oversized viewport (12000px tall) so the
+        # entire page — including the sidebar with all <details> visible
+        # AND the records table — fits without truncation. Excess white
+        # space at the bottom is acceptable; the alternative would be a
+        # CDP roundtrip to measure content height, requiring a JSON-RPC
+        # over websocket dance with no stdlib support.
         tall = _shot_plan_tall(ids)
         for slug, (path, desc) in tall.items():
             url = f"http://127.0.0.1:{port}{path}"
             out_path = args.out_dir / f"{slug}.png"
             try:
-                _take_shot(browser, url, out_path, width=1920, height=4000)
+                _take_shot(browser, url, out_path, width=1920, height=12000)
                 size_kb = out_path.stat().st_size / 1024
-                print(f"  ✓ {slug:20s} ({size_kb:6.1f} KB, 1920×4000) — {desc}",
+                print(f"  ✓ {slug:20s} ({size_kb:6.1f} KB, 1920×12000) — {desc}",
                       file=sys.stderr)
             except Exception as e:  # noqa: BLE001
                 print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)

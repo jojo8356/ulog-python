@@ -42,7 +42,7 @@
 # defines. Story IDs preserve their original epics.md numbering for traceability.
 
 generated: 2026-05-05
-last_updated: 2026-05-06
+last_updated: 2026-05-11
 project: ulog-python
 project_key: NOKEY
 tracking_system: file-system
@@ -95,8 +95,8 @@ development_status:
   # ========================================================================
   # Epic 3: v0.5 — Storage core & chain integrity (12 stories)
   # ========================================================================
-  epic-3: backlog
-  3-1-schema-extension-immutable-chain-pos-record-hash-prev-hash-columns: backlog
+  epic-3: in-progress
+  3-1-schema-extension-immutable-chain-pos-record-hash-prev-hash-columns: ready-for-dev
   3-2-sql-trigger-blocking-update-delete-on-immutable-rows: backlog
   3-3-schemaerror-upgrade-message-with-literal-alter-table-sql: backlog
   3-4-chainwriter-protocol-sqlitechainwriter-impl: backlog

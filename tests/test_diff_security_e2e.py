@@ -262,3 +262,73 @@ def test_diff_empty_sha_returns_404_not_500(viewer):
     # Django typically 404s missing path segments. Anything other
     # than 5xx is acceptable.
     assert status < 500, f"empty sha caused server error: {status}"
+
+
+# ============================================================================
+# §2.5 happy-path rendering (e2-2.5-1 + e2-2.5-2)
+# ============================================================================
+
+
+def _head_sha(repo: Path) -> str:
+    """Return the current HEAD sha of the demo repo."""
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def test_diff_valid_sha_renders_full_git_show_in_pre_monospace(viewer, seeded_demo):  # noqa: F811
+    """e2-2.5-1 — Clicking 'view diff' lands on /diff/<sha>/ which renders
+    the FULL `git show <sha>` output inside a `<pre>` block with
+    monospace + whitespace-preserved styling per Decision D4."""
+    sha = _head_sha(seeded_demo)
+    status, body = _http_get(viewer, f"/diff/{sha}/")
+    assert status == 200, f"valid sha should 200, got {status}"
+
+    # The <pre> block carries Tailwind classes the architecture pins:
+    # font-mono (monospace) + whitespace-pre (no collapsing) +
+    # overflow-x-auto (long lines scroll). Marker attribute
+    # data-diff-content="true" lets tests/template asserts pin it down.
+    assert 'data-diff-content="true"' in body, "diff <pre> marker missing"
+    # Each Tailwind class on the same element — explicit, deliberate.
+    for cls in ("font-mono", "whitespace-pre", "overflow-x-auto"):
+        assert cls in body, f"diff <pre> missing class {cls!r}"
+
+    # The `git show` payload itself must be visible: header line +
+    # at least one `diff --git` chunk + the commit message.
+    assert "commit " + sha in body, "full sha header line missing from rendered diff"
+    assert "diff --git" in body, "no diff hunks rendered"
+    assert "Author:" in body, "commit Author header missing"
+    assert "Date:" in body, "commit Date header missing"
+
+
+def test_diff_page_has_back_to_records_link_in_header(viewer, seeded_demo):  # noqa: F811
+    """e2-2.5-2 — The diff page header carries a `← back to records` link
+    pointing at the root `/` (records list)."""
+    sha = _head_sha(seeded_demo)
+    status, body = _http_get(viewer, f"/diff/{sha}/")
+    assert status == 200, f"valid sha should 200, got {status}"
+
+    # The text is literal in diff.html; the href resolves through the
+    # `ulog-list` URL name (= "/"). Check both the visible label AND
+    # the link target to catch a regression that renames either.
+    assert "← back to records" in body, "back-to-records link label missing"
+    # The link is `<a href="/" ...>` once the {% url %} tag resolves.
+    # Match the most-specific anchor pattern to avoid catching any
+    # unrelated `href="/"` further down.
+    assert 'href="/"' in body, "back link href to / missing"
+    # And it's wrapped in an <a> tag styled as a link (blue + hover).
+    assert "text-blue-600" in body, "back link missing blue styling"
+    assert "hover:underline" in body, "back link missing hover-underline styling"
+
+
+def test_diff_page_short_sha_in_h1(viewer, seeded_demo):  # noqa: F811
+    """The h1 shows `git show <short-sha>` where short-sha is 7 chars —
+    visual confirmation the page is about the right commit."""
+    sha = _head_sha(seeded_demo)
+    status, body = _http_get(viewer, f"/diff/{sha}/")
+    assert status == 200
+    assert f"git show {sha[:7]}" in body, "h1 missing short-sha header"

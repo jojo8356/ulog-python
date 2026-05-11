@@ -106,7 +106,6 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
     rec_id = ids.get("record_with_test_id", 1)
     first_id = ids.get("first_record_id", 1)
     no_test_id = ids.get("record_without_test_id", first_id)
-    sha = ids["sha"]
 
     return {
         # ------ Full-page (used for doc-pages and detail views) ---------
@@ -130,11 +129,8 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
             "kind": "full",
             "desc": "Detail view (Authored by panel)",
         },
-        "section-2-5": {
-            "path": f"/diff/{sha}/?qa_screenshot=1",
-            "kind": "full",
-            "desc": "Diff view (git show <sha>)",
-        },
+        # section-2-5 retired — §2.5 /diff/<sha>/ view is now fully
+        # automated by tests/test_diff_security_e2e.py (12 tests).
         "section-2-6": {
             "path": "/docs/author-filter/?qa_screenshot=1",
             "kind": "full",

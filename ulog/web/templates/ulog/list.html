@@ -67,7 +67,7 @@
             `regroup` requires contiguity-by-grouper which `(file, name)` sort
             already guarantees.
           {% endcomment %}
-          <div class="space-y-1 max-h-60 overflow-y-auto">
+          <div class="space-y-1 {% if not request.GET.qa_screenshot %}max-h-60 overflow-y-auto{% endif %}">
             {% regroup test_summary by file as tests_by_file %}
             {% for file_group in tests_by_file %}
               {% comment %}

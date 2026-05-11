@@ -136,8 +136,27 @@ def _shot_plan(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
         # QA page itself (meta)
         "section-qa":  ("/_qa/",
                         "QA checklist page (debug-only)"),
+
+        # Targeted captures for items the standard /  shot can't show
+        # (because the Tests sidebar has max-h-60 overflow-y-auto and
+        # narrow viewports require width tuning).
+        # Use ?qa_screenshot=1 to remove the max-h-60 cap so all
+        # deployed file groups are visible at once.
+        "item-1.1-3": ("/?qa_screenshot=1",
+                       "Tests sidebar with all groups visible — confirms 5 first <details> are open"),
+        "item-1.1-5": ("/?qa_screenshot=1",
+                       "Tests sidebar showing the full outcome mix (✓ passed / ✗ failed / 🔥 errored / ⊘ skipped)"),
+        # item-1.1-8 is captured at narrow window via _shot_plan_narrow below
     }
     return plan
+
+
+def _shot_plan_narrow(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
+    """Captures requiring a narrow viewport (≠ default width)."""
+    return {
+        "item-1.1-8": ("/",
+                       "Records table at viewport <1024px — horizontal scroll inside the pane only"),
+    }
 
 
 def urllib_quote_test_id(test_id: str) -> str:
@@ -198,7 +217,21 @@ def main() -> int:
             except Exception as e:  # noqa: BLE001
                 print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
 
-        print(f"\ndone — {len(plan)} screenshots in {args.out_dir}/",
+        # Narrow-viewport captures (e.g. responsive scroll demo)
+        narrow = _shot_plan_narrow(ids)
+        for slug, (path, desc) in narrow.items():
+            url = f"http://127.0.0.1:{port}{path}"
+            out_path = args.out_dir / f"{slug}.png"
+            try:
+                _take_shot(browser, url, out_path, width=900, height=700)
+                size_kb = out_path.stat().st_size / 1024
+                print(f"  ✓ {slug:20s} ({size_kb:6.1f} KB, 900×700) — {desc}",
+                      file=sys.stderr)
+            except Exception as e:  # noqa: BLE001
+                print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
+
+        total = len(plan) + len(narrow)
+        print(f"\ndone — {total} screenshots in {args.out_dir}/",
               file=sys.stderr)
         return 0
     finally:

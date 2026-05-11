@@ -257,18 +257,24 @@
     </ul>
   </section>
 
-  {# ====== 5. Stability ====== #}
-  <section class="mb-8">
-    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-rose-600 dark:text-rose-400">
-      <input type="checkbox" data-qa-epic-toggle="e5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this section">
-      {% lucide "shield-check" size=18 %}
-      <span data-i18n-key="section-5-title">5. Stability watchpoints</span>
+  {% comment %}
+    §5 Stability watchpoints — fully automated by
+    tests/test_stability_e2e.py: RSS ceiling after 20 reloads
+    (/proc/<pid>/status readout), stderr clean across major-views
+    navigation, and indexer-respawn detection via stderr line counts.
+  {% endcomment %}
+  <section class="mb-8 p-3 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+    <h2 class="font-semibold mb-1 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+      {% lucide "circle-check" size=16 %}
+      <span data-i18n-key="section-5-title">§5 Stability watchpoints — automated</span>
     </h2>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e5-sta-1" label="Reload page 20× → Django process stays under 200 MB RES" %}
-      {% include "ulog/_qa_item.html" with id="e5-sta-2" label="No 'Logging error' or 'OperationalError' on stderr while navigating" %}
-      {% include "ulog/_qa_item.html" with id="e5-sta-3" label="No git blame subprocess respawning on idle navigation (only at startup)" %}
-    </ul>
+    <p class="text-xs text-emerald-800 dark:text-emerald-200" data-i18n-key="section-5-desc">
+      20-reload RSS &lt; 200 MB ✓, no <code>Logging error</code> / <code>OperationalError</code> on stderr during navigation ✓, git blame indexer doesn't respawn on idle navigation ✓ — all covered by <code>tests/test_stability_e2e.py</code>. Run:
+    </p>
+    <pre class="bg-white/60 dark:bg-slate-900/40 rounded p-2 text-xs mt-1 overflow-x-auto"><code>python3 -m pytest tests/test_stability_e2e.py -v</code></pre>
+    <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1" data-i18n-key="section-5-footer">
+      If green → §5 done.
+    </p>
   </section>
 
   {# ====== Sign-off ====== #}

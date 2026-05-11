@@ -93,10 +93,9 @@
     "e4-reg-9": "Dark mode toggle in header — preference persisted",
     "e4-reg-11": "Detail view shows: ts, level, logger, msg, file:line, context, exception (when present)",
 
-    "section-5-title": "5. Stability watchpoints",
-    "e5-sta-1": "Reload page 20× → Django process stays under 200 MB RES",
-    "e5-sta-2": "No 'Logging error' or 'OperationalError' on stderr while navigating",
-    "e5-sta-3": "No git blame subprocess respawning on idle navigation (only at startup)",
+    "section-5-title": "§5 Stability watchpoints — automated",
+    "section-5-desc": "20-reload RSS < 200 MB ✓, no Logging error / OperationalError on stderr during navigation ✓, git blame indexer doesn't respawn on idle navigation ✓ — all covered by tests/test_stability_e2e.py. Run:",
+    "section-5-footer": "If green → §5 done.",
 
     "section-signoff-title": "Sign-off",
     "section-signoff-desc": "When all sections are green (or bugs noted to Claude), tell Claude:",
@@ -200,10 +199,9 @@
     "e4-reg-9": "Toggle dark mode dans le header — préférence persistée",
     "e4-reg-11": "Vue détail affiche : ts, level, logger, msg, file:line, context, exception (si présent)",
 
-    "section-5-title": "5. Watchpoints stabilité",
-    "e5-sta-1": "Reload la page 20× → process Django reste sous 200 MB RES",
-    "e5-sta-2": "Pas de 'Logging error' ou 'OperationalError' sur stderr pendant la navigation",
-    "e5-sta-3": "Pas de subprocess git blame qui respawn pendant la navigation idle (seulement au startup)",
+    "section-5-title": "§5 Watchpoints stabilité — automatisé",
+    "section-5-desc": "Reload 20× → RSS < 200 MB ✓, pas de Logging error / OperationalError sur stderr pendant la navigation ✓, l'indexer git blame ne respawn pas pendant la navigation idle ✓ — couvert par tests/test_stability_e2e.py. Lance :",
+    "section-5-footer": "Si vert → §5 fait.",
 
     "section-signoff-title": "Sign-off",
     "section-signoff-desc": "Quand toutes les sections sont vertes (ou bugs notés à Claude), dis à Claude :",

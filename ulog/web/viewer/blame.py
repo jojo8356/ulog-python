@@ -50,6 +50,64 @@ class AuthorIndex:
     def __init__(self, repo_root: str | Path) -> None:
         self._repo_root = Path(repo_root)
         self._cache: dict[str, _FileCache] = {}
+        # basename → list of repo-relative paths. Python `logging` stores
+        # `record.filename` as the BASENAME (per stdlib convention), so
+        # records reference e.g. `config.py` even when the source lives
+        # at `shared/config.py` in the repo. Without this map, every
+        # `os.stat(repo_root / "config.py")` would fail → all records
+        # bucketed under <unknown>. Built lazily on first lookup that
+        # needs it.
+        self._basename_map: dict[str, list[str]] | None = None
+
+    def _build_basename_map(self) -> dict[str, list[str]]:
+        """Index every tracked file by basename via `git ls-files`.
+
+        Honors .gitignore, doesn't follow submodules. One subprocess at
+        build time; result cached for the index's lifetime.
+        """
+        try:
+            proc = subprocess.run(
+                ["git", "ls-files"],
+                cwd=str(self._repo_root),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=10,
+                check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            return {}
+        if proc.returncode != 0:
+            return {}
+        mp: dict[str, list[str]] = defaultdict(list)
+        for rel_path in proc.stdout.splitlines():
+            rel_path = rel_path.strip()
+            if not rel_path:
+                continue
+            mp[os.path.basename(rel_path)].append(rel_path)
+        return dict(mp)
+
+    def _resolve_path(self, file: str) -> str | None:
+        """Map a record's `file` field to a real repo-relative path.
+
+        Three cases:
+        1. `file` exists at `repo_root / file` → return `file` unchanged.
+        2. `file` is a basename and exactly one repo file has that
+           basename → return that repo-relative path.
+        3. Otherwise (missing, or ambiguous basename) → return None.
+        """
+        # Direct hit — most common when records carry full paths.
+        if (self._repo_root / file).exists():
+            return file
+        # Basename fallback — Python `logging` default.
+        if self._basename_map is None:
+            self._basename_map = self._build_basename_map()
+        candidates = self._basename_map.get(os.path.basename(file), [])
+        if len(candidates) == 1:
+            return candidates[0]
+        # 0 candidates (file not in repo) or 2+ (ambiguous): give up.
+        return None
 
     def author_for(self, file: str, line: int) -> Author | None:
         cached = self._cache_lookup(file)
@@ -89,8 +147,11 @@ class AuthorIndex:
     # -- internals --
 
     def _mtime(self, file: str) -> float | None:
+        resolved = self._resolve_path(file)
+        if resolved is None:
+            return None
         try:
-            return os.stat(self._repo_root / file).st_mtime
+            return os.stat(self._repo_root / resolved).st_mtime
         except FileNotFoundError:
             return None
 
@@ -131,6 +192,12 @@ class AuthorIndex:
         if not line_list:
             return {}
 
+        resolved = self._resolve_path(file)
+        if resolved is None:
+            # File not in repo or basename is ambiguous — no blame
+            # possible. Map every requested line to None.
+            return dict.fromkeys(line_list)
+
         # Build the -L args: one range per line for v0.4 (collapse to
         # contiguous ranges is a v0.5 optimization — see story Dev Notes).
         l_flags: list[str] = []
@@ -138,7 +205,7 @@ class AuthorIndex:
             l_flags.extend(["-L", f"{ln},{ln}"])
 
         result = subprocess.run(
-            ["git", "blame", "--porcelain", *l_flags, "--", file],
+            ["git", "blame", "--porcelain", *l_flags, "--", resolved],
             cwd=str(self._repo_root),
             capture_output=True,
             text=True,

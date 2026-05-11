@@ -163,6 +163,8 @@
             title="Filter records by the git commit author of the source line. Multi-select with OR semantics.">
           {% lucide "user" size=14 %}
           <span>Authors</span>
+          <span class="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400 tabular-nums"
+                title="Distinct authors with at least one blamed record (excludes &lt;unknown&gt;)">({{ authors_summary.known_entries|length }})</span>
         </h3>
         <div class="space-y-1 max-h-48 overflow-y-auto" data-authors-block="true">
           {% for entry in authors_summary.entries %}

@@ -176,3 +176,30 @@ def test_perf_no_path_exceeds_hard_ceiling(viewer, seeded_demo):  # noqa: F811
         assert elapsed < BUDGET_HARD_CEILING, (
             f"PRD-v0.4.1 hard ceiling violated: GET {path} took {elapsed:.3f}s > {BUDGET_HARD_CEILING}s"
         )
+
+
+# ---- §4.10 /api/records/ JSON shape (formerly e4-reg-10) -----------------
+
+
+def test_api_records_returns_valid_json(viewer):
+    """§4.10 — /api/records/ returns valid JSON with the expected
+    top-level shape (records list + pagination metadata)."""
+    import json as _json
+    url = f"http://127.0.0.1:{viewer}/api/records/"
+    with urllib.request.urlopen(url, timeout=5) as resp:
+        assert resp.status == 200, f"got HTTP {resp.status}"
+        ctype = resp.getheader("Content-Type", "")
+        assert "application/json" in ctype.lower(), f"not JSON: Content-Type={ctype!r}"
+        body = resp.read().decode("utf-8")
+
+    payload = _json.loads(body)  # raises ValueError on malformed JSON
+    assert isinstance(payload, dict), f"top-level should be dict, got {type(payload).__name__}"
+
+    # Minimal contract: records list exists + each record has the core
+    # ULog fields. Don't over-assert (paginate/filter shape may evolve).
+    assert "records" in payload, "missing 'records' key"
+    assert isinstance(payload["records"], list)
+    if payload["records"]:
+        first = payload["records"][0]
+        for required in ("id", "ts", "level", "logger", "msg", "file", "line"):
+            assert required in first, f"record missing {required!r} field"

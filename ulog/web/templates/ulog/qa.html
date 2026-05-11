@@ -75,7 +75,7 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-1-title">1.1 Tests sidebar (Story 1.6 / FR62)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e1-1.1-1" label="Section 'Tests' visible in left sidebar between 'Level' and 'Sectors', with flask icon" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.1-1" label="Section 'Tests' visible in left sidebar between 'Level' and 'Sectors', with flask icon" screenshot="section-1-1" %}
       {% include "ulog/_qa_item.html" with id="e1-1.1-2" label="Tests grouped by file (tests/checkout.py, tests/login.py...)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.1-3" label="First 5 file groups expanded by default; rest collapsed" %}
       {% include "ulog/_qa_item.html" with id="e1-1.1-4" label="Each test shows: outcome icon (✓/✗/🔥/⊘) + name + formatted duration (ms/s)" %}
@@ -87,7 +87,7 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-2-title">1.2 Quick filters (Story 1.6 / FR63-FR64)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e1-1.2-1" label="'Failed only' checkbox filters list to failed/errored tests" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.2-1" label="'Failed only' checkbox filters list to failed/errored tests" screenshot="section-1-2" %}
       {% include "ulog/_qa_item.html" with id="e1-1.2-2" label="'Slowest top 10' filters list to 10 slowest tests by duration" %}
       {% include "ulog/_qa_item.html" with id="e1-1.2-3" label="Both checkboxes can be combined" %}
       {% include "ulog/_qa_item.html" with id="e1-1.2-4" label="Unchecking restores full list" %}
@@ -96,14 +96,14 @@
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-3-title">1.3 Click test name → filter (Story 1.7 / FR65)</span></h3>
     <ul class="space-y-1.5 text-sm">
       {% include "ulog/_qa_item.html" with id="e1-1.3-1" label="Click a test name in the sidebar → URL becomes /?test_id=tests/<file>.py%3A%3A<test_name> (slash NOT encoded; '::' encoded as %3A%3A)" %}
-      {% include "ulog/_qa_item.html" with id="e1-1.3-2" label="Records list filters to records emitted during this test (incl. propagated app records)" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.3-2" label="Records list filters to records emitted during this test (incl. propagated app records)" screenshot="section-1-3" %}
       {% include "ulog/_qa_item.html" with id="e1-1.3-3" label="Active test visually distinct in sidebar (background or bold)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.3-4" label="Other filters preserved when clicking a test (level, search, etc.)" %}
     </ul>
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-4-title">1.4 Detail view 'Test context' panel (Story 1.8 / FR66)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e1-1.4-1" label="Click any test record → 'Test context' panel between Context and Exception" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.4-1" label="Click any test record → 'Test context' panel between Context and Exception" screenshot="section-1-4" %}
       {% include "ulog/_qa_item.html" with id="e1-1.4-2" label="Panel shows: outcome icon + name + duration" %}
       {% include "ulog/_qa_item.html" with id="e1-1.4-3" label="Test ID (full path) shown" %}
       {% include "ulog/_qa_item.html" with id="e1-1.4-4" label="2 links: 'view all records for this test' + 'errors+warnings only'" %}
@@ -112,7 +112,7 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e1-1.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-1-5-title">1.5 Doc page /docs/test-integration/ (Story 1.11)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e1-1.5-1" label="/docs/test-integration/ returns 200 and renders" link_url="/docs/test-integration/" link_text="open" %}
+      {% include "ulog/_qa_item.html" with id="e1-1.5-1" label="/docs/test-integration/ returns 200 and renders" link_url="/docs/test-integration/" link_text="open" screenshot="section-1-5" %}
       {% include "ulog/_qa_item.html" with id="e1-1.5-2" label="Sections present: Install, CLI flags, Schema, Worked example, Programmatic API, Troubleshooting" %}
       {% include "ulog/_qa_item.html" with id="e1-1.5-3" label="conftest.py example in rendered code block (no raw markdown)" %}
       {% include "ulog/_qa_item.html" with id="e1-1.5-4" label="Listed in /docs/ index" link_url="/docs/" link_text="open" %}
@@ -128,7 +128,7 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-1-title">2.1 Authors sidebar (Story 2.6 / FR76)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e2-2.1-1" label="'Authors' block visible in left sidebar between 'Files' and 'Time range', with user icon" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.1-1" label="'Authors' block visible in left sidebar between 'Files' and 'Time range', with user icon" screenshot="section-2-1" %}
       {% include "ulog/_qa_item.html" with id="e2-2.1-2" label="8 author names listed (Alice Chen, Bob Martin, etc.)" %}
       {% include "ulog/_qa_item.html" with id="e2-2.1-3" label="Each row: name + truncated email + count" %}
       {% include "ulog/_qa_item.html" with id="e2-2.1-4" label="<unknown> entry at the end (~1100 test records)" %}
@@ -145,14 +145,14 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-3-title">2.3 Show unknown toggle (FR78)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e2-2.3-1" label="Uncheck 'Show unknown' → unknown records disappear" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.3-1" label="Uncheck 'Show unknown' → unknown records disappear" screenshot="section-2-3" %}
       {% include "ulog/_qa_item.html" with id="e2-2.3-2" label="Recheck → they come back" %}
       {% include "ulog/_qa_item.html" with id="e2-2.3-3" label="URL changes to ?show_unknown=0 when off" %}
     </ul>
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-4-title">2.4 Detail view 'Authored by' panel (Story 2.8 / FR80)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e2-2.4-1" label="Open any record → 'Authored by' panel between Test context and Exception" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.4-1" label="Open any record → 'Authored by' panel between Test context and Exception" screenshot="section-2-4" %}
       {% include "ulog/_qa_item.html" with id="e2-2.4-2" label="Format: <Name> <email truncated 40 chars> · <7-char short-sha>" %}
       {% include "ulog/_qa_item.html" with id="e2-2.4-3" label="Line 'committed X days/hours/minutes ago'" %}
       {% include "ulog/_qa_item.html" with id="e2-2.4-4" label="2 links: 'view all records from this author' + 'view diff: <sha>'" %}
@@ -160,7 +160,7 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-5-title">2.5 /diff/&lt;sha&gt;/ view (Story 2.9 / FR81 / NFR-SEC-30)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e2-2.5-1" label="'view diff' link → page renders with full git show output in <pre> monospace" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.5-1" label="'view diff' link → page renders with full git show output in <pre> monospace" screenshot="section-2-5" %}
       {% include "ulog/_qa_item.html" with id="e2-2.5-2" label="'← back to records' link in header" %}
       {% include "ulog/_qa_item.html" with id="e2-2.5-3" label="HTML-escaped (test with a commit msg containing < or >)" %}
     </ul>
@@ -173,7 +173,7 @@
 
     <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e2-2.6-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-2-6-title">2.6 Doc page /docs/author-filter/ (Story 2.11)</span></h3>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e2-2.6-1" label="/docs/author-filter/ renders" link_url="/docs/author-filter/" link_text="open" %}
+      {% include "ulog/_qa_item.html" with id="e2-2.6-1" label="/docs/author-filter/ renders" link_url="/docs/author-filter/" link_text="open" screenshot="section-2-6" %}
       {% include "ulog/_qa_item.html" with id="e2-2.6-2" label="Sections: How it works, CLI flags, <unknown> semantics, Code vs commit author, Worked example, Performance, Security, Troubleshooting" %}
     </ul>
 
@@ -208,7 +208,7 @@
       <span data-i18n-key="section-4-title">4. v0.1 / v0.2 features still work</span>
     </h2>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4-reg-1" label="Levels sidebar (DEBUG/INFO/WARNING/ERROR/CRITICAL) with ghost counts" %}
+      {% include "ulog/_qa_item.html" with id="e4-reg-1" label="Levels sidebar (DEBUG/INFO/WARNING/ERROR/CRITICAL) with ghost counts" screenshot="section-4" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-2" label="Sectors sidebar (logger names) — multi-select OR" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-3" label="Files sidebar — multi-select OR" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-4" label="Search msg — substring match" %}
@@ -217,7 +217,6 @@
       {% include "ulog/_qa_item.html" with id="e4-reg-7" label="Pagination buttons (prev/next at bottom)" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-8" label="Tutorial overlay on first launch (FR38)" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-9" label="Dark mode toggle in header — preference persisted" %}
-      {% include "ulog/_qa_item.html" with id="e4-reg-10" label="/api/records/ returns valid JSON" link_url="/api/records/" link_text="open" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-11" label="Detail view shows: ts, level, logger, msg, file:line, context, exception (when present)" %}
     </ul>
   </section>

@@ -101,6 +101,7 @@ class SQLHandler(logging.Handler):
             DateTime,
             Index,
             Integer,
+            LargeBinary,
             MetaData,
             String,
             Table,
@@ -123,10 +124,21 @@ class SQLHandler(logging.Handler):
             Column("line", Integer, nullable=False),
             Column("exc", JSON, nullable=True),
             Column("context", JSON, nullable=True),
+            # v0.5 chain integrity (Epic 3 / Story 3.1). Columns ride
+            # along on every v0.5 schema; population is gated by
+            # `setup(integrity='hash-chain')` once Story 3.6 lands.
+            # `INTEGER` not `Boolean` for `immutable` — keeps the v0.4→v0.5
+            # upgrade-hint SQL string (Story 3.3) unambiguous.
+            Column("chain_pos", Integer, nullable=False, server_default="0"),
+            Column("record_hash", LargeBinary, nullable=True),
+            Column("prev_hash", LargeBinary, nullable=True),
+            Column("immutable", Integer, nullable=False, server_default="0"),
             Index(f"ix_{table}_ts", "ts"),
             Index(f"ix_{table}_level", "level"),
             Index(f"ix_{table}_logger", "logger"),
             Index(f"ix_{table}_file", "file"),
+            Index(f"ix_{table}_chain_pos", "chain_pos"),
+            Index(f"ix_{table}_immutable", "immutable"),
         )
         # Lazy-create on first emit; expose for tests.
         self._metadata = metadata

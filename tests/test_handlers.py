@@ -307,3 +307,112 @@ def test_setup_json_without_path_raises(tmp_path):
 def test_setup_csv_without_path_raises(tmp_path):
     with pytest.raises(ValueError, match="csv_path"):
         ulog.setup(handlers=["csv"])
+
+
+# ---- SQL handler v0.5 schema extension (Story 3.1) ----------------------
+
+
+def test_sql_v05_schema_has_chain_and_immutable_columns(tmp_path):
+    """Story 3.1 AC1/AC2/AC3 — fresh DB carries the 4 new columns +
+    2 new indexes with correct types/defaults."""
+    db = tmp_path / "logs.sqlite"
+    url = f"sqlite:///{db}"
+    ulog.setup(handlers=["sql"], sql_url=url, sql_batch_size=1)
+    # Force schema creation by emitting one record.
+    ulog.get_logger().info("seed")
+    for h in logging.getLogger().handlers:
+        h.flush()
+
+    from sqlalchemy import create_engine, inspect
+
+    engine = create_engine(url, future=True)
+    insp = inspect(engine)
+    cols = {c["name"]: c for c in insp.get_columns("logs")}
+    expected_new = {"chain_pos", "record_hash", "prev_hash", "immutable"}
+    assert expected_new <= cols.keys(), f"missing columns: {expected_new - cols.keys()}"
+    # `chain_pos` and `immutable` are NOT NULL with default 0.
+    assert cols["chain_pos"]["nullable"] is False
+    assert cols["immutable"]["nullable"] is False
+    # `record_hash` / `prev_hash` are nullable BLOBs.
+    assert cols["record_hash"]["nullable"] is True
+    assert cols["prev_hash"]["nullable"] is True
+
+    idx_names = {i["name"] for i in insp.get_indexes("logs")}
+    assert "ix_logs_chain_pos" in idx_names
+    assert "ix_logs_immutable" in idx_names
+    engine.dispose()
+
+
+def test_sql_v05_default_values(tmp_path):
+    """Story 3.1 AC5 — records emitted without chain logic persist with
+    chain_pos=0, immutable=0, record_hash=NULL, prev_hash=NULL."""
+    db = tmp_path / "logs.sqlite"
+    url = f"sqlite:///{db}"
+    ulog.setup(handlers=["sql"], sql_url=url, sql_batch_size=1)
+    ulog.get_logger().info("one")
+    for h in logging.getLogger().handlers:
+        h.flush()
+
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(url, future=True)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT chain_pos, immutable, record_hash, prev_hash FROM logs")
+        ).first()
+    assert row is not None
+    assert row[0] == 0  # chain_pos
+    assert row[1] == 0  # immutable
+    assert row[2] is None  # record_hash
+    assert row[3] is None  # prev_hash
+    engine.dispose()
+
+
+def test_sql_v04_upgrade_path_raises_schema_error(tmp_path):
+    """Story 3.1 AC4 — pre-existing v0.4 table (no chain columns) →
+    SchemaError listing all 4 missing columns. Story 3.3 will replace
+    the diff-set wording with a literal ALTER TABLE hint."""
+    from sqlalchemy import (
+        JSON,
+        Column,
+        DateTime,
+        Integer,
+        MetaData,
+        String,
+        Table,
+        Text,
+        create_engine,
+    )
+
+    from ulog.handlers.sql import SchemaError, SQLHandler
+
+    db = tmp_path / "v04.sqlite"
+    url = f"sqlite:///{db}"
+    # Pre-create the v0.4 shape (9 cols, no chain/immutable).
+    engine = create_engine(url, future=True)
+    md = MetaData()
+    Table(
+        "logs",
+        md,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("ts", DateTime(timezone=False), nullable=False),
+        Column("level", String(10), nullable=False),
+        Column("logger", String(255), nullable=False),
+        Column("msg", Text, nullable=False),
+        Column("file", String(255), nullable=False),
+        Column("line", Integer, nullable=False),
+        Column("exc", JSON, nullable=True),
+        Column("context", JSON, nullable=True),
+    )
+    md.create_all(engine)
+    engine.dispose()
+
+    # Now bootstrap the v0.5 handler against it. SchemaError fires
+    # at schema verification time, NOT inside emit's swallow path.
+    handler = SQLHandler(url=url, batch_size=1)
+    with pytest.raises(SchemaError) as excinfo:
+        handler._ensure_schema()
+    msg = str(excinfo.value)
+    for col in ("chain_pos", "record_hash", "prev_hash", "immutable"):
+        assert col in msg, f"missing column {col!r} not surfaced in SchemaError: {msg!r}"
+    handler.close()

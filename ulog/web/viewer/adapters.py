@@ -35,6 +35,13 @@ class Record:
     line: int
     context: dict[str, Any] = field(default_factory=dict)
     exc: dict[str, Any] | None = None
+    # v0.5 chain integrity (Epic 3 / Story 3.1). Populated by the SQLite
+    # adapter when reading rows of a v0.5+ schema; JSONL/CSV adapters
+    # always default these — the chain is SQL-only (Decision B1).
+    chain_pos: int = 0
+    record_hash: bytes | None = None
+    prev_hash: bytes | None = None
+    immutable: bool = False
 
 
 @dataclass
@@ -476,6 +483,9 @@ class SQLiteAdapter(Adapter):
         exc = row.exc
         if isinstance(exc, str):
             exc = json.loads(exc) if exc else None
+        # v0.5 chain columns. `getattr` defaults guard against reading
+        # v0.4 DBs that pre-date Story 3.1 (the reflected `Table` may
+        # come from the live DB schema if SQLAlchemy autoload was used).
         return Record(
             id=row.id,
             ts=ts,
@@ -486,6 +496,10 @@ class SQLiteAdapter(Adapter):
             line=row.line,
             context=ctx or {},
             exc=exc,
+            chain_pos=int(getattr(row, "chain_pos", 0) or 0),
+            record_hash=bytes(rh) if (rh := getattr(row, "record_hash", None)) else None,
+            prev_hash=bytes(ph) if (ph := getattr(row, "prev_hash", None)) else None,
+            immutable=bool(getattr(row, "immutable", 0)),
         )
 
     def get(self, record_id: int) -> Record | None:

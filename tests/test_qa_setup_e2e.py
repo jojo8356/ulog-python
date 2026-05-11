@@ -11,6 +11,7 @@ Spawns real subprocesses (seed + viewer) so the assertions match the
 exact user experience. Each viewer subprocess is bounded in wall-time
 and torn down even on failure.
 """
+
 from __future__ import annotations
 
 import socket
@@ -72,9 +73,20 @@ def seeded_demo(tmp_path_factory) -> Path:
     demo_dir = tmp_path_factory.mktemp("ulog-qa-demo")
     seed_script = REPO_ROOT / "scripts" / "seed_demo_db.py"
     proc = subprocess.run(
-        [sys.executable, str(seed_script), str(demo_dir),
-         "--records", "5000", "--test-files", "3", "--tests-per-file", "10"],
-        capture_output=True, text=True, timeout=60,
+        [
+            sys.executable,
+            str(seed_script),
+            str(demo_dir),
+            "--records",
+            "5000",
+            "--test-files",
+            "3",
+            "--tests-per-file",
+            "10",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert proc.returncode == 0, (
         f"seed script failed (exit {proc.returncode}):\n"
@@ -119,27 +131,28 @@ def test_seed_script_records_in_db(seeded_demo):
 
 def test_viewer_startup_indexer_progress_and_no_stacktrace(seeded_demo):
     """§0 AC3 + AC4 combined (one subprocess covers both)."""
-    proc = _spawn_viewer([
-        "--no-open", "--port", str(_free_port()),
-        "--repo", str(seeded_demo),
-        str(seeded_demo / "logs.sqlite"),
-    ])
+    proc = _spawn_viewer(
+        [
+            "--no-open",
+            "--port",
+            str(_free_port()),
+            "--repo",
+            str(seeded_demo),
+            str(seeded_demo / "logs.sqlite"),
+        ]
+    )
     stderr = _wait_then_capture_stderr(proc, settle_s=7.0)
 
     # AC3 — author indexer ran and printed its summary line.
     # First-launch path emits "indexed N records across M files in X.XXs".
     # If a cache exists from a prior test run, path is "indexed ... from cache".
-    assert "ulog: indexed " in stderr, (
-        f"author-indexer summary line missing from stderr:\n{stderr}"
-    )
+    assert "ulog: indexed " in stderr, f"author-indexer summary line missing from stderr:\n{stderr}"
     assert ("files in" in stderr) or ("from cache" in stderr), (
         f"indexer summary malformed:\n{stderr}"
     )
 
     # AC4 — no Python traceback or unhandled exception.
-    assert "Traceback (most recent call last)" not in stderr, (
-        f"stack trace at startup:\n{stderr}"
-    )
+    assert "Traceback (most recent call last)" not in stderr, f"stack trace at startup:\n{stderr}"
     assert "OperationalError" not in stderr
     assert "Logging error" not in stderr
 

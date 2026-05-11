@@ -1,4 +1,5 @@
 """Story 2.3 — lazy index build with stderr progress."""
+
 from __future__ import annotations
 
 import io
@@ -11,7 +12,6 @@ import pytest
 
 import ulog
 from ulog.web.viewer.adapters import (
-    CSVAdapter,
     JSONLAdapter,
     SQLiteAdapter,
 )
@@ -55,16 +55,50 @@ def test_sqlite_adapter_unique_pairs(tmp_path: Path):
 def test_jsonl_adapter_unique_pairs(tmp_path: Path):
     p = tmp_path / "logs.jsonl"
     p.write_text(
-        "\n".join([
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": "a", "file": "foo.py", "line": 10}),
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": "b", "file": "foo.py", "line": 10}),  # dup
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": "c", "file": "foo.py", "line": 20}),
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": "d", "file": "bar.py", "line": 5}),
-        ]),
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "a",
+                        "file": "foo.py",
+                        "line": 10,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "b",
+                        "file": "foo.py",
+                        "line": 10,
+                    }
+                ),  # dup
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "c",
+                        "file": "foo.py",
+                        "line": 20,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "d",
+                        "file": "bar.py",
+                        "line": 5,
+                    }
+                ),
+            ]
+        ),
         encoding="utf-8",
     )
     pairs = set(JSONLAdapter(p).unique_file_line_pairs())
@@ -85,20 +119,51 @@ def git_repo_with_log(tmp_path: Path) -> tuple[Path, Path]:
     subprocess.run(
         ["git", "commit", "-q", "-m", "init"],
         cwd=tmp_path,
-        env={**os.environ, "GIT_AUTHOR_NAME": "Alice", "GIT_AUTHOR_EMAIL": "alice@example.com",
-             "GIT_COMMITTER_NAME": "Alice", "GIT_COMMITTER_EMAIL": "alice@example.com"},
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "Alice",
+            "GIT_AUTHOR_EMAIL": "alice@example.com",
+            "GIT_COMMITTER_NAME": "Alice",
+            "GIT_COMMITTER_EMAIL": "alice@example.com",
+        },
         check=True,
     )
     log = tmp_path / "logs.jsonl"
     log.write_text(
-        "\n".join([
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": "a", "file": "foo.py", "line": 1}),
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": "b", "file": "foo.py", "line": 2}),
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": "c", "file": "foo.py", "line": 3}),
-        ]),
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "a",
+                        "file": "foo.py",
+                        "line": 1,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "b",
+                        "file": "foo.py",
+                        "line": 2,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "c",
+                        "file": "foo.py",
+                        "line": 3,
+                    }
+                ),
+            ]
+        ),
         encoding="utf-8",
     )
     return tmp_path, log

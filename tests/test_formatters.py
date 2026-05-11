@@ -1,4 +1,5 @@
 """Tests for the four built-in formatters: qlnes, simple, verbose, json."""
+
 from __future__ import annotations
 
 import io
@@ -172,5 +173,5 @@ def test_register_custom_formatter():
 
 
 def test_register_rejects_non_formatter():
-    with pytest.raises(TypeError, match="logging.Formatter"):
+    with pytest.raises(TypeError, match=r"logging\.Formatter"):
         ulog.register_formatter("bad", str)  # type: ignore[arg-type]

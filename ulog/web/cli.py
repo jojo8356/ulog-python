@@ -11,6 +11,7 @@ The script:
   3. Spins up `manage.py runserver` on the requested port.
   4. Opens the system browser via `webbrowser`.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -31,11 +32,12 @@ def _find_free_port() -> int:
     localhost-only it's not an attack surface."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+        return int(s.getsockname()[1])
 
 
 def _open_browser_when_ready(host: str, port: int, delay_s: float = 1.0) -> None:
     """Run in a background thread: wait briefly, then open the URL."""
+
     def _open() -> None:
         time.sleep(delay_s)
         url = f"http://{host}:{port}/"
@@ -103,36 +105,44 @@ def main(argv: list[str] | None = None) -> int:
         help="Log file: .sqlite/.sqlite3/.db, .jsonl/.ndjson, or .csv",
     )
     parser.add_argument(
-        "--port", type=int, default=0,
+        "--port",
+        type=int,
+        default=0,
         help="Port to bind (default: random free port).",
     )
     parser.add_argument(
-        "--host", default="127.0.0.1",
+        "--host",
+        default="127.0.0.1",
         help="Bind host. Default 127.0.0.1 (localhost only). "
-             "Set to 0.0.0.0 to expose to the network — requires explicit opt-in.",
+        "Set to 0.0.0.0 to expose to the network — requires explicit opt-in.",
     )
     parser.add_argument(
-        "--no-open", action="store_true",
+        "--no-open",
+        action="store_true",
         help="Don't auto-open a browser tab.",
     )
     parser.add_argument(
-        "--repo", default=None,
+        "--repo",
+        default=None,
         help="Git repo root for author attribution. Default: walk parents "
-             "of cwd until .git/ is found.",
+        "of cwd until .git/ is found.",
     )
     index_group = parser.add_mutually_exclusive_group()
     index_group.add_argument(
-        "--no-author-index", action="store_true",
+        "--no-author-index",
+        action="store_true",
         help="Skip the author indexer; hides the Authors sidebar.",
     )
     index_group.add_argument(
-        "--rebuild-author-index", action="store_true",
+        "--rebuild-author-index",
+        action="store_true",
         help="Force rebuild of the author cache (drops the existing one).",
     )
     parser.add_argument(
-        "--debug", action="store_true",
+        "--debug",
+        action="store_true",
         help="Enable Django DEBUG mode + show the /_qa/ checklist link "
-             "in the header. Dev-only — never use against shared logs.",
+        "in the header. Dev-only — never use against shared logs.",
     )
     args = parser.parse_args(argv)
 
@@ -184,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     import django
+
     django.setup()
 
     if not args.no_open:
@@ -216,8 +227,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.debug:
             from django.utils.autoreload import run_with_reloader
+
             print(
-                f"ulog-web: --debug active → autoreload on .py changes",
+                "ulog-web: --debug active → autoreload on .py changes",
                 file=sys.stderr,
             )
             run_with_reloader(_serve)

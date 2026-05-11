@@ -1,6 +1,8 @@
 """Tests for ulog.testing.test_event (Story 1.9 / PRD-v0.3 §5.2)."""
+
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import sqlite3
@@ -25,10 +27,8 @@ def _isolate():
     yield
     for h in list(logging.getLogger().handlers):
         if getattr(h, "_ulog_managed", False):
-            try:
+            with contextlib.suppress(Exception):
                 h.close()
-            except Exception:
-                pass
             logging.getLogger().removeHandler(h)
     ulog.clear()
 
@@ -113,9 +113,8 @@ def test_test_event_no_outcome_no_exception_auto_passed(configured_db):
 def test_test_event_exception_emits_errored_and_raises(configured_db):
     """AC3 — block raises ValueError → 3 records (started + errored + traceback)
     AND the exception propagates out of the context manager."""
-    with pytest.raises(ValueError, match="boom"):
-        with test_event("oh_no"):
-            raise ValueError("boom")
+    with pytest.raises(ValueError, match="boom"), test_event("oh_no"):
+        raise ValueError("boom")
     for h in logging.getLogger().handlers:
         h.flush()
 
@@ -168,10 +167,11 @@ def test_test_event_supports_all_four_outcome_strings(configured_db):
         h.flush()
 
     records = _read_records(configured_db)
-    # 4 tests × 2 records (started + outcome) = 8
+    # 4 tests x 2 records (started + outcome) = 8
     assert len(records) == 8
-    outcome_records = [r for r in records if r["msg"].startswith("test ")
-                       and r["msg"] != "test started"]
+    outcome_records = [
+        r for r in records if r["msg"].startswith("test ") and r["msg"] != "test started"
+    ]
     assert len(outcome_records) == 4
     seen = {json.loads(r["context"])["outcome"] for r in outcome_records}
     assert seen == {"passed", "failed", "skipped", "errored"}
@@ -191,7 +191,8 @@ def test_test_event_propagates_test_id_to_app_records(configured_db):
     records = _read_records(configured_db)
     inside_recs = [r for r in records if r["msg"] == "inside"]
     outside_recs = [r for r in records if r["msg"] == "outside"]
-    assert len(inside_recs) == 1 and len(outside_recs) == 1
+    assert len(inside_recs) == 1
+    assert len(outside_recs) == 1
 
     inside_ctx = json.loads(inside_recs[0]["context"])
     assert inside_ctx.get("test_id") == "scope_test"
@@ -206,9 +207,7 @@ def test_test_event_propagates_test_id_to_app_records(configured_db):
         parsed = json.loads(raw_outside) if isinstance(raw_outside, str) else raw_outside
         outside_ctx = parsed
     has_test_id_post_context = (
-        outside_ctx is not None
-        and isinstance(outside_ctx, dict)
-        and "test_id" in outside_ctx
+        outside_ctx is not None and isinstance(outside_ctx, dict) and "test_id" in outside_ctx
     )
     assert not has_test_id_post_context, (
         f"AC6: post-context emit must not carry test_id; got {outside_ctx!r}"
@@ -240,9 +239,10 @@ def test_replay_records_importable_and_stub_raises():
     """AC7 — replay_records is importable but raises NotImplementedError
     when called (full impl in v0.5 / Story 4.9)."""
     from ulog.testing import replay_records
+
     assert callable(replay_records)
     # Match on "Story 4.9" — more stable than "v0.5" (versioning may evolve).
-    with pytest.raises(NotImplementedError, match="Story 4.9"):
+    with pytest.raises(NotImplementedError, match=r"Story 4\.9"):
         replay_records([])
 
 
@@ -250,6 +250,7 @@ def test_test_session_importable_and_constructible():
     """AC7 — TestSession is importable as a class and can be constructed
     (placeholder fields; v0.5 may extend)."""
     from ulog.testing import TestSession
+
     assert isinstance(TestSession, type)
     s = TestSession(name="x")
     assert s.name == "x"
@@ -259,6 +260,7 @@ def test_test_session_importable_and_constructible():
 def test_testing_module_all_lists_three_exports():
     """AC8 — ulog.testing.__all__ contains exactly the three locked names."""
     import ulog.testing as t
+
     # Python's default sorted() is case-sensitive: uppercase 'T' < lowercase
     # 'r'/'t' by ASCII, so TestSession sorts first.
     assert sorted(t.__all__) == ["TestSession", "replay_records", "test_event"]
@@ -274,10 +276,9 @@ def test_test_event_explicit_outcome_then_exception_no_double_outcome(configured
     block then raises, the explicit outcome wins (no auto-`errored` record)
     AND the traceback ERROR is still emitted. Total: started + explicit
     outcome + traceback ERROR = 3 records."""
-    with pytest.raises(ValueError, match="boom"):
-        with test_event("explicit_then_raise") as ev:
-            ev.outcome("passed", duration_s=0.05)
-            raise ValueError("boom")
+    with pytest.raises(ValueError, match="boom"), test_event("explicit_then_raise") as ev:
+        ev.outcome("passed", duration_s=0.05)
+        raise ValueError("boom")
     for h in logging.getLogger().handlers:
         h.flush()
 
@@ -330,17 +331,12 @@ def test_test_event_nested_blocks_restore_outer_test_id(configured_db):
 
     # The post-both app record carries no test_id
     after = by_msg["after both"]
-    has_tid = (
-        after is not None
-        and isinstance(after, dict)
-        and "test_id" in after
-    )
+    has_tid = after is not None and isinstance(after, dict) and "test_id" in after
     assert not has_tid, f"post-context emit must not carry test_id; got {after!r}"
 
 
 def test_test_event_empty_name_raises(configured_db):
     """Review patch P8 — empty test_id is rejected at entry (rather than
     storing a meaningless empty-string value in records)."""
-    with pytest.raises(ValueError, match="non-empty"):
-        with test_event(""):
-            pass
+    with pytest.raises(ValueError, match="non-empty"), test_event(""):
+        pass

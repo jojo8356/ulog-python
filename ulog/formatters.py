@@ -4,6 +4,7 @@ Four built-in formatters cover the user-facing CLI cases (qlnes,
 simple, verbose) and the pipeline/aggregator case (json). Custom
 formatters register via `register_formatter(name, cls)`.
 """
+
 from __future__ import annotations
 
 import json
@@ -115,13 +116,33 @@ class JsonFormatter(logging.Formatter):
 
     # Reserved attribute names on LogRecord — anything in `extra=` not
     # in this set lands in the JSON output.
-    _RESERVED = frozenset({
-        "args", "asctime", "created", "exc_info", "exc_text", "filename",
-        "funcName", "levelname", "levelno", "lineno", "message", "module",
-        "msecs", "msg", "name", "pathname", "process", "processName",
-        "relativeCreated", "stack_info", "thread", "threadName",
-        "taskName",  # py3.12+
-    })
+    _RESERVED = frozenset(
+        {
+            "args",
+            "asctime",
+            "created",
+            "exc_info",
+            "exc_text",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "message",
+            "module",
+            "msecs",
+            "msg",
+            "name",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "thread",
+            "threadName",
+            "taskName",  # py3.12+
+        }
+    )
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
@@ -171,9 +192,7 @@ def register_formatter(name: str, cls: type[logging.Formatter]) -> None:
     """Add a custom formatter under `name`. Replaces any previous
     formatter at that name (including built-ins, to allow overriding)."""
     if not issubclass(cls, logging.Formatter):
-        raise TypeError(
-            f"register_formatter requires a logging.Formatter subclass; got {cls!r}"
-        )
+        raise TypeError(f"register_formatter requires a logging.Formatter subclass; got {cls!r}")
     _REGISTERED[name] = cls
 
 
@@ -185,10 +204,7 @@ def _resolve_formatter(name: str, *, color_on: bool, **kwargs: Any) -> logging.F
     through.
     """
     if name not in _REGISTERED:
-        raise ValueError(
-            f"unknown formatter {name!r}; "
-            f"registered: {sorted(_REGISTERED.keys())}"
-        )
+        raise ValueError(f"unknown formatter {name!r}; registered: {sorted(_REGISTERED.keys())}")
     cls = _REGISTERED[name]
     if cls is JsonFormatter:
         return cls()

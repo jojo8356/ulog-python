@@ -11,6 +11,7 @@ Produces:
 Then:
     ulog-web --repo /tmp/ulog-demo /tmp/ulog-demo/logs.sqlite
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,28 +30,28 @@ random.seed(42)
 # ---- Synthetic team -----------------------------------------------------
 
 AUTHORS = [
-    ("Alice Chen",      "alice@globex.io"),
-    ("Bob Martin",      "bob@globex.io"),
-    ("Charlie Patel",   "charlie@globex.io"),
-    ("Dana Wong",       "dana@globex.io"),
-    ("Erwin Schmidt",   "erwin@globex.io"),
-    ("Fatima Khouri",   "fatima@globex.io"),
-    ("Gao Li",          "gao@globex.io"),
-    ("Hiroshi Sato",    "hiroshi@globex.io"),
+    ("Alice Chen", "alice@globex.io"),
+    ("Bob Martin", "bob@globex.io"),
+    ("Charlie Patel", "charlie@globex.io"),
+    ("Dana Wong", "dana@globex.io"),
+    ("Erwin Schmidt", "erwin@globex.io"),
+    ("Fatima Khouri", "fatima@globex.io"),
+    ("Gao Li", "gao@globex.io"),
+    ("Hiroshi Sato", "hiroshi@globex.io"),
 ]
 
 # ---- Synthetic codebase: 30 files across 8 services --------------------
 # Distribution: a few hot files (payments/checkout), many cooler files.
 
 SERVICES = {
-    "payments":       ["checkout.py", "stripe_adapter.py", "refund.py", "webhook.py", "tax.py"],
-    "billing":        ["invoice.py", "subscription.py", "trial.py", "dunning.py"],
-    "auth":           ["login.py", "session.py", "oauth.py", "rbac.py"],
-    "search":         ["index.py", "ranker.py", "facets.py"],
-    "notifications":  ["email.py", "sms.py", "push.py"],
-    "analytics":      ["events.py", "funnel.py", "rollup.py"],
-    "recommendations":["model.py", "features.py"],
-    "shared":         ["config.py", "db.py", "cache.py", "metrics.py"],
+    "payments": ["checkout.py", "stripe_adapter.py", "refund.py", "webhook.py", "tax.py"],
+    "billing": ["invoice.py", "subscription.py", "trial.py", "dunning.py"],
+    "auth": ["login.py", "session.py", "oauth.py", "rbac.py"],
+    "search": ["index.py", "ranker.py", "facets.py"],
+    "notifications": ["email.py", "sms.py", "push.py"],
+    "analytics": ["events.py", "funnel.py", "rollup.py"],
+    "recommendations": ["model.py", "features.py"],
+    "shared": ["config.py", "db.py", "cache.py", "metrics.py"],
 }
 
 # logger / sector for each service (3-letter prefix for visual grouping)
@@ -59,23 +60,23 @@ LOGGER_PREFIXES = {svc: f"globex.{svc}" for svc in SERVICES}
 # ---- Distributions -----------------------------------------------------
 
 LEVEL_WEIGHTS = [
-    ("DEBUG",    25),
-    ("INFO",     58),
-    ("WARNING",  10),
-    ("ERROR",     6),
-    ("CRITICAL",  1),
+    ("DEBUG", 25),
+    ("INFO", 58),
+    ("WARNING", 10),
+    ("ERROR", 6),
+    ("CRITICAL", 1),
 ]
 
 OUTCOME_WEIGHTS = [
-    ("passed",    85),
-    ("failed",     8),
-    ("skipped",    4),
-    ("errored",    3),
+    ("passed", 85),
+    ("failed", 8),
+    ("skipped", 4),
+    ("errored", 3),
 ]
 
 # Sample messages per level (real-feeling, not lorem ipsum)
 MESSAGES_BY_LEVEL = {
-    "DEBUG":    [
+    "DEBUG": [
         "cache miss for key=%s",
         "issuing query: %s",
         "decoding payload (%d bytes)",
@@ -83,7 +84,7 @@ MESSAGES_BY_LEVEL = {
         "connection acquired from pool",
         "scheduled retry in %dms",
     ],
-    "INFO":     [
+    "INFO": [
         "user %s authenticated",
         "checkout session %s started",
         "invoice %s issued",
@@ -93,7 +94,7 @@ MESSAGES_BY_LEVEL = {
         "subscription renewed for tenant %s",
         "campaign %s computed reach=%d",
     ],
-    "WARNING":  [
+    "WARNING": [
         "rate limit reached for tenant %s",
         "stripe retry triggered (attempt %d)",
         "slow query: %dms",
@@ -101,7 +102,7 @@ MESSAGES_BY_LEVEL = {
         "deprecated endpoint %s used",
         "low free credits for tenant %s",
     ],
-    "ERROR":    [
+    "ERROR": [
         "checkout failed: %s",
         "webhook signature mismatch from %s",
         "invoice generation failed: %s",
@@ -118,6 +119,7 @@ MESSAGES_BY_LEVEL = {
 
 # ---- Repo bootstrap -----------------------------------------------------
 
+
 def _git(*args, cwd: Path, capture: bool = True) -> str:
     """Run a git command, optionally capturing output."""
     if capture:
@@ -128,12 +130,19 @@ def _git(*args, cwd: Path, capture: bool = True) -> str:
 
 
 def _commit(cwd: Path, msg: str, name: str, email: str) -> None:
-    env = {**os.environ,
-           "GIT_AUTHOR_NAME": name, "GIT_AUTHOR_EMAIL": email,
-           "GIT_COMMITTER_NAME": name, "GIT_COMMITTER_EMAIL": email}
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": name,
+        "GIT_AUTHOR_EMAIL": email,
+        "GIT_COMMITTER_NAME": name,
+        "GIT_COMMITTER_EMAIL": email,
+    }
     subprocess.run(
         ["git", "commit", "-q", "-m", msg],
-        cwd=cwd, env=env, check=True, capture_output=True,
+        cwd=cwd,
+        env=env,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -161,10 +170,10 @@ def build_repo(repo_path: Path) -> dict[str, str]:
         svc_dir.mkdir(exist_ok=True)
         for fname in files:
             n_lines = random.randint(200, 500)
-            content = "\n".join([
-                f"# {fname} — synthetic source line {i}"
-                for i in range(1, n_lines + 1)
-            ]) + "\n"
+            content = (
+                "\n".join([f"# {fname} — synthetic source line {i}" for i in range(1, n_lines + 1)])
+                + "\n"
+            )
             (svc_dir / fname).write_text(content, encoding="utf-8")
             files_total.append(svc_dir / fname)
             # Use BASENAME to match record.file convention (Python logging's filename).
@@ -201,6 +210,7 @@ def build_repo(repo_path: Path) -> dict[str, str]:
 
 
 # ---- Log generation -----------------------------------------------------
+
 
 def generate_log_db(
     db_path: Path,
@@ -252,7 +262,7 @@ def generate_log_db(
 
     # Tenants/users for context
     tenants = [f"tenant_{i:03d}" for i in range(50)]
-    users   = [f"user_{i:04d}"   for i in range(500)]
+    users = [f"user_{i:04d}" for i in range(500)]
 
     rows: list[tuple] = []
 
@@ -318,7 +328,13 @@ def generate_log_db(
         # Some ERROR records carry an exception
         exc = None
         if level == "ERROR" and random.random() < 0.5:
-            exc_types = ["ValueError", "RuntimeError", "ConnectionError", "TimeoutError", "KeyError"]
+            exc_types = [
+                "ValueError",
+                "RuntimeError",
+                "ConnectionError",
+                "TimeoutError",
+                "KeyError",
+            ]
             exc_type = random.choice(exc_types)
             exc = {
                 "type": exc_type,
@@ -330,11 +346,18 @@ def generate_log_db(
                 ],
             }
 
-        rows.append((
-            ts, level, logger, msg, fname, line,
-            json.dumps(exc) if exc else None,
-            json.dumps(ctx) if ctx else None,
-        ))
+        rows.append(
+            (
+                ts,
+                level,
+                logger,
+                msg,
+                fname,
+                line,
+                json.dumps(exc) if exc else None,
+                json.dumps(ctx) if ctx else None,
+            )
+        )
 
     # ---- Test events (Story 1.2/1.5 shape) --------------------------
     # Mimic the pytest plugin's records: started + outcome (+ optional ERROR).
@@ -342,7 +365,7 @@ def generate_log_db(
     test_logger = "ulog.test"
     for tf in test_files:
         for ti in range(tests_per_file):
-            test_id = f"tests/{tf}::test_{tf.replace('.py','')}_{ti:03d}"
+            test_id = f"tests/{tf}::test_{tf.replace('.py', '')}_{ti:03d}"
             outcome = random.choices(outcomes, weights=outcome_w, k=1)[0]
             duration = round(random.uniform(0.0001, 4.5), 6)
 
@@ -351,11 +374,18 @@ def generate_log_db(
 
             # `test started` record (line 183 to match real plugin source)
             started_ctx = {"test_id": test_id, "phase": "setup"}
-            rows.append((
-                base_ts.isoformat(), "INFO", test_logger, "test started",
-                "pytest_plugin.py", 183,
-                None, json.dumps(started_ctx),
-            ))
+            rows.append(
+                (
+                    base_ts.isoformat(),
+                    "INFO",
+                    test_logger,
+                    "test started",
+                    "pytest_plugin.py",
+                    183,
+                    None,
+                    json.dumps(started_ctx),
+                )
+            )
 
             # Story 1.4 propagation simulation: 1-4 app records emitted
             # DURING the test body inherit `test_id` via the bound-context
@@ -388,11 +418,18 @@ def generate_log_db(
                     "tenant_id": random.choice(tenants),
                     "request_id": f"req_{random.randint(10**8, 10**9 - 1):x}",
                 }
-                rows.append((
-                    app_ts, app_level, app_logger, app_msg,
-                    app_fname, app_line,
-                    None, json.dumps(app_ctx),
-                ))
+                rows.append(
+                    (
+                        app_ts,
+                        app_level,
+                        app_logger,
+                        app_msg,
+                        app_fname,
+                        app_line,
+                        None,
+                        json.dumps(app_ctx),
+                    )
+                )
 
             # outcome record (line 281 for passed, line 211 for traceback)
             outcome_ts = (base_ts + timedelta(seconds=duration)).isoformat()
@@ -402,14 +439,18 @@ def generate_log_db(
                 "duration_s": duration,
                 "phase": "call",
             }
-            rows.append((
-                outcome_ts,
-                "INFO" if outcome in ("passed", "skipped") else "ERROR",
-                test_logger,
-                f"test {outcome}",
-                "pytest_plugin.py", 281 if outcome == "passed" else 211,
-                None, json.dumps(outcome_ctx),
-            ))
+            rows.append(
+                (
+                    outcome_ts,
+                    "INFO" if outcome in ("passed", "skipped") else "ERROR",
+                    test_logger,
+                    f"test {outcome}",
+                    "pytest_plugin.py",
+                    281 if outcome == "passed" else 211,
+                    None,
+                    json.dumps(outcome_ctx),
+                )
+            )
 
             # Optional traceback record for failed/errored
             if outcome in ("failed", "errored"):
@@ -420,15 +461,22 @@ def generate_log_db(
                     "msg": f"test {outcome}: {random.choice(['expected 42, got 41', 'broken precondition', 'mock not called'])}",
                     "tb": [
                         f'  File "tests/{tf}", line {random.randint(10, 80)}, in test_body',
-                        f'    assert result == expected',
+                        "    assert result == expected",
                         f"{exc_type}: synthetic test failure",
                     ],
                 }
-                rows.append((
-                    outcome_ts, "ERROR", test_logger, "traceback",
-                    "pytest_plugin.py", 211,
-                    json.dumps(exc), json.dumps({"test_id": test_id}),
-                ))
+                rows.append(
+                    (
+                        outcome_ts,
+                        "ERROR",
+                        test_logger,
+                        "traceback",
+                        "pytest_plugin.py",
+                        211,
+                        json.dumps(exc),
+                        json.dumps({"test_id": test_id}),
+                    )
+                )
 
     # Sort by timestamp before insert so id ordering ≈ chronological.
     rows.sort(key=lambda r: r[0])
@@ -446,22 +494,31 @@ def generate_log_db(
 
 # ---- Entrypoint ---------------------------------------------------------
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "out_dir", type=Path,
+        "out_dir",
+        type=Path,
         help="Output directory (will be CLEARED). Recommended: /tmp/ulog-demo",
     )
     parser.add_argument(
-        "--records", type=int, default=50_000,
+        "--records",
+        type=int,
+        default=50_000,
         help="Number of app records to generate (default: 50000)",
     )
     parser.add_argument(
-        "--test-files", type=int, default=10, help="Number of test files (default: 10)",
+        "--test-files",
+        type=int,
+        default=10,
+        help="Number of test files (default: 10)",
     )
     parser.add_argument(
-        "--tests-per-file", type=int, default=50,
-        help="Number of tests per file (default: 50). Total test events = files × tests × ~2.2 records.",
+        "--tests-per-file",
+        type=int,
+        default=50,
+        help="Number of tests per file (default: 50). Total test events = files x tests x ~2.2 records.",
     )
     args = parser.parse_args()
 
@@ -470,10 +527,12 @@ def main() -> int:
 
     print(f"=== Building synthetic git repo at {out_dir} ===", file=sys.stderr)
     file_to_lines = build_repo(out_dir)
-    print(f"  {len(file_to_lines)} source files, "
-          f"{len(AUTHORS)} authors, "
-          f"{sum(file_to_lines.values())} total lines",
-          file=sys.stderr)
+    print(
+        f"  {len(file_to_lines)} source files, "
+        f"{len(AUTHORS)} authors, "
+        f"{sum(file_to_lines.values())} total lines",
+        file=sys.stderr,
+    )
 
     db = out_dir / "logs.sqlite"
     print(f"=== Generating log DB at {db} ===", file=sys.stderr)
@@ -488,7 +547,9 @@ def main() -> int:
     print("\n=== Done. Run the viewer with: ===", file=sys.stderr)
     print(f"  ulog-web --repo {out_dir} {db}", file=sys.stderr)
     print("\nFirst launch will run the author indexer (≤5s budget for ~30 files).", file=sys.stderr)
-    print("Subsequent launches reuse the cached `authors` table for instant startup.", file=sys.stderr)
+    print(
+        "Subsequent launches reuse the cached `authors` table for instant startup.", file=sys.stderr
+    )
     return 0
 
 

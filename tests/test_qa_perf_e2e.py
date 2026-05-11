@@ -7,17 +7,18 @@ GETs for cold/warm/filter/pagination/detail-view paths.
 Budgets here are RELAXED vs the PRD-v0.4.1 user-facing targets
 (which assume the 50K-record demo). The seeded_demo fixture uses
 ~5K records (the lighter shared seed for fast tests) AND we add
-2× headroom for slow CI runners. The assertion `no path > 3s`
+2x headroom for slow CI runners. The assertion `no path > 3s`
 matches the user-visible PRD ceiling regardless.
 
 Manual `/qa/` checkboxes for §3 are removed in the same commit;
 this test file becomes the regression gate.
 """
+
 from __future__ import annotations
 
 import socket
-import subprocess
 import sqlite3
+import subprocess
 import sys
 import time
 import urllib.request
@@ -58,7 +59,7 @@ def _wait_for_server(port: int, *, timeout_s: float = 15.0) -> None:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=2) as resp:
                 if resp.status == 200:
                     return
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             last_err = e
             time.sleep(0.2)
     raise RuntimeError(f"viewer never responded on port {port}: {last_err}")
@@ -80,11 +81,16 @@ def _time_get(port: int, path: str) -> float:
 def viewer(seeded_demo):  # noqa: F811
     """Spawn one viewer per module, tear down after."""
     port = _free_port()
-    proc = _spawn_viewer([
-        "--no-open", "--port", str(port),
-        "--repo", str(seeded_demo),
-        str(seeded_demo / "logs.sqlite"),
-    ])
+    proc = _spawn_viewer(
+        [
+            "--no-open",
+            "--port",
+            str(port),
+            "--repo",
+            str(seeded_demo),
+            str(seeded_demo / "logs.sqlite"),
+        ]
+    )
     try:
         _wait_for_server(port, timeout_s=15)
         yield port
@@ -101,22 +107,23 @@ def viewer(seeded_demo):  # noqa: F811
 # ---- §3 perf budgets (relaxed for 5K-record fixture + CI headroom) -------
 
 # PRD-v0.4.1 targets are for 50K records. On 5K (the test fixture)
-# everything is naturally faster, but we add 2× headroom for slow CI.
+# everything is naturally faster, but we add 2x headroom for slow CI.
 
-BUDGET_COLD_S       = 3.0   # PRD target < 1s (50K) → 3s ceiling on test fixture
-BUDGET_WARM_S       = 1.0   # PRD target < 200ms → 1s ceiling
-BUDGET_FILTER_S     = 1.0   # PRD target < 200ms → 1s ceiling
-BUDGET_AUTHOR_S     = 2.0   # PRD target < 2s → kept as-is
-BUDGET_PAGINATION_S = 1.0   # PRD target < 200ms → 1s ceiling
-BUDGET_DETAIL_S     = 0.5   # PRD target < 100ms → 500ms ceiling
-BUDGET_HARD_CEILING = 3.0   # The user-visible "no path > 3s" rule
+BUDGET_COLD_S = 3.0  # PRD target < 1s (50K) → 3s ceiling on test fixture
+BUDGET_WARM_S = 1.0  # PRD target < 200ms → 1s ceiling
+BUDGET_FILTER_S = 1.0  # PRD target < 200ms → 1s ceiling
+BUDGET_AUTHOR_S = 2.0  # PRD target < 2s → kept as-is
+BUDGET_PAGINATION_S = 1.0  # PRD target < 200ms → 1s ceiling
+BUDGET_DETAIL_S = 0.5  # PRD target < 100ms → 500ms ceiling
+BUDGET_HARD_CEILING = 3.0  # The user-visible "no path > 3s" rule
 
 
 def _first_record_id(seeded_demo) -> int:  # noqa: F811
     """Return the lowest record id present, for the detail-view test."""
     with sqlite3.connect(str(seeded_demo / "logs.sqlite")) as conn:
         row = conn.execute("SELECT MIN(id) FROM logs").fetchone()
-    assert row and row[0] is not None, "fixture DB has no records"
+    assert row, "fixture DB has no rows"
+    assert row[0] is not None, "fixture DB has no records"
     return int(row[0])
 
 
@@ -168,8 +175,12 @@ def test_perf_no_path_exceeds_hard_ceiling(viewer, seeded_demo):  # noqa: F811
     fails before the more aggressive ones do."""
     rec_id = _first_record_id(seeded_demo)
     paths = [
-        "/", "/", "/?level=ERROR", "/?author=alice@globex.io",
-        "/?page=2", f"/r/{rec_id}/",
+        "/",
+        "/",
+        "/?level=ERROR",
+        "/?author=alice@globex.io",
+        "/?page=2",
+        f"/r/{rec_id}/",
     ]
     for path in paths:
         elapsed = _time_get(viewer, path)
@@ -185,6 +196,7 @@ def test_api_records_returns_valid_json(viewer):
     """§4.10 — /api/records/ returns valid JSON with the expected
     top-level shape (records list + pagination metadata)."""
     import json as _json
+
     url = f"http://127.0.0.1:{viewer}/api/records/"
     with urllib.request.urlopen(url, timeout=5) as resp:
         assert resp.status == 200, f"got HTTP {resp.status}"

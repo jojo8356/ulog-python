@@ -1,4 +1,5 @@
 """Story 2.6 — Authors sidebar block render + ghost-count plumbing."""
+
 from __future__ import annotations
 
 import os
@@ -30,6 +31,7 @@ def sqlite_fixture(tmp_path: Path) -> Path:
     ulog.get_logger("svc").info("hi from svc")
     ulog.get_logger("audio").error("boom")
     import logging
+
     for h in logging.getLogger().handlers:
         h.flush()
     ulog.clear()
@@ -43,14 +45,18 @@ def _make_django_client(db_path: Path):
     os.environ["ULOG_DEBUG"] = "0"
     import django
     from django.apps import apps as django_apps
+
     if not django_apps.ready:
         django.setup()
     from django.conf import settings as _dj_settings
+
     _dj_settings.ULOG_LOGS_PATH = str(db_path)
     _dj_settings.ULOG_LOGS_KIND = "sqlite"
     from ulog.web.viewer import views as _views
+
     _views._adapter = None
     from django.test import Client
+
     return Client()
 
 
@@ -103,7 +109,7 @@ def test_authors_block_renders_when_idx_is_set(sqlite_fixture, tmp_path):
     mtime = os.stat(stub).st_mtime
     idx._cache[basename] = _FileCache(
         mtime=mtime,
-        blames={i: a for i in range(1, 500)},
+        blames=dict.fromkeys(range(1, 500), a),
     )
     set_global_index(idx)
 
@@ -137,6 +143,7 @@ def test_authors_block_includes_unknown_when_present(sqlite_fixture, tmp_path):
 def test_parse_filters_reads_author_query_param():
     """Story 2.7 prep — _parse_filters honors ?author=foo&author=bar"""
     from django.test import RequestFactory
+
     from ulog.web.viewer.views import _parse_filters
 
     req = RequestFactory().get("/", {"author": ["a@x", "b@y"]})
@@ -146,6 +153,7 @@ def test_parse_filters_reads_author_query_param():
 
 def test_parse_filters_show_unknown_default_on():
     from django.test import RequestFactory
+
     from ulog.web.viewer.views import _parse_filters
 
     req = RequestFactory().get("/")
@@ -155,6 +163,7 @@ def test_parse_filters_show_unknown_default_on():
 
 def test_parse_filters_show_unknown_off_via_query():
     from django.test import RequestFactory
+
     from ulog.web.viewer.views import _parse_filters
 
     req = RequestFactory().get("/", {"show_unknown": "0"})

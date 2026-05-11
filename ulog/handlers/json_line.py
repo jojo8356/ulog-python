@@ -4,11 +4,11 @@ Schema matches the v0.1 `JsonFormatter` byte-for-byte (FR26): the
 emitted lines are jq-compatible and re-readable by the Django UI's
 JSON adapter.
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 from ..formatters import JsonFormatter
 

@@ -14,6 +14,7 @@ printed to stderr (FR71).
 Single-threaded by contract: the indexer runs at viewer startup, before
 any WSGI worker pool exists. No locking is provided.
 """
+
 from __future__ import annotations
 
 import os
@@ -22,9 +23,10 @@ import subprocess
 import sys
 import time
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Iterable
+from typing import IO, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .adapters import Adapter
@@ -149,7 +151,7 @@ class AuthorIndex:
             # File not tracked / line out of range / other git-side error.
             # Map all requested lines to None — caller distinguishes by
             # presence of the key, not by truthiness.
-            return {ln: None for ln in line_list}
+            return dict.fromkeys(line_list)
         return _parse_porcelain(result.stdout, set(line_list))
 
 
@@ -168,7 +170,7 @@ CREATE TABLE IF NOT EXISTS authors (
 """
 
 
-def cache_path_for(adapter: "Adapter") -> Path:
+def cache_path_for(adapter: Adapter) -> Path:
     """Return the SQLite path where the authors cache lives for `adapter`.
 
     SQLite log sources reuse the same DB (so `authors` sits beside `logs`).
@@ -180,7 +182,7 @@ def cache_path_for(adapter: "Adapter") -> Path:
         # SQLAlchemy URL form: 'sqlite:///path/to/file' — extract path.
         url = str(adapter._engine.url)
         if url.startswith("sqlite:///"):
-            return Path(url[len("sqlite:///"):])
+            return Path(url[len("sqlite:///") :])
         # Fallback (shouldn't happen for our use).
         return Path(url)
     if isinstance(adapter, (JSONLAdapter, CSVAdapter)):
@@ -190,14 +192,12 @@ def cache_path_for(adapter: "Adapter") -> Path:
         # adapter's `_source_path` attribute, set below in adapters.py.
         src = getattr(adapter, "_source_path", None)
         if src is None:
-            raise RuntimeError(
-                "JSONL/CSV adapter is missing _source_path; cannot resolve sidecar"
-            )
+            raise RuntimeError("JSONL/CSV adapter is missing _source_path; cannot resolve sidecar")
         return Path(str(src) + ".authors.sqlite")
     raise TypeError(f"unknown adapter kind: {type(adapter).__name__}")
 
 
-def _persist_authors(idx: "AuthorIndex", db_path: Path) -> int:
+def _persist_authors(idx: AuthorIndex, db_path: Path) -> int:
     """Write idx's resolved (file, line) → Author entries to the
     `authors` table at db_path. Returns count written. Skips entries
     where the Author is None (line OOR / untracked)."""
@@ -224,7 +224,7 @@ def _persist_authors(idx: "AuthorIndex", db_path: Path) -> int:
     return len(rows)
 
 
-def _load_authors(idx: "AuthorIndex", db_path: Path) -> int:
+def _load_authors(idx: AuthorIndex, db_path: Path) -> int:
     """Populate idx's cache from the `authors` table at db_path.
     Returns count loaded. Returns 0 if the table doesn't exist yet."""
     if not db_path.exists():
@@ -238,14 +238,11 @@ def _load_authors(idx: "AuthorIndex", db_path: Path) -> int:
         if row is None:
             return 0
         cur = conn.execute(
-            "SELECT file, line, author_name, author_email, commit_sha, commit_ts "
-            "FROM authors"
+            "SELECT file, line, author_name, author_email, commit_sha, commit_ts FROM authors"
         )
         count = 0
         for f, line, name, email, sha, ts in cur:
-            cache = idx._cache.setdefault(
-                f, _FileCache(mtime=idx._mtime(f) or 0.0, blames={})
-            )
+            cache = idx._cache.setdefault(f, _FileCache(mtime=idx._mtime(f) or 0.0, blames={}))
             cache.blames[int(line)] = Author(name=name, email=email, sha=sha, ts=int(ts))
             count += 1
         return count
@@ -278,6 +275,7 @@ class AuthorsSummary:
 
     Sort order: known authors by count desc, then `<unknown>` last.
     """
+
     entries: tuple[tuple[Author | None, int], ...]
 
     @property
@@ -295,7 +293,7 @@ class AuthorsSummary:
 _AUTHORS_SUMMARY_CACHE: tuple[tuple[float, int], AuthorsSummary] | None = None
 
 
-def _adapter_db_mtime(adapter: "Adapter") -> float:
+def _adapter_db_mtime(adapter: Adapter) -> float:
     """Best-effort source-file mtime for cache invalidation. 0.0 on failure."""
     from .adapters import CSVAdapter, JSONLAdapter, SQLiteAdapter
 
@@ -303,7 +301,7 @@ def _adapter_db_mtime(adapter: "Adapter") -> float:
         if isinstance(adapter, SQLiteAdapter):
             url = str(adapter._engine.url)
             if url.startswith("sqlite:///"):
-                return os.stat(url[len("sqlite:///"):]).st_mtime
+                return os.stat(url[len("sqlite:///") :]).st_mtime
         if isinstance(adapter, (JSONLAdapter, CSVAdapter)):
             src = getattr(adapter, "_source_path", None)
             if src is not None:
@@ -321,7 +319,7 @@ def invalidate_authors_summary_cache() -> None:
 
 
 def compute_authors_summary(
-    adapter: "Adapter",
+    adapter: Adapter,
     idx: AuthorIndex | None,
 ) -> AuthorsSummary:
     """Aggregate records into per-author counts (Story 2.5 + PRD-v0.4.1 perf).
@@ -348,8 +346,8 @@ def compute_authors_summary(
             counts[None] += n
     else:
         # One author_for per unique pair, multiplied by its record count.
-        for f, l, n in adapter.file_line_record_counts():
-            a = idx.author_for(f, l)
+        for f, ln, n in adapter.file_line_record_counts():
+            a = idx.author_for(f, ln)
             counts[a] += n
 
     known_sorted = sorted(
@@ -386,7 +384,7 @@ def set_global_index(idx: AuthorIndex | None) -> None:
 
 
 def build_index_at_startup(
-    adapter: "Adapter",
+    adapter: Adapter,
     repo: str | Path,
     *,
     progress_stream: IO[str] = sys.stderr,
@@ -432,15 +430,12 @@ def build_index_at_startup(
     if cache_path is not None and not rebuild:
         loaded = _load_authors(idx, cache_path)
         if loaded > 0:
-            cached_pairs = {
-                (f, line) for f, fc in idx._cache.items() for line in fc.blames
-            }
+            cached_pairs = {(f, line) for f, fc in idx._cache.items() for line in fc.blames}
             if all(p in cached_pairs for p in pairs):
                 # Every requested pair is in the cache; skip the build.
                 n_files = len({p[0] for p in pairs})
                 print(
-                    f"ulog: indexed {total} records across {n_files} files "
-                    f"from cache",
+                    f"ulog: indexed {total} records across {n_files} files from cache",
                     file=progress_stream,
                 )
                 set_global_index(idx)
@@ -449,8 +444,8 @@ def build_index_at_startup(
     # Group by file so we can emit progress at file boundaries AND every
     # ~10% of records (whichever is sparser).
     by_file: dict[str, list[int]] = defaultdict(list)
-    for f, l in pairs:
-        by_file[f].append(l)
+    for f, ln in pairs:
+        by_file[f].append(ln)
     n_files = len(by_file)
 
     start = time.monotonic()
@@ -460,13 +455,12 @@ def build_index_at_startup(
 
     for f, lines in by_file.items():
         unique_lines = sorted(set(lines))
-        idx.build_for_pairs([(f, l) for l in unique_lines])
+        idx.build_for_pairs([(f, ln) for ln in unique_lines])
         processed += len(unique_lines)
         if processed >= next_emit:
             pct = (processed * 100) // total
             print(
-                f"ulog: indexing authors... {n_files} files, "
-                f"{processed}/{total} records ({pct}%)",
+                f"ulog: indexing authors... {n_files} files, {processed}/{total} records ({pct}%)",
                 file=progress_stream,
             )
             next_emit += progress_step
@@ -543,7 +537,11 @@ def _parse_porcelain(out: str, requested_lines: set[int]) -> dict[int, Author | 
         if not in_headers:
             # Expecting chunk header: "<sha> <orig> <final> [<group>]"
             parts = raw_line.split()
-            if len(parts) >= 3 and len(parts[0]) == 40 and all(c in "0123456789abcdef" for c in parts[0]):
+            if (
+                len(parts) >= 3
+                and len(parts[0]) == 40
+                and all(c in "0123456789abcdef" for c in parts[0])
+            ):
                 cur_sha = parts[0]
                 try:
                     cur_final_line = int(parts[2])
@@ -555,17 +553,17 @@ def _parse_porcelain(out: str, requested_lines: set[int]) -> dict[int, Author | 
 
         # In header section.
         if raw_line.startswith("author-mail "):
-            mail = raw_line[len("author-mail "):].strip()
+            mail = raw_line[len("author-mail ") :].strip()
             if mail.startswith("<") and mail.endswith(">"):
                 mail = mail[1:-1]
             cur_email = mail
         elif raw_line.startswith("author-time "):
             try:
-                cur_ts = int(raw_line[len("author-time "):].strip())
+                cur_ts = int(raw_line[len("author-time ") :].strip())
             except ValueError:
                 cur_ts = None
         elif raw_line.startswith("author "):
-            cur_name = raw_line[len("author "):].strip()
+            cur_name = raw_line[len("author ") :].strip()
         # other headers (committer, summary, filename, boundary, previous) ignored
 
     # Fill missing requested lines with None.

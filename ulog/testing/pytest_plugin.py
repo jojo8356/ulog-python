@@ -16,13 +16,15 @@ The plugin is OFF by default unless either:
 
 ``--ulog-disable`` short-circuits the plugin even when (a) or (b) hold.
 """
+
 from __future__ import annotations
 
 import logging
 import os
 import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 
@@ -56,10 +58,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         dest="ulog_summary",
         default=True,
-        help=(
-            "Print one-line stderr summary after the session "
-            "(default ON; -q suppresses)."
-        ),
+        help=("Print one-line stderr summary after the session (default ON; -q suppresses)."),
     )
 
 
@@ -86,15 +85,11 @@ def pytest_configure(config: pytest.Config) -> None:
         for ``pytest_terminal_summary`` to render at session end.
     """
     import ulog  # lazy: only on pytest config
+
     ulog_db = config.getoption("ulog_db")
     host_already_configured = ulog.is_configured()
-    enabled = (
-        not config.getoption("ulog_disable")
-        and (host_already_configured or bool(ulog_db))
-    )
-    auto_setup_fired = (
-        enabled and not host_already_configured and bool(ulog_db)
-    )
+    enabled = not config.getoption("ulog_disable") and (host_already_configured or bool(ulog_db))
+    auto_setup_fired = enabled and not host_already_configured and bool(ulog_db)
     # IMPORTANT ORDERING (review patch P1): set the gate + stash + stats dict
     # BEFORE attempting auto-setup. If `ulog.setup` raises (bad path, missing
     # SQLAlchemy, locked DB), the exception still propagates — but downstream
@@ -176,6 +171,7 @@ def pytest_runtest_protocol(
         return
 
     import ulog  # lazy: only on enabled path
+
     test_id = _make_test_id(item)  # FR55 — see _make_test_id docstring (Story 1.3 contract)
     log = ulog.get_logger("ulog.test")
 
@@ -190,7 +186,7 @@ def pytest_runtest_protocol(
         # raising would leave `test_id` poisoned in contextvars for the next test).
         try:
             _emit_outcome_records(item, log)
-        except Exception:  # noqa: BLE001 — emit must not break the test runner
+        except Exception:
             pass
         finally:
             # Unbind LAST so the outcome records (if emitted) still carry test_id.
@@ -232,7 +228,7 @@ def pytest_runtest_makereport(
     # session (review finding H3).
     try:
         report = outcome.get_result()  # type: ignore[attr-defined]
-    except Exception:  # noqa: BLE001
+    except Exception:
         return
     if not hasattr(item, "_ulog_reports"):
         item._ulog_reports = {}  # type: ignore[attr-defined]
@@ -275,9 +271,7 @@ def _emit_outcome_records(item: pytest.Item, log: logging.Logger) -> None:
     # not the body's verdict.
     _bump_session_stats(item.config, final_outcome)
 
-    level = (
-        logging.ERROR if final_outcome in ("failed", "errored") else logging.INFO
-    )
+    level = logging.ERROR if final_outcome in ("failed", "errored") else logging.INFO
     log.log(
         level,
         f"test {final_outcome}",
@@ -289,9 +283,7 @@ def _emit_outcome_records(item: pytest.Item, log: logging.Logger) -> None:
     )
 
     if failure_report is not None:
-        exc = _longrepr_to_exc(
-            failure_report.longrepr, excinfos.get(failure_report.when)
-        )
+        exc = _longrepr_to_exc(failure_report.longrepr, excinfos.get(failure_report.when))
         log.error(
             f"{exc['type']}: {exc['msg']}",
             extra={"exc": exc},
@@ -346,9 +338,7 @@ def _classify(
     return ("passed", "call", None)
 
 
-def _longrepr_to_exc(
-    longrepr: object, excinfo: Any = None
-) -> dict[str, Any]:
+def _longrepr_to_exc(longrepr: object, excinfo: Any = None) -> dict[str, Any]:
     """Best-effort extraction of ``longrepr`` to the
     {type, msg, tb} JSON shape per PRD-v0.3 §2.1.2.
 
@@ -370,7 +360,7 @@ def _longrepr_to_exc(
         try:
             exc_type = excinfo.type.__name__
             exc_msg = str(excinfo.value)
-        except Exception:  # noqa: BLE001
+        except Exception:
             exc_type = None
             exc_msg = None
 
@@ -386,9 +376,7 @@ def _longrepr_to_exc(
             # not a type name (review finding M3).
             ct, _, cm = message.partition(":")
             ct_stripped = ct.strip()
-            if ct_stripped and all(
-                c.isalnum() or c in "._" for c in ct_stripped
-            ):
+            if ct_stripped and all(c.isalnum() or c in "._" for c in ct_stripped):
                 exc_type = ct_stripped
                 exc_msg = cm.strip()
             else:
@@ -409,9 +397,7 @@ def _longrepr_to_exc(
 
 
 @pytest.hookimpl(trylast=True)
-def pytest_terminal_summary(
-    terminalreporter: Any, exitstatus: int, config: pytest.Config
-) -> None:
+def pytest_terminal_summary(terminalreporter: Any, exitstatus: int, config: pytest.Config) -> None:
     """Print a one-line ulog summary at session end (FR69, Story 1.5).
 
     Format (PRD-v0.3 §2.1.6):
@@ -483,18 +469,21 @@ def pytest_terminal_summary(
 
 
 _NETWORK_FS_TYPES_LINUX = {
-    "nfs", "nfs4", "cifs", "smbfs", "smb3",
-    "fuse.sshfs", "9p", "ceph",
+    "nfs",
+    "nfs4",
+    "cifs",
+    "smbfs",
+    "smb3",
+    "fuse.sshfs",
+    "9p",
+    "ceph",
 }
 _NETWORK_FS_TYPES_MACOS = {"nfs", "smbfs", "afpfs", "webdav"}
 
 
 def _xdist_active() -> bool:
     """Return True if pytest-xdist is running (worker env vars present)."""
-    return bool(
-        os.environ.get("PYTEST_XDIST_WORKER")
-        or os.environ.get("PYTEST_XDIST_TESTRUNUID")
-    )
+    return bool(os.environ.get("PYTEST_XDIST_WORKER") or os.environ.get("PYTEST_XDIST_TESTRUNUID"))
 
 
 def _is_network_fs_linux(path: Path) -> bool:
@@ -517,9 +506,7 @@ def _is_network_fs_linux(path: Path) -> bool:
         # Special-case the root mount `/`: every path lives under it,
         # so `path_str.startswith("/" + "/")` would never be true.
         is_match = (
-            mountpoint == "/"
-            or path_str == mountpoint
-            or path_str.startswith(mountpoint + "/")
+            mountpoint == "/" or path_str == mountpoint or path_str.startswith(mountpoint + "/")
         )
         if is_match and len(mountpoint) > len(best_match[0]):
             best_match = (mountpoint, fstype)
@@ -531,10 +518,9 @@ def _is_network_fs_linux(path: Path) -> bool:
 def _is_network_fs_macos(path: Path) -> bool:
     """macOS: parse `mount` output for the path's filesystem type."""
     import subprocess
+
     try:
-        output = subprocess.run(
-            ["mount"], capture_output=True, text=True, timeout=2.0
-        ).stdout
+        output = subprocess.run(["mount"], capture_output=True, text=True, timeout=2.0).stdout
     except (subprocess.SubprocessError, FileNotFoundError):
         return False
     best_match = ("", "")
@@ -545,12 +531,10 @@ def _is_network_fs_macos(path: Path) -> bool:
             _, _, rest = line.partition(" on ")
             mountpoint, _, paren = rest.partition(" (")
             fstype = paren.split(",", 1)[0].strip()
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
         is_match = (
-            mountpoint == "/"
-            or path_str == mountpoint
-            or path_str.startswith(mountpoint + "/")
+            mountpoint == "/" or path_str == mountpoint or path_str.startswith(mountpoint + "/")
         )
         if is_match and len(mountpoint) > len(best_match[0]):
             best_match = (mountpoint, fstype)
@@ -563,16 +547,17 @@ def _is_network_fs_windows(path: Path) -> bool:
     always falls back to JSONL (per AC4)."""
     try:
         import ctypes
+
         DRIVE_REMOTE = 4
         drive = str(path)[:3]  # e.g. "C:\\"
         kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
         # ctypes returns Any; cast to bool explicitly to keep mypy clean.
         return bool(kernel32.GetDriveTypeW(drive) == DRIVE_REMOTE)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return True
 
 
-def _is_network_fs(path: "str | Path") -> bool:
+def _is_network_fs(path: str | Path) -> bool:
     """Detect whether `path` lives on a network filesystem (NFS / CIFS / SMB).
 
     Uses stdlib only (no psutil dep). Per-platform dispatch:
@@ -614,11 +599,10 @@ def _swap_sql_for_jsonl(reason: str) -> None:
         url = getattr(handler, "_url", "")
         if not url.startswith("sqlite:///"):
             continue
-        sqlite_path = url[len("sqlite:///"):]
+        sqlite_path = url[len("sqlite:///") :]
         jsonl_path = sqlite_path.rsplit(".", 1)[0] + ".jsonl"
         print(
-            f"ulog: {reason} detected — falling back from SQLite to "
-            f"JSONL at {jsonl_path}",
+            f"ulog: {reason} detected — falling back from SQLite to JSONL at {jsonl_path}",
             file=sys.stderr,
         )
         # Detach + close the SQL handler. Wrapped in try/except so a
@@ -626,7 +610,7 @@ def _swap_sql_for_jsonl(reason: str) -> None:
         try:
             handler.flush()
             handler.close()
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         root.removeHandler(handler)
         # Reinstall via setup — its idempotency removes any other managed
@@ -666,7 +650,7 @@ def _enable_wal_mode_or_fallback() -> bool:
     try:
         with target_handler._engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA journal_mode=WAL")
-    except Exception:  # noqa: BLE001 — fall back on any PRAGMA failure
+    except Exception:
         wal_failed = True
     if wal_failed:
         _swap_sql_for_jsonl("WAL mode unavailable")
@@ -695,7 +679,7 @@ def _apply_xdist_storage_strategy(config: pytest.Config) -> None:
         if isinstance(h, SQLHandler) and getattr(h, "_ulog_managed", False):
             url = getattr(h, "_url", "")
             if url.startswith("sqlite:///"):
-                sql_path = url[len("sqlite:///"):]
+                sql_path = url[len("sqlite:///") :]
                 break
 
     if sql_path is None:

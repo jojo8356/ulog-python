@@ -1,4 +1,5 @@
 """Story 2.2 — CLI flags `--repo`, `--no-author-index`, `--rebuild-author-index`."""
+
 from __future__ import annotations
 
 import argparse
@@ -113,6 +114,7 @@ def test_set_env_for_django_rebuild(monkeypatch, tmp_path):
 def test_argparse_no_index_and_rebuild_are_mutually_exclusive():
     """AC6 — both flags simultaneously must error."""
     from ulog.web.cli import main
+
     with pytest.raises(SystemExit) as exc:
         main(["--no-author-index", "--rebuild-author-index", "/tmp/whatever.sqlite"])
     # argparse exits 2 on usage errors
@@ -122,7 +124,8 @@ def test_argparse_no_index_and_rebuild_are_mutually_exclusive():
 def test_argparse_accepts_debug_flag():
     """`--debug` is a valid flag; sets args.debug = True."""
     import argparse
-    from ulog.web.cli import main  # noqa: F401  (imported for side-effects only)
+
+    from ulog.web.cli import main
 
     # Build the same parser shape as main() to assert the flag exists.
     parser = argparse.ArgumentParser()

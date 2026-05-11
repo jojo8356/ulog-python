@@ -1,4 +1,5 @@
 """Story 2.11 — `/docs/author-filter/` page render."""
+
 from __future__ import annotations
 
 import os
@@ -15,6 +16,7 @@ def sqlite_fixture(tmp_path: Path) -> Path:
     ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
     ulog.get_logger("svc").info("hi")
     import logging
+
     for h in logging.getLogger().handlers:
         h.flush()
     ulog.clear()
@@ -28,14 +30,18 @@ def _make_django_client(db_path: Path):
     os.environ["ULOG_DEBUG"] = "0"
     import django
     from django.apps import apps as django_apps
+
     if not django_apps.ready:
         django.setup()
     from django.conf import settings as _dj_settings
+
     _dj_settings.ULOG_LOGS_PATH = str(db_path)
     _dj_settings.ULOG_LOGS_KIND = "sqlite"
     from ulog.web.viewer import views as _views
+
     _views._adapter = None
     from django.test import Client
+
     return Client()
 
 

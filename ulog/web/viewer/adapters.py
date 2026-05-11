@@ -10,14 +10,16 @@ For JSONL/CSV, the adapter loads the full file once into memory; for
 million-record files this gets slow — v0.3 may add streaming
 filtering. v0.2 ships the simple "load and filter in memory" path.
 """
+
 from __future__ import annotations
 
 import csv
 import json
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass
@@ -63,11 +65,17 @@ class Filters:
 
     def is_empty(self) -> bool:
         return (
-            not self.levels and not self.loggers and not self.files
-            and not self.search and not self.bound
-            and not self.ts_from and not self.ts_to
-            and not self.failed_only and not self.slowest_only
-            and not self.test_id and not self.authors
+            not self.levels
+            and not self.loggers
+            and not self.files
+            and not self.search
+            and not self.bound
+            and not self.ts_from
+            and not self.ts_to
+            and not self.failed_only
+            and not self.slowest_only
+            and not self.test_id
+            and not self.authors
         )
 
 
@@ -78,11 +86,12 @@ class TestSummaryRow:
     Aggregated by ``SQLiteAdapter._build_test_summary`` from records where
     ``logger='ulog.test'`` AND ``context.outcome IS NOT NULL`` (the body
     verdict records, NOT ``test started`` or traceback ERRORs)."""
-    test_id: str         # e.g. "tests/test_audio.py::test_render[44100]"
-    file: str            # the part before `::` — e.g. "tests/test_audio.py"
-    name: str            # the part after the first `::` — e.g. "test_render[44100]"
-    outcome: str         # "passed" / "failed" / "skipped" / "errored"
-    duration_s: float    # raw seconds; template formats to ms/s
+
+    test_id: str  # e.g. "tests/test_audio.py::test_render[44100]"
+    file: str  # the part before `::` — e.g. "tests/test_audio.py"
+    name: str  # the part after the first `::` — e.g. "test_render[44100]"
+    outcome: str  # "passed" / "failed" / "skipped" / "errored"
+    duration_s: float  # raw seconds; template formats to ms/s
 
 
 # FR64 — "Slowest top N" cap. Module-level constant so the WHERE / ORDER BY
@@ -99,10 +108,12 @@ class QueryResult:
     page: int
     page_size: int
     sector_counts: dict[str, int]  # logger-prefix → count, all data
-    file_counts: dict[str, int]    # file → count, all data
-    level_counts: dict[str, int]   # level → count, all data
-    bound_keys: list[str]          # auto-detected bound-context keys
-    test_summary: list[TestSummaryRow] = field(default_factory=list)  # Story 1.6 — empty when no test records
+    file_counts: dict[str, int]  # file → count, all data
+    level_counts: dict[str, int]  # level → count, all data
+    bound_keys: list[str]  # auto-detected bound-context keys
+    test_summary: list[TestSummaryRow] = field(
+        default_factory=list
+    )  # Story 1.6 — empty when no test records
 
 
 def detect_kind(path: Path) -> str:
@@ -120,7 +131,7 @@ def detect_kind(path: Path) -> str:
     )
 
 
-def get_adapter(path: str | Path) -> "Adapter":
+def get_adapter(path: str | Path) -> Adapter:
     """Build an adapter from a file path. Auto-detects storage kind."""
     p = Path(path)
     if not p.exists():
@@ -136,7 +147,7 @@ def get_adapter(path: str | Path) -> "Adapter":
 class Adapter:
     """Common interface every storage adapter implements."""
 
-    def query(self, filters: Filters, page: int = 1, page_size: int = 100) -> QueryResult:  # noqa: D401
+    def query(self, filters: Filters, page: int = 1, page_size: int = 100) -> QueryResult:
         raise NotImplementedError
 
     def get(self, record_id: int) -> Record | None:
@@ -161,6 +172,18 @@ class Adapter:
         """
         raise NotImplementedError
 
+    def get_test_summary_row(self, test_id: str) -> TestSummaryRow | None:
+        """Aggregate the outcome row for a test_id (Story 1.6 / 1.8).
+
+        Non-SQLite adapters may return None when the aggregation isn't
+        implemented for that storage (graceful stub — the detail-view
+        panel falls back to "outcome unknown")."""
+        raise NotImplementedError
+
+    def count_records_for_test_id(self, test_id: str) -> int:
+        """Count records (plugin + propagated app) bound to test_id (Story 1.8)."""
+        raise NotImplementedError
+
 
 # ---- SQLite (SQL via SQLAlchemy core) ------------------------------------
 
@@ -176,11 +199,12 @@ class SQLiteAdapter(Adapter):
         # Reflect the existing schema so users with custom column adds work too.
         self._table = Table("logs", self._md, autoload_with=self._engine)
 
-    def _base_filters(self, filters: Filters):
+    def _base_filters(self, filters: Filters) -> Any:
         from sqlalchemy import and_, or_
+        from sqlalchemy.sql.elements import ColumnElement
 
         t = self._table
-        clauses = []
+        clauses: list[ColumnElement[bool]] = []
         if filters.levels:
             clauses.append(t.c.level.in_(filters.levels))
         if filters.loggers:
@@ -214,30 +238,30 @@ class SQLiteAdapter(Adapter):
         # keeps the noise to one line per quick-filter rather than 2-3.
         if filters.failed_only:
             # FR63: limit to plugin outcome records flagged failed/errored.
-            clauses.append(and_(  # type: ignore[arg-type]
-                t.c.logger == "ulog.test",
-                func.json_extract(t.c.context, "$.outcome").in_(
-                    ("failed", "errored")
-                ),
-            ))
+            clauses.append(
+                and_(
+                    t.c.logger == "ulog.test",
+                    func.json_extract(t.c.context, "$.outcome").in_(("failed", "errored")),
+                )
+            )
         if filters.slowest_only:
             # FR64: only plugin outcome records with a measurable duration —
             # skipped tests have `duration_s=0` by pytest convention.
-            clauses.append(and_(  # type: ignore[arg-type]
-                t.c.logger == "ulog.test",
-                func.json_extract(t.c.context, "$.duration_s").is_not(None),
-                func.json_extract(t.c.context, "$.outcome").in_(
-                    ("passed", "failed", "errored")
-                ),
-            ))
+            clauses.append(
+                and_(
+                    t.c.logger == "ulog.test",
+                    func.json_extract(t.c.context, "$.duration_s").is_not(None),
+                    func.json_extract(t.c.context, "$.outcome").in_(
+                        ("passed", "failed", "errored")
+                    ),
+                )
+            )
         if filters.test_id:
             # FR65 (Story 1.7): restrict to records carrying this test_id in
             # context. Single equality matches both plugin records
             # (`logger='ulog.test'`) AND app records that inherited test_id
             # via Story 1.4's bound-context propagation — same column path.
-            clauses.append(
-                func.json_extract(t.c.context, "$.test_id") == filters.test_id  # type: ignore[arg-type]
-            )
+            clauses.append(func.json_extract(t.c.context, "$.test_id") == filters.test_id)
 
         return and_(*clauses) if clauses else None
 
@@ -253,7 +277,8 @@ class SQLiteAdapter(Adapter):
         The main record list keeps the full filter set (correct).
         """
         from dataclasses import replace as _replace
-        from sqlalchemy import select, func
+
+        from sqlalchemy import func, select
 
         t = self._table
         full_where = self._base_filters(filters)
@@ -283,9 +308,7 @@ class SQLiteAdapter(Adapter):
             if filters.slowest_only:
                 stmt = (
                     select(t)
-                    .order_by(
-                        func.json_extract(t.c.context, "$.duration_s").desc()
-                    )
+                    .order_by(func.json_extract(t.c.context, "$.duration_s").desc())
                     .limit(SLOWEST_TOP_N)
                 )
                 if full_where is not None:
@@ -324,9 +347,14 @@ class SQLiteAdapter(Adapter):
         records = [self._row_to_record(r) for r in rows]
         sector_counts = _build_sector_counts(logger_counts)
         return QueryResult(
-            records=records, total=total, page=page, page_size=page_size,
-            sector_counts=sector_counts, file_counts=file_counts,
-            level_counts=level_counts, bound_keys=bound_keys,
+            records=records,
+            total=total,
+            page=page,
+            page_size=page_size,
+            sector_counts=sector_counts,
+            file_counts=file_counts,
+            level_counts=level_counts,
+            bound_keys=bound_keys,
             test_summary=test_summary,
         )
 
@@ -349,7 +377,8 @@ class SQLiteAdapter(Adapter):
         # Use the SQLAlchemy `select()` builder rather than raw `text()` —
         # keeps the query injection-safe by construction and consistent with
         # the rest of this file's pattern (review patch P1).
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         t = self._table
         json_test_id = func.json_extract(t.c.context, "$.test_id")
         json_outcome = func.json_extract(t.c.context, "$.outcome")
@@ -386,27 +415,34 @@ class SQLiteAdapter(Adapter):
             file_part, sep, name_part = tid.partition("::")
             if not sep or not name_part:  # malformed nodeid — skip defensively
                 continue
-            rows.append(TestSummaryRow(
-                test_id=tid, file=file_part, name=name_part,
-                outcome=outcome, duration_s=duration_s,
-            ))
+            rows.append(
+                TestSummaryRow(
+                    test_id=tid,
+                    file=file_part,
+                    name=name_part,
+                    outcome=outcome,
+                    duration_s=duration_s,
+                )
+            )
         # AC7: sort by file then by name (alphabetical within file). regroup
         # in the template requires file-grouped contiguity which file-first
         # sort guarantees.
         rows.sort(key=lambda r: (r.file, r.name))
         return rows
 
-    def _count_by(self, conn, col, where) -> dict[str, int]:
-        from sqlalchemy import select, func
+    def _count_by(self, conn: Any, col: Any, where: Any) -> dict[str, int]:
+        from sqlalchemy import func, select
+
         stmt = select(col, func.count()).group_by(col).order_by(func.count().desc())
         if where is not None:
             stmt = stmt.where(where)
         return {row[0]: row[1] for row in conn.execute(stmt)}
 
-    def _distinct_bound_keys(self, conn, where) -> list[str]:
+    def _distinct_bound_keys(self, conn: Any, where: Any) -> list[str]:
         # Heuristic: pull a sample of context blobs, gather their top-level keys.
         # SQLite v0.2 keeps this in app-space rather than JSON path.
         from sqlalchemy import select
+
         t = self._table
         stmt = select(t.c.context).where(t.c.context.is_not(None)).limit(500)
         if where is not None:
@@ -420,7 +456,7 @@ class SQLiteAdapter(Adapter):
                 keys.update(payload.keys())
         return sorted(keys)
 
-    def _row_to_record(self, row) -> Record:
+    def _row_to_record(self, row: Any) -> Record:
         # ULog stores timestamps as tz-aware UTC datetimes (sql.py uses
         # datetime.fromtimestamp(record.created, tz=timezone.utc)). The
         # naive isoformat() + "Z" pattern produces "+00:00Z" — invalid
@@ -441,18 +477,22 @@ class SQLiteAdapter(Adapter):
         if isinstance(exc, str):
             exc = json.loads(exc) if exc else None
         return Record(
-            id=row.id, ts=ts, level=row.level, logger=row.logger,
-            msg=row.msg, file=row.file, line=row.line,
-            context=ctx or {}, exc=exc,
+            id=row.id,
+            ts=ts,
+            level=row.level,
+            logger=row.logger,
+            msg=row.msg,
+            file=row.file,
+            line=row.line,
+            context=ctx or {},
+            exc=exc,
         )
 
     def get(self, record_id: int) -> Record | None:
         from sqlalchemy import select
 
         with self._engine.begin() as conn:
-            row = conn.execute(
-                select(self._table).where(self._table.c.id == record_id)
-            ).first()
+            row = conn.execute(select(self._table).where(self._table.c.id == record_id)).first()
         if row is None:
             return None
         return self._row_to_record(row)
@@ -463,7 +503,8 @@ class SQLiteAdapter(Adapter):
         Includes both plugin records (logger='ulog.test') and Story 1.4-
         propagated app records — same single-equality clause used by Story 1.7.
         """
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         if not test_id:
             return 0
         t = self._table
@@ -472,13 +513,11 @@ class SQLiteAdapter(Adapter):
             stmt = (
                 select(func.count())
                 .select_from(t)
-                .where(
-                    func.json_extract(t.c.context, "$.test_id") == test_id
-                )
+                .where(func.json_extract(t.c.context, "$.test_id") == test_id)
             )
             return int(conn.execute(stmt).scalar() or 0)
 
-    def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
+    def get_test_summary_row(self, test_id: str) -> TestSummaryRow | None:
         """Find the TestSummaryRow for a given test_id (Story 1.8 / FR66).
 
         Returns None when no outcome record exists for this test_id (e.g. a
@@ -503,23 +542,25 @@ class SQLiteAdapter(Adapter):
     def unique_file_line_pairs(self) -> Iterable[tuple[str, int]]:
         """Distinct (file, line) pairs via a single `SELECT DISTINCT` (Story 2.3)."""
         from sqlalchemy import select
+
         t = self._table
         with self._engine.connect() as conn:
             stmt = select(t.c.file, t.c.line).distinct()
             for row in conn.execute(stmt):
-                f, l = row
-                if f and isinstance(l, int) and l > 0:
-                    yield (str(f), int(l))
+                f, ln = row
+                if f and isinstance(ln, int) and ln > 0:
+                    yield (str(f), int(ln))
 
     def file_line_record_counts(self) -> Iterable[tuple[str, int, int]]:
         """SQL GROUP BY (file, line) → (file, line, count). PRD-v0.4.1 perf."""
         from sqlalchemy import func, select
+
         t = self._table
         with self._engine.connect() as conn:
             stmt = select(t.c.file, t.c.line, func.count().label("n")).group_by(t.c.file, t.c.line)
-            for f, l, n in conn.execute(stmt):
-                if f and isinstance(l, int) and l > 0:
-                    yield (str(f), int(l), int(n))
+            for f, ln, n in conn.execute(stmt):
+                if f and isinstance(ln, int) and ln > 0:
+                    yield (str(f), int(ln), int(n))
 
 
 # ---- JSONL ---------------------------------------------------------------
@@ -555,9 +596,7 @@ class JSONLAdapter(Adapter):
         Story 1.4-propagated app records via the shared context.test_id key."""
         if not test_id:
             return 0
-        return sum(
-            1 for r in self._records if r.context.get("test_id") == test_id
-        )
+        return sum(1 for r in self._records if r.context.get("test_id") == test_id)
 
     def unique_file_line_pairs(self) -> Iterable[tuple[str, int]]:
         """In-memory dedup of (file, line) pairs (Story 2.3)."""
@@ -572,14 +611,15 @@ class JSONLAdapter(Adapter):
     def file_line_record_counts(self) -> Iterable[tuple[str, int, int]]:
         """In-memory Counter over records (PRD-v0.4.1 perf)."""
         from collections import Counter as _C
+
         c: _C[tuple[str, int]] = _C()
         for r in self._records:
             if r.file and r.line > 0:
                 c[(r.file, r.line)] += 1
-        for (f, l), n in c.items():
-            yield (f, l, n)
+        for (f, ln), n in c.items():
+            yield (f, ln, n)
 
-    def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
+    def get_test_summary_row(self, test_id: str) -> TestSummaryRow | None:
         """JSONL adapter stub — v0.3 doesn't implement test-summary aggregation
         for non-SQLite formats (Story 1.6 deferred). Returns None so the
         detail-view panel falls back to "outcome unknown" gracefully."""
@@ -627,9 +667,7 @@ class CSVAdapter(Adapter):
         """Count records bound to test_id (Story 1.8) — same shape as JSONL."""
         if not test_id:
             return 0
-        return sum(
-            1 for r in self._records if r.context.get("test_id") == test_id
-        )
+        return sum(1 for r in self._records if r.context.get("test_id") == test_id)
 
     def unique_file_line_pairs(self) -> Iterable[tuple[str, int]]:
         """In-memory dedup (Story 2.3) — same shape as JSONL."""
@@ -644,14 +682,15 @@ class CSVAdapter(Adapter):
     def file_line_record_counts(self) -> Iterable[tuple[str, int, int]]:
         """In-memory Counter over records (PRD-v0.4.1 perf)."""
         from collections import Counter as _C
+
         c: _C[tuple[str, int]] = _C()
         for r in self._records:
             if r.file and r.line > 0:
                 c[(r.file, r.line)] += 1
-        for (f, l), n in c.items():
-            yield (f, l, n)
+        for (f, ln), n in c.items():
+            yield (f, ln, n)
 
-    def get_test_summary_row(self, test_id: str) -> "TestSummaryRow | None":
+    def get_test_summary_row(self, test_id: str) -> TestSummaryRow | None:
         """CSV adapter stub — v0.3 doesn't implement test-summary aggregation
         for non-SQLite formats. Returns None; panel falls back gracefully."""
         return None
@@ -671,7 +710,8 @@ def _payload_to_record(payload: dict[str, Any], idx: int) -> Record:
         file=str(payload.get("file", "")),
         line=int(payload.get("line", 0) or 0),
         context={
-            k: v for k, v in payload.items()
+            k: v
+            for k, v in payload.items()
             if k not in {"ts", "level", "logger", "msg", "file", "line", "exc"}
         },
         exc=payload.get("exc"),
@@ -710,15 +750,13 @@ def _filter_and_paginate(
                 return False
         # Story 1.7 (FR65) — single-equality test_id filter applies to both
         # plugin records and propagated app records (same context.test_id key).
-        if ff.test_id and r.context.get("test_id") != ff.test_id:
-            return False
-        return True
+        return not (ff.test_id and r.context.get("test_id") != ff.test_id)
 
     # Full filter — for records list + total + bound_keys
     full_filtered = [r for r in records if keep(r, f)]
     total = len(full_filtered)
     start = (page - 1) * page_size
-    page_records = list(reversed(full_filtered))[start:start + page_size]
+    page_records = list(reversed(full_filtered))[start : start + page_size]
 
     # Per-axis ghost-count datasets — strip test_id too (review patch P1).
     no_levels_filtered = [r for r in records if keep(r, _replace(f, levels=[], test_id=""))]
@@ -736,9 +774,14 @@ def _filter_and_paginate(
         bound_keys.update(r.context.keys())
 
     return QueryResult(
-        records=page_records, total=total, page=page, page_size=page_size,
-        sector_counts=sector_counts, file_counts=dict(file_counts),
-        level_counts=dict(level_counts), bound_keys=sorted(bound_keys),
+        records=page_records,
+        total=total,
+        page=page,
+        page_size=page_size,
+        sector_counts=sector_counts,
+        file_counts=dict(file_counts),
+        level_counts=dict(level_counts),
+        bound_keys=sorted(bound_keys),
     )
 
 

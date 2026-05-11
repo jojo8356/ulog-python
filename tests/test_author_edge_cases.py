@@ -2,10 +2,10 @@
 by Stories 2.1, 2.2, 2.9). The 3 already-covered cases (line OOR,
 unreachable sha, no git) are checked by their owning tests; this file
 adds the remaining 2 cases (file rename, submodule)."""
+
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -19,11 +19,19 @@ def _git(*args: str, cwd: Path) -> None:
 
 
 def _commit(cwd: Path, msg: str, name: str = "Alice", email: str = "alice@example.com") -> None:
-    env = {**os.environ, "GIT_AUTHOR_NAME": name, "GIT_AUTHOR_EMAIL": email,
-           "GIT_COMMITTER_NAME": name, "GIT_COMMITTER_EMAIL": email}
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": name,
+        "GIT_AUTHOR_EMAIL": email,
+        "GIT_COMMITTER_NAME": name,
+        "GIT_COMMITTER_EMAIL": email,
+    }
     subprocess.run(
         ["git", "commit", "-q", "-m", msg],
-        cwd=cwd, env=env, check=True, capture_output=True,
+        cwd=cwd,
+        env=env,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -62,7 +70,9 @@ def _has_submodule_support() -> bool:
     try:
         out = subprocess.run(
             ["git", "submodule", "--help"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return out.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -93,8 +103,13 @@ def test_submodule_path_returns_unknown_for_v0_4(tmp_path):
     _git("config", "user.name", "Alice", cwd=parent)
     _git("config", "user.email", "alice@example.com", cwd=parent)
     _git(
-        "-c", "protocol.file.allow=always",
-        "submodule", "add", "-q", str(sub), "sub_path",
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        "-q",
+        str(sub),
+        "sub_path",
         cwd=parent,
     )
     _commit(parent, "add submodule")
@@ -136,7 +151,12 @@ def test_edge_case_mapping_complete():
     """SC4 — each of the 5 PRD-v0.4 §2.3 edge cases must have
     coverage in the test suite. This test asserts the mapping doc
     (in story 2-10's spec) accurately reflects test names."""
-    spec = Path(__file__).parent.parent / "_bmad-output" / "implementation-artifacts" / "2-10-prd-v0-4-edge-cases-as-tests.md"
+    spec = (
+        Path(__file__).parent.parent
+        / "_bmad-output"
+        / "implementation-artifacts"
+        / "2-10-prd-v0-4-edge-cases-as-tests.md"
+    )
     assert spec.exists(), "Story 2.10 spec missing"
     txt = spec.read_text(encoding="utf-8")
     # Each edge case mentioned by name in the mapping table.

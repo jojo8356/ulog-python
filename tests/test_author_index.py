@@ -1,4 +1,5 @@
 """Tests for `ulog.web.viewer.blame.AuthorIndex` — Story 2.1 (FR70, FR82, FR83, NFR-DEP-30)."""
+
 from __future__ import annotations
 
 import os
@@ -9,7 +10,6 @@ from pathlib import Path
 import pytest
 
 from ulog.web.viewer.blame import Author, AuthorIndex
-
 
 # ---- fixtures ------------------------------------------------------------
 
@@ -30,7 +30,10 @@ def _git_commit(cwd: Path, msg: str, name: str = "Alice", email: str = "alice@ex
     }
     subprocess.run(
         ["git", "commit", "-q", "-m", msg],
-        cwd=cwd, env=env, check=True, capture_output=True,
+        cwd=cwd,
+        env=env,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -75,7 +78,8 @@ def test_author_for_returns_author_on_tracked_line(repo):
     assert a is not None
     assert a.name == "Alice"
     assert a.email == "alice@example.com"
-    assert len(a.sha) == 40 and all(c in "0123456789abcdef" for c in a.sha)
+    assert len(a.sha) == 40
+    assert all(c in "0123456789abcdef" for c in a.sha)
     assert a.ts > 0
 
 
@@ -155,10 +159,15 @@ def test_batched_build_two_files_two_forks(tmp_path):
     _git_commit(tmp_path, "init")
 
     idx = AuthorIndex(tmp_path)
-    idx.build_for_pairs([
-        ("a.py", 1), ("a.py", 2),
-        ("b.py", 1), ("b.py", 2), ("b.py", 3),
-    ])
+    idx.build_for_pairs(
+        [
+            ("a.py", 1),
+            ("a.py", 2),
+            ("b.py", 1),
+            ("b.py", 2),
+            ("b.py", 3),
+        ]
+    )
     # Now query — should be cached.
     assert idx.author_for("a.py", 1) is not None
     assert idx.author_for("b.py", 3) is not None
@@ -174,7 +183,9 @@ def test_porcelain_repeated_sha_parser(repo):
     a1 = idx.author_for("foo.py", 1)
     a2 = idx.author_for("foo.py", 2)
     a3 = idx.author_for("foo.py", 3)
-    assert a1 is not None and a2 is not None and a3 is not None
+    assert a1 is not None
+    assert a2 is not None
+    assert a3 is not None
     assert a1.sha == a2.sha == a3.sha
     assert a1.email == a2.email == a3.email == "alice@example.com"
 
@@ -194,7 +205,8 @@ def test_porcelain_parser_handles_two_authors(tmp_path):
     idx = AuthorIndex(tmp_path)
     a1 = idx.author_for("x.py", 1)
     a2 = idx.author_for("x.py", 2)
-    assert a1 is not None and a2 is not None
+    assert a1 is not None
+    assert a2 is not None
     assert a1.email == "alice@example.com"
     assert a2.email == "bob@example.com"
     assert a1.sha != a2.sha
@@ -227,7 +239,9 @@ def test_no_gitpython_or_pygit2_import_in_ulog():
     """Hard regression check: NFR-DEP-30 + AC8."""
     out = subprocess.run(
         ["grep", "-rE", r"^(from|import)\s+(git|pygit2)", "ulog/"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert out.stdout == "", f"GitPython/pygit2 import found in ulog/:\n{out.stdout}"
 
@@ -265,7 +279,8 @@ def test_invocation_uses_porcelain_L_separator_and_cwd(repo, monkeypatch):
     assert len(blame_calls) == 1
     args, kw = blame_calls[0]
     assert "--porcelain" in args
-    assert "-L" in args and "2,2" in args
+    assert "-L" in args
+    assert "2,2" in args
     assert "--" in args  # path separator (security: prevents ref/path ambiguity)
     assert kw.get("cwd") == str(repo)
     # Path comes AFTER --

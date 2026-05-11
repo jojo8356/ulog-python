@@ -6,6 +6,7 @@ script), not via environment variables. The script sets:
   - `ULOG_LOGS_KIND`      → 'sqlite' / 'jsonl' / 'csv'
   - `ULOG_BIND_HOST`      → '127.0.0.1' (default)
 """
+
 from __future__ import annotations
 
 import os
@@ -48,6 +49,7 @@ MIDDLEWARE = [
 if DEBUG:
     try:
         import django_browser_reload  # noqa: F401
+
         INSTALLED_APPS.append("django_browser_reload")
         MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
     except ImportError:

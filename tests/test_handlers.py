@@ -1,12 +1,12 @@
 """Tests for the v0.2 storage handlers (SQL, JSON Line, CSV)."""
+
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
 import logging
-import os
-from pathlib import Path
 
 import pytest
 
@@ -25,10 +25,8 @@ def _isolate():
     yield
     for h in list(logging.getLogger().handlers):
         if getattr(h, "_ulog_managed", False):
-            try:
+            with contextlib.suppress(Exception):
                 h.close()
-            except Exception:
-                pass
             logging.getLogger().removeHandler(h)
     ulog.clear()
 
@@ -48,8 +46,10 @@ def test_jsonline_writes_one_object_per_record(tmp_path):
     lines = path.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     e0, e1 = json.loads(lines[0]), json.loads(lines[1])
-    assert e0["msg"] == "first" and e0["level"] == "INFO"
-    assert e1["msg"] == "boom" and e1["level"] == "ERROR"
+    assert e0["msg"] == "first"
+    assert e0["level"] == "INFO"
+    assert e1["msg"] == "boom"
+    assert e1["level"] == "ERROR"
 
 
 def test_jsonline_appends_to_existing_file(tmp_path):
@@ -74,9 +74,7 @@ def test_csv_writes_header_then_rows(tmp_path):
     ulog.get_logger("svc").info("rendered", extra={"frames": 600})
     ulog.get_logger("svc").error("boom")
     rows = list(csv.reader(path.open()))
-    assert rows[0] == [
-        "ts", "level", "logger", "msg", "file", "line", "context_json", "exc_json"
-    ]
+    assert rows[0] == ["ts", "level", "logger", "msg", "file", "line", "context_json", "exc_json"]
     assert len(rows) == 3  # header + 2 data
     assert rows[1][1] == "INFO"
     assert rows[1][2] == "svc"
@@ -130,9 +128,7 @@ def test_sql_records_persist_to_sqlite(tmp_path):
 
     engine = create_engine(url, future=True)
     with engine.begin() as conn:
-        rows = conn.execute(
-            text("SELECT level, logger, msg FROM logs ORDER BY id")
-        ).all()
+        rows = conn.execute(text("SELECT level, logger, msg FROM logs ORDER BY id")).all()
     assert rows == [("INFO", "svc", "one"), ("ERROR", "svc", "boom")]
     engine.dispose()
 
@@ -247,12 +243,8 @@ def test_sql_handler_no_race_under_concurrent_bootstrap(tmp_path):
         stderrs.append(err.decode())
 
     combined = "\n".join(stderrs)
-    assert "Logging error" not in combined, (
-        f"CREATE TABLE race produced stderr noise:\n{combined}"
-    )
-    assert "OperationalError" not in combined, (
-        f"OperationalError leaked to stderr:\n{combined}"
-    )
+    assert "Logging error" not in combined, f"CREATE TABLE race produced stderr noise:\n{combined}"
+    assert "OperationalError" not in combined, f"OperationalError leaked to stderr:\n{combined}"
 
     # All 4 records should have persisted (no record was lost to the race).
     from sqlalchemy import create_engine, text
@@ -287,7 +279,8 @@ def test_multi_handler_emits_to_all_targets(tmp_path):
     # Stream output
     assert "hello" in sink.getvalue()
     # JSON file
-    assert jsonl.exists() and jsonl.stat().st_size > 0
+    assert jsonl.exists()
+    assert jsonl.stat().st_size > 0
     # CSV
     rows = list(csv.reader(csv_path.open()))
     assert rows[1][3] == "hello"

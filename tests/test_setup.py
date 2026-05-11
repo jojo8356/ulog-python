@@ -1,4 +1,5 @@
 """Tests for ulog.setup + idempotency + name-scoping."""
+
 from __future__ import annotations
 
 import io
@@ -35,7 +36,7 @@ def test_setup_default_format_is_qlnes():
     log = ulog.get_logger()
     log.error("boom")
     out = sink.getvalue().strip()
-    assert "qlnes: error: boom" == out
+    assert out == "qlnes: error: boom"
 
 
 def test_setup_emits_to_provided_stream():
@@ -199,9 +200,7 @@ def test_setup_profile_none_keeps_v01_stream_only_behavior(monkeypatch, tmp_path
 def test_setup_explicit_sql_url_overrides_profile(tmp_path):
     """If both profile= and sql_url= are passed, sql_url wins."""
     custom = tmp_path / "custom.sqlite"
-    ulog.setup(
-        profile="prod", sql_url=f"sqlite:///{custom}", color="never"
-    )
+    ulog.setup(profile="prod", sql_url=f"sqlite:///{custom}", color="never")
     ulog.get_logger().info("custom")
     for h in logging.getLogger().handlers:
         h.flush()

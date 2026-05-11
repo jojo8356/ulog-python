@@ -17,6 +17,7 @@ Quick start:
     log.info("hello")
     log.error("boom")        # → "qlnes: error: boom" in red on a TTY
 """
+
 from __future__ import annotations
 
 from .context import bind, clear, context, get_bound, unbind
@@ -43,32 +44,32 @@ from .setup import (
 __version__ = "0.1.0"
 
 __all__ = [
-    # Setup
-    "setup",
-    "get_logger",
-    "set_level",
-    "is_configured",
-    "default_db_path",
     "LOG_LEVELS",
-    "LogLevel",
     "PROFILES",
+    "CSVHandler",
+    "JSONLineHandler",
+    "JsonFormatter",
+    "LogLevel",
     "Profile",
-    # Context binding
-    "bind",
-    "unbind",
-    "clear",
-    "context",
-    "get_bound",
     # Formatter registration / classes (advanced)
     "QlnesFormatter",
-    "SimpleFormatter",
-    "VerboseFormatter",
-    "JsonFormatter",
-    "register_formatter",
     # Storage handlers (v0.2)
     "SQLHandler",
-    "JSONLineHandler",
-    "CSVHandler",
     "SchemaError",
+    "SimpleFormatter",
+    "VerboseFormatter",
     "__version__",
+    # Context binding
+    "bind",
+    "clear",
+    "context",
+    "default_db_path",
+    "get_bound",
+    "get_logger",
+    "is_configured",
+    "register_formatter",
+    "set_level",
+    # Setup
+    "setup",
+    "unbind",
 ]

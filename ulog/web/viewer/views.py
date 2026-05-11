@@ -1,23 +1,23 @@
 """Django views for the ULog inspection UI."""
+
 from __future__ import annotations
 
 import json
 import os
 import re
 from pathlib import Path
-from typing import Any
 
 from django.conf import settings
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
-from .adapters import Filters, get_adapter
+from .adapters import Adapter, Filters, get_adapter
 
 # Module-level singleton adapter — built once on first request, reused.
-_adapter = None
+_adapter: Adapter | None = None
 
 
-def _adapter_or_404():
+def _adapter_or_404() -> Adapter:
     global _adapter
     if _adapter is None:
         path = settings.ULOG_LOGS_PATH
@@ -27,7 +27,7 @@ def _adapter_or_404():
     return _adapter
 
 
-def _parse_filters(request) -> Filters:
+def _parse_filters(request: HttpRequest) -> Filters:
     """Decode the query string into a Filters object."""
     qs = request.GET
     levels = [lv for lv in qs.getlist("level") if lv]
@@ -62,7 +62,7 @@ def _parse_filters(request) -> Filters:
     )
 
 
-def list_view(request):
+def list_view(request: HttpRequest) -> HttpResponse:
     """Main filter + list view (FR35-FR36)."""
     from dataclasses import replace
 
@@ -80,11 +80,10 @@ def list_view(request):
     # show_unknown=False), we post-filter records in Python because the
     # adapter doesn't know about the index. Cost: O(N) for in-memory
     # adapters; bounded for SQLite (NFR-PERF-31 ≤500ms is the budget).
-    author_filter_active = (
-        bool(filters.authors) or not filters.show_unknown
-    ) and idx is not None
+    author_filter_active = (bool(filters.authors) or not filters.show_unknown) and idx is not None
 
     if author_filter_active:
+        assert idx is not None  # narrowed by author_filter_active above
         full = adapter.query(filters, page=1, page_size=10_000_000)
         selected = set(filters.authors)
         unknown_ticked = "<unknown>" in selected
@@ -92,9 +91,7 @@ def list_view(request):
         for r in full.records:
             a = idx.author_for(r.file, r.line)
             if selected:
-                if a is not None and a.email in selected:
-                    kept.append(r)
-                elif a is None and unknown_ticked:
+                if (a is not None and a.email in selected) or (a is None and unknown_ticked):
                     kept.append(r)
             else:
                 # No specific authors selected — show_unknown is the only filter.
@@ -104,7 +101,7 @@ def list_view(request):
         total = len(kept)
         start = (page - 1) * page_size
         result = QueryResult(
-            records=kept[start:start + page_size],
+            records=kept[start : start + page_size],
             total=total,
             page=page,
             page_size=page_size,
@@ -145,9 +142,7 @@ def list_view(request):
     qs_dict.pop("test_id", None)
     qs_dict.pop("page", None)
     qs_minus_test_id_encoded = qs_dict.urlencode()
-    qs_minus_test_id = (
-        f"&{qs_minus_test_id_encoded}" if qs_minus_test_id_encoded else ""
-    )
+    qs_minus_test_id = f"&{qs_minus_test_id_encoded}" if qs_minus_test_id_encoded else ""
 
     ctx = {
         "logs_path": settings.ULOG_LOGS_PATH,
@@ -175,7 +170,7 @@ def list_view(request):
     return render(request, "ulog/list.html", ctx)
 
 
-def detail_view(request, record_id: int):
+def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
     """Full record detail page (FR37) + Story 1.8 Test context panel (FR66)."""
     adapter = _adapter_or_404()
     record = adapter.get(record_id)
@@ -197,6 +192,7 @@ def detail_view(request, record_id: int):
     # Story 2.8 (FR80) — author panel below Context. None when no idx
     # is active or the (file, line) doesn't resolve.
     from .blame import get_global_index
+
     idx = get_global_index()
     author = idx.author_for(record.file, record.line) if idx else None
     author_relative_date = _relative_date(author.ts) if author else ""
@@ -229,7 +225,7 @@ def _validate_sha(sha: str) -> bool:
     return bool(_SHA_RE.match(sha))
 
 
-def qa_view(request):
+def qa_view(request: HttpRequest) -> HttpResponse:
     """Debug-only QA checklist page (Epic 1 + Epic 2 + perf v0.4.1).
 
     404 unless `settings.DEBUG` is True (i.e. user launched the viewer
@@ -244,13 +240,17 @@ def qa_view(request):
         qa_strings = json.loads(strings_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         qa_strings = {"en": {}, "fr": {}}
-    return render(request, "ulog/qa.html", {
-        "logs_path": settings.ULOG_LOGS_PATH,
-        "qa_strings_json": qa_strings,
-    })
+    return render(
+        request,
+        "ulog/qa.html",
+        {
+            "logs_path": settings.ULOG_LOGS_PATH,
+            "qa_strings_json": qa_strings,
+        },
+    )
 
 
-def diff_view(request, sha: str):
+def diff_view(request: HttpRequest, sha: str) -> HttpResponse:
     """Story 2.9 (FR81 / NFR-SEC-30) — render `git show <sha>` safely."""
     import subprocess
 
@@ -284,7 +284,9 @@ def diff_view(request, sha: str):
         )
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         return HttpResponse(
-            f"git invocation failed: {e}", status=503, content_type="text/plain",
+            f"git invocation failed: {e}",
+            status=503,
+            content_type="text/plain",
         )
     if rp.returncode != 0:
         return HttpResponse(
@@ -328,6 +330,7 @@ def _relative_date(ts: int) -> str:
     Story 2.8 (FR80). Stdlib only — no humanize/arrow dep (NFR-DEP-50).
     """
     import time as _time
+
     delta = int(_time.time()) - int(ts)
     if delta < 0:
         return "in the future"
@@ -349,7 +352,7 @@ def _relative_date(ts: int) -> str:
     return f"{y} year{'s' if y != 1 else ''} ago"
 
 
-def api_records(request):
+def api_records(request: HttpRequest) -> HttpResponse:
     """JSON endpoint for the JS-driven filter UI (FR34)."""
     adapter = _adapter_or_404()
     filters = _parse_filters(request)
@@ -357,25 +360,34 @@ def api_records(request):
     result = adapter.query(filters, page=page, page_size=100)
 
     from dataclasses import asdict
-    return JsonResponse({
-        "records": [
-            {
-                "id": r.id, "ts": r.ts, "level": r.level, "logger": r.logger,
-                "msg": r.msg, "file": r.file, "line": r.line,
-                "context": r.context, "exc": r.exc,
-            }
-            for r in result.records
-        ],
-        "total": result.total,
-        "page": result.page,
-        "level_counts": result.level_counts,
-        "file_counts": result.file_counts,
-        "sector_counts": result.sector_counts,
-        # Story 1.6 — Test sidebar data for the JS-driven UI (FR62).
-        # `asdict` works on frozen dataclasses; all TestSummaryRow fields
-        # are JSON-serializable primitives.
-        "test_summary": [asdict(r) for r in result.test_summary],
-    })
+
+    return JsonResponse(
+        {
+            "records": [
+                {
+                    "id": r.id,
+                    "ts": r.ts,
+                    "level": r.level,
+                    "logger": r.logger,
+                    "msg": r.msg,
+                    "file": r.file,
+                    "line": r.line,
+                    "context": r.context,
+                    "exc": r.exc,
+                }
+                for r in result.records
+            ],
+            "total": result.total,
+            "page": result.page,
+            "level_counts": result.level_counts,
+            "file_counts": result.file_counts,
+            "sector_counts": result.sector_counts,
+            # Story 1.6 — Test sidebar data for the JS-driven UI (FR62).
+            # `asdict` works on frozen dataclasses; all TestSummaryRow fields
+            # are JSON-serializable primitives.
+            "test_summary": [asdict(r) for r in result.test_summary],
+        }
+    )
 
 
 # ---- Built-in /docs (FR40) ----------------------------------------------
@@ -392,7 +404,7 @@ _DOC_PAGES: dict[str, str] = {
 }
 
 
-def docs_index(request):
+def docs_index(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "ulog/docs_index.html",
@@ -400,7 +412,7 @@ def docs_index(request):
     )
 
 
-def docs_page(request, page: str):
+def docs_page(request: HttpRequest, page: str) -> HttpResponse:
     if page not in _DOC_PAGES:
         raise Http404(f"unknown doc page {page!r}")
     md_path = settings.ULOG_DOCS_DIR / f"{page}.md"
@@ -435,13 +447,13 @@ def _markdown_to_html(md: str) -> str:
     code_lang = ""
     code_buf: list[str] = []
 
-    def close_list():
+    def close_list() -> None:
         nonlocal in_list
         if in_list:
             out.append("</ul>")
             in_list = False
 
-    def flush_code():
+    def flush_code() -> None:
         nonlocal in_code, code_buf, code_lang
         if in_code:
             joined = "\n".join(code_buf).rstrip("\n")
@@ -469,13 +481,19 @@ def _markdown_to_html(md: str) -> str:
             continue
         if stripped.startswith("# "):
             close_list()
-            out.append(f'<h1 class="text-3xl font-bold mt-4 mb-2">{_html_escape(stripped[2:])}</h1>')
+            out.append(
+                f'<h1 class="text-3xl font-bold mt-4 mb-2">{_html_escape(stripped[2:])}</h1>'
+            )
         elif stripped.startswith("## "):
             close_list()
-            out.append(f'<h2 class="text-2xl font-semibold mt-4 mb-2">{_html_escape(stripped[3:])}</h2>')
+            out.append(
+                f'<h2 class="text-2xl font-semibold mt-4 mb-2">{_html_escape(stripped[3:])}</h2>'
+            )
         elif stripped.startswith("### "):
             close_list()
-            out.append(f'<h3 class="text-xl font-semibold mt-3 mb-1">{_html_escape(stripped[4:])}</h3>')
+            out.append(
+                f'<h3 class="text-xl font-semibold mt-3 mb-1">{_html_escape(stripped[4:])}</h3>'
+            )
         elif stripped.startswith("- "):
             if not in_list:
                 out.append('<ul class="list-disc list-inside space-y-1 my-2">')
@@ -496,7 +514,9 @@ def _markdown_to_html(md: str) -> str:
 def _inline_md(text: str) -> str:
     """Inline `code`, **bold**, [link](url) → HTML."""
     text = _html_escape(text)
-    text = re.sub(r"`([^`]+)`", r'<code class="bg-slate-100 dark:bg-slate-800 px-1 rounded">\1</code>', text)
+    text = re.sub(
+        r"`([^`]+)`", r'<code class="bg-slate-100 dark:bg-slate-800 px-1 rounded">\1</code>', text
+    )
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
     text = re.sub(
         r"\[([^\]]+)\]\(([^)]+)\)",
@@ -508,6 +528,9 @@ def _inline_md(text: str) -> str:
 
 def _html_escape(text: str) -> str:
     return (
-        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        .replace('"', "&quot;").replace("'", "&#39;")
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
     )

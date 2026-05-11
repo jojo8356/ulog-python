@@ -1,4 +1,5 @@
 """Story 2.7 — multi-select OR + URL + show_unknown filter wiring."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-from ulog.web.viewer.adapters import JSONLAdapter
 from ulog.web.viewer.blame import (
     Author,
     AuthorIndex,
@@ -31,20 +31,70 @@ def fixture_log_and_idx(tmp_path: Path) -> tuple[Path, AuthorIndex]:
     a2 = Author(name="Bob", email="bob@x", sha="b" * 40, ts=2)
     log = tmp_path / "logs.jsonl"
     log.write_text(
-        "\n".join([
-            json.dumps({"ts": "x", "level": "INFO", "logger": "x", "msg": "a1",
-                       "file": "foo.py", "line": 1}),
-            json.dumps({"ts": "x", "level": "INFO", "logger": "x", "msg": "a2",
-                       "file": "foo.py", "line": 1}),
-            json.dumps({"ts": "x", "level": "INFO", "logger": "x", "msg": "b1",
-                       "file": "bar.py", "line": 1}),
-            json.dumps({"ts": "x", "level": "INFO", "logger": "x", "msg": "b2",
-                       "file": "bar.py", "line": 1}),
-            json.dumps({"ts": "x", "level": "INFO", "logger": "x", "msg": "u1",
-                       "file": "external.py", "line": 99}),
-            json.dumps({"ts": "x", "level": "INFO", "logger": "x", "msg": "u2",
-                       "file": "external.py", "line": 99}),
-        ]),
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "ts": "x",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "a1",
+                        "file": "foo.py",
+                        "line": 1,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "x",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "a2",
+                        "file": "foo.py",
+                        "line": 1,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "x",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "b1",
+                        "file": "bar.py",
+                        "line": 1,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "x",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "b2",
+                        "file": "bar.py",
+                        "line": 1,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "x",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "u1",
+                        "file": "external.py",
+                        "line": 99,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": "x",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": "u2",
+                        "file": "external.py",
+                        "line": 99,
+                    }
+                ),
+            ]
+        ),
         encoding="utf-8",
     )
     idx = AuthorIndex(tmp_path)
@@ -52,7 +102,7 @@ def fixture_log_and_idx(tmp_path: Path) -> tuple[Path, AuthorIndex]:
         path = tmp_path / fname
         path.write_text("stub\n", encoding="utf-8")
         mtime = os.stat(path).st_mtime
-        idx._cache[fname] = _FileCache(mtime=mtime, blames={i: author for i in range(1, 200)})
+        idx._cache[fname] = _FileCache(mtime=mtime, blames=dict.fromkeys(range(1, 200), author))
     # external.py — not in idx → resolves to None (<unknown>)
     set_global_index(idx)
     return log, idx
@@ -65,14 +115,18 @@ def _make_django_client(db_path: Path):
     os.environ["ULOG_DEBUG"] = "0"
     import django
     from django.apps import apps as django_apps
+
     if not django_apps.ready:
         django.setup()
     from django.conf import settings as _dj_settings
+
     _dj_settings.ULOG_LOGS_PATH = str(db_path)
     _dj_settings.ULOG_LOGS_KIND = "jsonl"
     from ulog.web.viewer import views as _views
+
     _views._adapter = None
     from django.test import Client
+
     return Client()
 
 
@@ -88,8 +142,10 @@ def test_filter_single_author(fixture_log_and_idx):
     # Alice's records should be present (msgs in HTML)
     assert ">a1<" in body or ">a2<" in body
     # Bob's records and unknowns should be filtered out from the main list
-    assert ">b1<" not in body and ">b2<" not in body
-    assert ">u1<" not in body and ">u2<" not in body
+    assert ">b1<" not in body
+    assert ">b2<" not in body
+    assert ">u1<" not in body
+    assert ">u2<" not in body
 
 
 # ---- AC1 + AC2: multi-author OR -----------------------------------------
@@ -107,7 +163,8 @@ def test_filter_multi_author_or(fixture_log_and_idx):
     assert ">a1<" in body or '"a1"' in body
     assert ">b1<" in body or '"b1"' in body
     # external (unknown) NOT in selection
-    assert ">u1<" not in body and ">u2<" not in body
+    assert ">u1<" not in body
+    assert ">u2<" not in body
 
 
 # ---- AC3: <unknown> sentinel ---------------------------------------------
@@ -120,8 +177,10 @@ def test_filter_unknown_sentinel(fixture_log_and_idx):
     resp = client.get("/?author=%3Cunknown%3E")
     assert resp.status_code == 200
     body = resp.content.decode("utf-8")
-    assert ">u1<" in body and ">u2<" in body
-    assert ">a1<" not in body and ">b1<" not in body
+    assert ">u1<" in body
+    assert ">u2<" in body
+    assert ">a1<" not in body
+    assert ">b1<" not in body
 
 
 # ---- AC4: show_unknown toggle -------------------------------------------
@@ -134,8 +193,10 @@ def test_show_unknown_off_hides_unknowns(fixture_log_and_idx):
     assert resp.status_code == 200
     body = resp.content.decode("utf-8")
     # Knowns visible, unknowns hidden
-    assert ">a1<" in body and ">b1<" in body
-    assert ">u1<" not in body and ">u2<" not in body
+    assert ">a1<" in body
+    assert ">b1<" in body
+    assert ">u1<" not in body
+    assert ">u2<" not in body
 
 
 def test_show_unknown_default_on_keeps_unknowns(fixture_log_and_idx):
@@ -145,7 +206,9 @@ def test_show_unknown_default_on_keeps_unknowns(fixture_log_and_idx):
     assert resp.status_code == 200
     body = resp.content.decode("utf-8")
     # All records visible (default show_unknown=True, no author filter)
-    assert ">a1<" in body and ">b1<" in body and ">u1<" in body
+    assert ">a1<" in body
+    assert ">b1<" in body
+    assert ">u1<" in body
 
 
 # ---- AC5: pagination correctness ----------------------------------------

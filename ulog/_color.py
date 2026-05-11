@@ -5,11 +5,11 @@ stays usable zero-deps. The fallback supports the 8 basic ANSI colors
 + bold/dim styles — enough for level-prefix rendering without 24-bit
 truecolor accuracy.
 """
+
 from __future__ import annotations
 
 import os
-import sys
-from typing import Literal
+from typing import IO, Any, Literal
 
 ColorMode = Literal["auto", "always", "never"]
 
@@ -27,7 +27,7 @@ _FALLBACK_ANSI: dict[str, str] = {
 }
 
 
-def resolve_color(mode: ColorMode, stream) -> bool:
+def resolve_color(mode: ColorMode, stream: IO[Any]) -> bool:
     """Decide whether ANSI escapes should be emitted for this stream.
 
     `NO_COLOR` env var hard-clamps to False (per https://no-color.org).
@@ -42,9 +42,7 @@ def resolve_color(mode: ColorMode, stream) -> bool:
     # auto
     if not hasattr(stream, "isatty") or not stream.isatty():
         return False
-    if os.environ.get("TERM") == "dumb":
-        return False
-    return True
+    return os.environ.get("TERM") != "dumb"
 
 
 def have_ucolor() -> bool:

@@ -13,18 +13,20 @@ Sub-package home for v0.3 test integration and v0.5 replay tooling:
 
 The sub-package is loaded only when the ``[testing]`` extra is installed.
 """
+
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .test_event import test_event
 
-__all__ = ["test_event", "replay_records", "TestSession"]
+__all__ = ["TestSession", "replay_records", "test_event"]
 
 
 def replay_records(
-    records: "Sequence[Mapping[str, Any]]",
+    records: Sequence[Mapping[str, Any]],
 ) -> Any:
     """STUB — full implementation in v0.5 (Story 4.9).
 
@@ -53,6 +55,7 @@ class TestSession:
     placeholders; v0.5 (Story 4.9) will pin the final shape in its own
     architectural review.
     """
+
     name: str = ""
     records: list[Any] = field(default_factory=list)
 

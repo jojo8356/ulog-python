@@ -4,8 +4,10 @@ Covers the adapter layer (storage-agnostic shape) + the Django views
 (list, detail, docs) via the test client. Each test creates a tiny
 SQLite fixture in tmp_path so tests are hermetic.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -29,10 +31,8 @@ def _isolate():
     yield
     for h in list(logging.getLogger().handlers):
         if getattr(h, "_ulog_managed", False):
-            try:
+            with contextlib.suppress(Exception):
                 h.close()
-            except Exception:
-                pass
             logging.getLogger().removeHandler(h)
     ulog.clear()
 
@@ -191,9 +191,7 @@ def test_jsonl_adapter_ghost_counts(tmp_path):
     assert res.total == 2  # 2 INFO records
     assert res.level_counts.get("INFO") == 2
     # Ghost: ERROR row must still show its count (1)
-    assert res.level_counts.get("ERROR") == 1, (
-        "JSONL adapter ghost-count broken on the level axis"
-    )
+    assert res.level_counts.get("ERROR") == 1, "JSONL adapter ghost-count broken on the level axis"
 
 
 def test_jsonl_adapter_round_trip(tmp_path):
@@ -257,6 +255,7 @@ def _make_django_client(db_path: Path):
 
     import django
     from django.apps import apps as django_apps
+
     if not django_apps.ready:
         django.setup()
     # `settings.ULOG_LOGS_PATH` is resolved at module load (env-var read once),
@@ -264,13 +263,16 @@ def _make_django_client(db_path: Path):
     # point at the original DB without this explicit update. Force-sync from
     # the env var we just set so each test sees its own fixture DB.
     from django.conf import settings as _dj_settings
+
     _dj_settings.ULOG_LOGS_PATH = str(db_path)
     _dj_settings.ULOG_LOGS_KIND = "sqlite"
     # Reset module-level adapter cache (tests reuse fixtures)
     from ulog.web.viewer import views as _views
+
     _views._adapter = None
 
     from django.test import Client
+
     return Client()
 
 
@@ -352,7 +354,8 @@ def test_docs_page_renders_markdown(sqlite_fixture):
     assert "<h1" in body  # rendered heading
     assert "ulog-web" in body
     # Code-block class from our minimal markdown renderer
-    assert "<pre" in body and "<code" in body
+    assert "<pre" in body
+    assert "<code" in body
 
 
 def test_docs_unknown_page_404(sqlite_fixture):
@@ -378,7 +381,6 @@ def _make_test_records_db(tmp_path: Path) -> Path:
     - 1 errored test (fixture failure) in test_b.py
     Plus a few `myapp` application records for compose-with-existing-filters tests.
     """
-    import sqlite3
 
     db = tmp_path / "tests.sqlite"
     # Bootstrap a real SQLite via ulog.setup so the schema is correct.
@@ -391,9 +393,15 @@ def _make_test_records_db(tmp_path: Path) -> Path:
         ulog.bind(test_id=test_id)
         log.info("test started")
         level = logging.ERROR if outcome in ("failed", "errored") else logging.INFO
-        log.log(level, f"test {outcome}", extra={
-            "outcome": outcome, "duration_s": duration_s, "phase": "call",
-        })
+        log.log(
+            level,
+            f"test {outcome}",
+            extra={
+                "outcome": outcome,
+                "duration_s": duration_s,
+                "phase": "call",
+            },
+        )
         ulog.unbind("test_id")
 
     emit_test("tests/test_a.py::test_fast", "passed", 0.024)
@@ -510,11 +518,13 @@ def test_existing_filters_compose_with_failed_only(tmp_path):
     db = _make_test_records_db(tmp_path)
     ad = SQLiteAdapter(db)
     # All three filters: failed_only + level=ERROR + logger=ulog.test
-    res = ad.query(Filters(
-        failed_only=True,
-        levels=["ERROR"],
-        loggers=["ulog.test"],
-    ))
+    res = ad.query(
+        Filters(
+            failed_only=True,
+            levels=["ERROR"],
+            loggers=["ulog.test"],
+        )
+    )
     # Of the 5 tests in the fixture, 2 have failed/errored outcome AND emit
     # at level ERROR (failed + errored) — both are also on logger 'ulog.test'.
     assert res.total == 2, f"expected 2 records; got {res.total}"
@@ -526,7 +536,7 @@ def test_existing_filters_compose_with_failed_only(tmp_path):
 
 def test_slowest_only_orders_by_duration_desc(tmp_path):
     """AC4 / FR64 — `?slowest_only=1` orders by duration_s DESC and caps at 10."""
-    from ulog.web.viewer.adapters import Filters, SQLiteAdapter, SLOWEST_TOP_N
+    from ulog.web.viewer.adapters import SLOWEST_TOP_N, Filters, SQLiteAdapter
 
     # Build a fixture with 12 outcome records of varying duration; expect
     # SLOWEST_TOP_N=10 returned in DESC order.
@@ -568,9 +578,15 @@ def test_failed_and_slowest_combine(tmp_path):
         ulog.bind(test_id=tid)
         log.info("test started")
         level = logging.ERROR if outcome in ("failed", "errored") else logging.INFO
-        log.log(level, f"test {outcome}", extra={
-            "outcome": outcome, "duration_s": dur, "phase": "call",
-        })
+        log.log(
+            level,
+            f"test {outcome}",
+            extra={
+                "outcome": outcome,
+                "duration_s": dur,
+                "phase": "call",
+            },
+        )
         ulog.unbind("test_id")
 
     for i in range(5):
@@ -659,9 +675,15 @@ def _make_test_records_with_app_logs(tmp_path: Path) -> Path:
         app.info(f"app log for {test_id}")  # Story 1.4 propagation: gets test_id
         # Plugin emits failed/errored outcomes at ERROR level (Story 1.2 contract)
         level = logging.ERROR if outcome in ("failed", "errored") else logging.INFO
-        plugin.log(level, f"test {outcome}", extra={
-            "outcome": outcome, "duration_s": 0.01, "phase": "call",
-        })
+        plugin.log(
+            level,
+            f"test {outcome}",
+            extra={
+                "outcome": outcome,
+                "duration_s": 0.01,
+                "phase": "call",
+            },
+        )
         ulog.unbind("test_id")
 
     emit("tests/test_a.py::test_one", "passed")
@@ -736,11 +758,13 @@ def test_test_id_filter_composes_with_failed_only_and_level(tmp_path):
     db = _make_test_records_with_app_logs(tmp_path)
     ad = SQLiteAdapter(db)
     # test_two is the failing one; outcome record is at ERROR
-    res = ad.query(Filters(
-        test_id="tests/test_a.py::test_two",
-        failed_only=True,
-        levels=["ERROR"],
-    ))
+    res = ad.query(
+        Filters(
+            test_id="tests/test_a.py::test_two",
+            failed_only=True,
+            levels=["ERROR"],
+        )
+    )
     # Only the outcome ERROR record matches all 3 filters
     assert res.total == 1, f"got {res.total} records"
     r = res.records[0]
@@ -761,7 +785,7 @@ def test_test_id_filter_active_row_visually_distinguished(tmp_path):
     resp = client.get(f"/?test_id={encoded}")
     body = resp.content.decode()
     assert 'data-active-test="true"' in body, (
-        "AC6: active sidebar row must carry data-active-test=\"true\""
+        'AC6: active sidebar row must carry data-active-test="true"'
     )
 
 
@@ -770,7 +794,7 @@ def test_test_id_filter_anchor_preserves_other_filters(tmp_path):
     active preserves those filters in the resulting URL."""
     import html
     import re
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import parse_qs, urlparse
 
     db = _make_test_records_with_app_logs(tmp_path)
     client = _make_django_client(db)
@@ -795,10 +819,10 @@ def test_test_id_filter_anchor_drops_page_param(tmp_path):
     """AC7 / VS-step C2 — sidebar anchors must NOT preserve `?page=N`.
     Clicking a test from page 5 should reset to page 1, not land on a stale
     page-5 view of the (typically smaller) filtered set."""
-    import re
-    from urllib.parse import urlparse, parse_qs
-
     import html
+    import re
+    from urllib.parse import parse_qs, urlparse
+
     db = _make_test_records_with_app_logs(tmp_path)
     client = _make_django_client(db)
     resp = client.get("/?page=5")
@@ -807,9 +831,7 @@ def test_test_id_filter_anchor_drops_page_param(tmp_path):
     assert matches
     parsed = urlparse(html.unescape(matches[0]))
     qs = parse_qs(parsed.query)
-    assert "page" not in qs, (
-        f"AC7: sidebar anchor must drop ?page; got qs={qs}"
-    )
+    assert "page" not in qs, f"AC7: sidebar anchor must drop ?page; got qs={qs}"
 
 
 def test_test_id_filter_parametrized_id_url_encoded(tmp_path):
@@ -821,9 +843,14 @@ def test_test_id_filter_parametrized_id_url_encoded(tmp_path):
 
     ulog.bind(test_id="tests/test_p.py::test_param[True-1]")
     log.info("test started")
-    log.info("test passed", extra={
-        "outcome": "passed", "duration_s": 0.01, "phase": "call",
-    })
+    log.info(
+        "test passed",
+        extra={
+            "outcome": "passed",
+            "duration_s": 0.01,
+            "phase": "call",
+        },
+    )
     ulog.unbind("test_id")
     for h in logging.getLogger().handlers:
         h.flush()
@@ -861,10 +888,10 @@ def test_test_id_does_not_poison_ghost_counts(tmp_path):
         f"with_test_id={res_with_test_id.level_counts!r}"
     )
     assert res_with_test_id.sector_counts == res_unfiltered.sector_counts, (
-        f"sector ghost-counts poisoned by test_id"
+        "sector ghost-counts poisoned by test_id"
     )
     assert res_with_test_id.file_counts == res_unfiltered.file_counts, (
-        f"file ghost-counts poisoned by test_id"
+        "file ghost-counts poisoned by test_id"
     )
 
 
@@ -922,6 +949,7 @@ def _find_first_record_id_for_test_id(db: Path, test_id: str) -> int:
     """Helper: read SQLite DB, return the id of the first record with the
     matching context.test_id. Used to construct detail-view URLs."""
     import sqlite3
+
     conn = sqlite3.connect(str(db))
     try:
         conn.row_factory = sqlite3.Row
@@ -940,9 +968,7 @@ def test_detail_view_renders_test_context_panel_when_record_has_test_id(tmp_path
     """AC1, AC6 — detail view renders the panel with outcome badge when the
     record has a test_id."""
     db = _make_test_records_with_app_logs(tmp_path)
-    record_id = _find_first_record_id_for_test_id(
-        db, "tests/test_a.py::test_one"
-    )
+    record_id = _find_first_record_id_for_test_id(db, "tests/test_a.py::test_one")
     assert record_id > 0
 
     client = _make_django_client(db)
@@ -977,12 +1003,10 @@ def test_detail_view_test_context_link_uses_test_id_filter(tmp_path):
     """AC3 — 'view all records' anchor href is `/?test_id=<urlencoded>`."""
     import html
     import re
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import parse_qs, urlparse
 
     db = _make_test_records_with_app_logs(tmp_path)
-    record_id = _find_first_record_id_for_test_id(
-        db, "tests/test_a.py::test_one"
-    )
+    record_id = _find_first_record_id_for_test_id(db, "tests/test_a.py::test_one")
     client = _make_django_client(db)
     resp = client.get(f"/r/{record_id}/")
     body = resp.content.decode()
@@ -991,7 +1015,7 @@ def test_detail_view_test_context_link_uses_test_id_filter(tmp_path):
     # text contains the link label
     pattern = r'href="([^"]+)"[^>]*>\s*\n?\s*view all records for this test'
     matches = re.findall(pattern, body)
-    assert matches, f"expected 'view all records' anchor in body"
+    assert matches, "expected 'view all records' anchor in body"
     href = html.unescape(matches[0])
     parsed = urlparse(href)
     qs = parse_qs(parsed.query)
@@ -1003,12 +1027,10 @@ def test_detail_view_errors_warnings_link_combines_filters(tmp_path):
     AND level=WARNING (multi-value level filter)."""
     import html
     import re
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import parse_qs, urlparse
 
     db = _make_test_records_with_app_logs(tmp_path)
-    record_id = _find_first_record_id_for_test_id(
-        db, "tests/test_a.py::test_one"
-    )
+    record_id = _find_first_record_id_for_test_id(db, "tests/test_a.py::test_one")
     client = _make_django_client(db)
     resp = client.get(f"/r/{record_id}/")
     body = resp.content.decode()
@@ -1064,9 +1086,7 @@ def test_detail_view_total_records_count_matches_test_id_records(tmp_path):
     """AC5 — rendered HTML shows the correct count: 3 records for test_one
     (plugin started + app log + plugin outcome per fixture)."""
     db = _make_test_records_with_app_logs(tmp_path)
-    record_id = _find_first_record_id_for_test_id(
-        db, "tests/test_a.py::test_one"
-    )
+    record_id = _find_first_record_id_for_test_id(db, "tests/test_a.py::test_one")
     client = _make_django_client(db)
     resp = client.get(f"/r/{record_id}/")
     body = resp.content.decode()
@@ -1089,7 +1109,8 @@ def test_test_integration_doc_page_renders(sqlite_fixture):
     # AC3: structural elements
     assert "<h1" in body
     assert "<h2" in body
-    assert "<pre" in body and "<code" in body
+    assert "<pre" in body
+    assert "<code" in body
     # AC1: required sections
     assert "Install" in body
     assert "CLI flags" in body

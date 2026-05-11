@@ -4,13 +4,14 @@ Schema (FR22): single table, indexed for the common filter axes
 (ts, level, logger, file). Bound context + exception serialized as
 JSON columns. SQLite by default; Postgres/MySQL via URL.
 """
+
 from __future__ import annotations
 
 import atexit
-import json
+import contextlib
+import datetime
 import logging
 import threading
-import time
 import traceback
 from pathlib import Path
 from typing import Any
@@ -20,10 +21,28 @@ from ..context import get_bound
 # Reserved LogRecord keys (matches CSVHandler / JsonFormatter).
 _RESERVED = frozenset(
     {
-        "args", "asctime", "created", "exc_info", "exc_text", "filename",
-        "funcName", "levelname", "levelno", "lineno", "message", "module",
-        "msecs", "msg", "name", "pathname", "process", "processName",
-        "relativeCreated", "stack_info", "thread", "threadName",
+        "args",
+        "asctime",
+        "created",
+        "exc_info",
+        "exc_text",
+        "filename",
+        "funcName",
+        "levelname",
+        "levelno",
+        "lineno",
+        "message",
+        "module",
+        "msecs",
+        "msg",
+        "name",
+        "pathname",
+        "process",
+        "processName",
+        "relativeCreated",
+        "stack_info",
+        "thread",
+        "threadName",
         "taskName",
     }
 )
@@ -126,7 +145,7 @@ class SQLHandler(logging.Handler):
                 buf_len = len(self._buffer)
             if buf_len >= self._batch_size:
                 self.flush()
-        except Exception:  # noqa: BLE001
+        except Exception:
             self.handleError(record)
 
     def flush(self) -> None:
@@ -207,10 +226,7 @@ class SQLHandler(logging.Handler):
             exc_payload = {
                 "type": etype.__name__ if etype else None,
                 "msg": str(evalue) if evalue else None,
-                "tb": [
-                    line.rstrip("\n")
-                    for line in (traceback.format_tb(etb) if etb else [])
-                ],
+                "tb": [line.rstrip("\n") for line in (traceback.format_tb(etb) if etb else [])],
             }
         # JSON columns can hold dicts directly with SQLAlchemy 2.x; for
         # SQLite the driver serializes via json.dumps under the hood.
@@ -226,15 +242,11 @@ class SQLHandler(logging.Handler):
         }
 
     def _safe_flush(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self.flush()
-        except Exception:  # noqa: BLE001
-            pass
 
 
-def _ts_aware(epoch: float):
+def _ts_aware(epoch: float) -> datetime.datetime:
     """Convert a `time.time()` float to a naive UTC datetime suitable
     for SQLAlchemy's `DateTime(timezone=False)` column."""
-    import datetime as _dt
-
-    return _dt.datetime.fromtimestamp(epoch, tz=_dt.timezone.utc).replace(tzinfo=None)
+    return datetime.datetime.fromtimestamp(epoch, tz=datetime.timezone.utc).replace(tzinfo=None)

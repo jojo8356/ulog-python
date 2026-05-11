@@ -10,8 +10,10 @@
 `get_logger()` and `set_level()` are thin stdlib passthroughs so users
 keep the standard `logging.Logger` API.
 """
+
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import sys
@@ -40,9 +42,7 @@ def default_db_path(profile: str = "prod") -> Path:
     pytest). Both can be opened independently in `ulog-web`.
     """
     if profile not in PROFILES:
-        raise ValueError(
-            f"unknown profile {profile!r}; valid: {', '.join(PROFILES)}"
-        )
+        raise ValueError(f"unknown profile {profile!r}; valid: {', '.join(PROFILES)}")
     cache_dir = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
     return cache_dir / "ulog" / f"{profile}.sqlite"
 
@@ -122,13 +122,9 @@ def setup(
     Returns the configured `logging.Logger`.
     """
     if level not in LOG_LEVELS and not isinstance(level, int):
-        raise ValueError(
-            f"unknown log level {level!r}; valid: {', '.join(LOG_LEVELS)}"
-        )
+        raise ValueError(f"unknown log level {level!r}; valid: {', '.join(LOG_LEVELS)}")
     if color not in ("auto", "always", "never"):
-        raise ValueError(
-            f"unknown color mode {color!r}; valid: 'auto', 'always', 'never'"
-        )
+        raise ValueError(f"unknown color mode {color!r}; valid: 'auto', 'always', 'never'")
 
     use_stream = stream if stream is not None else sys.stderr
     color_on = resolve_color(color, use_stream)
@@ -142,9 +138,7 @@ def setup(
     #     Pick this for run scripts / demos that want the right thing
     #     to happen in both environments without thinking about it.
     if profile is not None and profile not in ProfileChoice:
-        raise ValueError(
-            f"unknown profile {profile!r}; valid: {', '.join(ProfileChoice)}"
-        )
+        raise ValueError(f"unknown profile {profile!r}; valid: {', '.join(ProfileChoice)}")
     if profile == "auto":
         profile = _auto_profile()
     if profile is not None:
@@ -164,10 +158,8 @@ def setup(
     # handler we drop releases its file/DB connection cleanly.
     for h in list(logger.handlers):
         if getattr(h, "_ulog_managed", False):
-            try:
+            with contextlib.suppress(Exception):
                 h.close()
-            except Exception:  # noqa: BLE001
-                pass
             logger.removeHandler(h)
 
     for kind in handler_kinds:
@@ -218,23 +210,17 @@ def _build_handler(
         return SQLHandler(sql_url, table=sql_table, batch_size=sql_batch_size)
     if kind == "json":
         if json_path is None:
-            raise ValueError(
-                "handlers=['json'] requires a `json_path=` argument."
-            )
+            raise ValueError("handlers=['json'] requires a `json_path=` argument.")
         from .handlers.json_line import JSONLineHandler
 
         return JSONLineHandler(json_path)
     if kind == "csv":
         if csv_path is None:
-            raise ValueError(
-                "handlers=['csv'] requires a `csv_path=` argument."
-            )
+            raise ValueError("handlers=['csv'] requires a `csv_path=` argument.")
         from .handlers.csv_file import CSVHandler
 
         return CSVHandler(csv_path)
-    raise ValueError(
-        f"unknown handler kind {kind!r}; valid: 'stream', 'sql', 'json', 'csv'"
-    )
+    raise ValueError(f"unknown handler kind {kind!r}; valid: 'stream', 'sql', 'json', 'csv'")
 
 
 def get_logger(name: str | None = None) -> logging.Logger:

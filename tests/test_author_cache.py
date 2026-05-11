@@ -1,4 +1,5 @@
 """Story 2.4 — authors cache table + sidecar SQLite for JSONL/CSV."""
+
 from __future__ import annotations
 
 import io
@@ -20,7 +21,6 @@ from ulog.web.viewer.blame import (
     _persist_authors,
     build_index_at_startup,
     cache_path_for,
-    get_global_index,
     set_global_index,
 )
 
@@ -41,8 +41,13 @@ def _setup_repo(tmp_path: Path) -> Path:
     subprocess.run(
         ["git", "commit", "-q", "-m", "init"],
         cwd=tmp_path,
-        env={**os.environ, "GIT_AUTHOR_NAME": "Alice", "GIT_AUTHOR_EMAIL": "alice@example.com",
-             "GIT_COMMITTER_NAME": "Alice", "GIT_COMMITTER_EMAIL": "alice@example.com"},
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "Alice",
+            "GIT_AUTHOR_EMAIL": "alice@example.com",
+            "GIT_COMMITTER_NAME": "Alice",
+            "GIT_COMMITTER_EMAIL": "alice@example.com",
+        },
         check=True,
     )
     return tmp_path
@@ -51,11 +56,21 @@ def _setup_repo(tmp_path: Path) -> Path:
 def _jsonl_log(repo: Path) -> Path:
     log = repo / "logs.jsonl"
     log.write_text(
-        "\n".join([
-            json.dumps({"ts": "2026-01-01T00:00:00Z", "level": "INFO", "logger": "x",
-                       "msg": f"line{i}", "file": "foo.py", "line": i})
-            for i in (1, 2, 3)
-        ]),
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "ts": "2026-01-01T00:00:00Z",
+                        "level": "INFO",
+                        "logger": "x",
+                        "msg": f"line{i}",
+                        "file": "foo.py",
+                        "line": i,
+                    }
+                )
+                for i in (1, 2, 3)
+            ]
+        ),
         encoding="utf-8",
     )
     return log
@@ -70,6 +85,7 @@ def test_persist_creates_authors_table_with_correct_schema(tmp_path):
     idx = AuthorIndex("/tmp")
     a = Author(name="A", email="a@x", sha="abc" * 13 + "a", ts=1700000000)
     from ulog.web.viewer.blame import _FileCache
+
     idx._cache["foo.py"] = _FileCache(mtime=0.0, blames={5: a})
     n = _persist_authors(idx, db)
     assert n == 1
@@ -77,7 +93,12 @@ def test_persist_creates_authors_table_with_correct_schema(tmp_path):
     try:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(authors)").fetchall()]
         assert set(cols) == {
-            "file", "line", "author_name", "author_email", "commit_sha", "commit_ts"
+            "file",
+            "line",
+            "author_name",
+            "author_email",
+            "commit_sha",
+            "commit_ts",
         }
         # PK = (file, line)
         pk_rows = [r for r in conn.execute("PRAGMA table_info(authors)").fetchall() if r[5] > 0]
@@ -94,6 +115,7 @@ def test_persist_then_load_roundtrip(tmp_path):
     a = Author(name="Alice", email="alice@x", sha="abc" * 13 + "a", ts=1700000000)
     b = Author(name="Bob", email="bob@x", sha="def" * 13 + "f", ts=1700000100)
     from ulog.web.viewer.blame import _FileCache
+
     idx_a._cache["foo.py"] = _FileCache(mtime=0.0, blames={1: a, 2: b})
     idx_a._cache["bar.py"] = _FileCache(mtime=0.0, blames={10: a})
     assert _persist_authors(idx_a, db) == 3
@@ -159,7 +181,8 @@ def test_build_persists_then_subsequent_load_uses_cache(tmp_path):
     idx2 = build_index_at_startup(adapter2, repo, progress_stream=sink2)
     assert "from cache" in sink2.getvalue()
     a = idx2.author_for("foo.py", 2)
-    assert a is not None and a.email == "alice@example.com"
+    assert a is not None
+    assert a.email == "alice@example.com"
 
 
 def test_rebuild_flag_drops_cache(tmp_path):

@@ -94,6 +94,17 @@ testpaths = ["tests"]
 strict = true
 exclude = ["scripts/", "vendor/"]
 
+# Django ships without py.typed; django-stubs requires a runtime settings
+# bootstrap we don't want as a dev dependency. Same story for ucolor
+# (vendored as a submodule, gracefully optional at runtime).
+[[tool.mypy.overrides]]
+module = [
+    "django.*",
+    "ucolor",
+    "ucolor.*",
+]
+ignore_missing_imports = true
+
 # ---- Ruff: lint + format (replaces black + isort + flake8 + pyupgrade) ----
 [tool.ruff]
 line-length = 100
@@ -125,6 +136,9 @@ ignore = [
 "tests/**" = ["B011", "PT012"]   # tests legitimately use assert + multi-statement raises
 "scripts/**" = ["B007"]          # scripts have one-off loops with unused vars
 
+[tool.ruff.lint.isort]
+known-first-party = ["ulog"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
@@ -135,8 +149,16 @@ known_first_party = ["ulog"]
 extend_exclude = ["vendor", "scripts", "_bmad", "_bmad-output"]
 
 [tool.deptry.per_rule_ignores]
-# Used as Django INSTALLED_APPS / middleware, never imported in our code.
-DEP002 = ["django-lucide", "django-browser-reload", "pytest-xdist"]
+# Used as Django INSTALLED_APPS / middleware, or wired through tool
+# entry points / CLI — never imported from our source code.
+DEP002 = [
+    "django-lucide", "django-browser-reload", "pytest-xdist",
+    # Dev tools — invoked as CLIs, not imported.
+    "ruff", "mypy", "deptry", "pip-audit", "pre-commit", "playwright",
+]
+# `ucolor` is vendored as a git submodule under vendor/ucolor-python/
+# and imported lazily via try/except — not a PyPI dependency.
+DEP001 = ["ucolor"]
 # Optional/lazy imports — deptry can't see the try/except gates.
 DEP004 = ["sqlalchemy", "playwright"]
 

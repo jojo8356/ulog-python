@@ -1,4 +1,5 @@
 """ULog viewer URL routes."""
+
 from __future__ import annotations
 
 from django.conf import settings
@@ -30,6 +31,7 @@ urlpatterns = [
 if settings.DEBUG:
     try:
         import django_browser_reload  # noqa: F401
+
         urlpatterns += [path("__reload__/", include("django_browser_reload.urls"))]
     except ImportError:
         pass

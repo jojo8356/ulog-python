@@ -33,19 +33,23 @@ correctly. The inner block uses ``ulog.context(test_id=...)`` semantics
 inner exit. Records emitted between inner exit and outer exit carry the
 outer ``test_id``; records emitted after outer exit carry no ``test_id``.
 """
+
 from __future__ import annotations
 
 import logging
 import time
 import traceback
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
+
 
 # Lazy import — `ulog.testing` is part of `ulog`, so direct import at
 # module top would create a partial-import edge if `ulog/__init__.py`
 # itself reaches into this submodule. Keep `ulog` deferred to first use.
 def _ulog() -> Any:
     import ulog
+
     return ulog
 
 
@@ -85,11 +89,7 @@ class _TestEventHandle:
         if self._outcome_emitted:
             return  # idempotent — first call wins
         log = _ulog().get_logger("ulog.test")
-        level = (
-            logging.ERROR
-            if outcome in ("failed", "errored")
-            else logging.INFO
-        )
+        level = logging.ERROR if outcome in ("failed", "errored") else logging.INFO
         log.log(
             level,
             f"test {outcome}",
@@ -122,9 +122,7 @@ def test_event(name: str) -> Iterator[_TestEventHandle]:
       outcome with measured duration.
     """
     if not name:
-        raise ValueError(
-            "test_event(name) requires a non-empty test_id; got empty string"
-        )
+        raise ValueError("test_event(name) requires a non-empty test_id; got empty string")
 
     ulog = _ulog()
     log = ulog.get_logger("ulog.test")
@@ -159,10 +157,7 @@ def test_event(name: str) -> Iterator[_TestEventHandle]:
             # `__cause__` / `__context__` chains are captured correctly
             # by `TracebackException.from_exception` (review patch P1).
             raw = traceback.format_exception(exc)
-            tb_lines = [
-                line for entry in raw
-                for line in entry.rstrip("\n").splitlines()
-            ]
+            tb_lines = [line for entry in raw for line in entry.rstrip("\n").splitlines()]
             log.error(
                 f"{type(exc).__name__}: {exc}",
                 extra={

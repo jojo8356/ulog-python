@@ -1,4 +1,5 @@
 """Custom Django template filters for the ulog viewer (Story 1.6+)."""
+
 from __future__ import annotations
 
 from django import template
@@ -6,7 +7,7 @@ from django import template
 register = template.Library()
 
 
-@register.filter(name="test_duration_fmt")
+@register.filter(name="test_duration_fmt")  # type: ignore[untyped-decorator]
 def test_duration_fmt(seconds: object) -> str:
     """Format a `duration_s` float per Story 1.6 AC8.
 

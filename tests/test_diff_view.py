@@ -1,4 +1,5 @@
 """Story 2.9 — `/diff/<sha>` view + sha validation (FR81 / NFR-SEC-30)."""
+
 from __future__ import annotations
 
 import os
@@ -22,12 +23,21 @@ def repo_with_commits(tmp_path: Path) -> tuple[Path, str]:
     subprocess.run(
         ["git", "commit", "-q", "-m", "init"],
         cwd=tmp_path,
-        env={**os.environ, "GIT_AUTHOR_NAME": "Alice", "GIT_AUTHOR_EMAIL": "alice@example.com",
-             "GIT_COMMITTER_NAME": "Alice", "GIT_COMMITTER_EMAIL": "alice@example.com"},
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "Alice",
+            "GIT_AUTHOR_EMAIL": "alice@example.com",
+            "GIT_COMMITTER_NAME": "Alice",
+            "GIT_COMMITTER_EMAIL": "alice@example.com",
+        },
         check=True,
     )
     sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True, check=True,
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
     return tmp_path, sha
 
@@ -38,6 +48,7 @@ def sqlite_fixture(tmp_path: Path) -> Path:
     ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
     ulog.get_logger("svc").info("hi")
     import logging
+
     for h in logging.getLogger().handlers:
         h.flush()
     ulog.clear()
@@ -51,14 +62,18 @@ def _make_django_client(db_path: Path):
     os.environ["ULOG_DEBUG"] = "0"
     import django
     from django.apps import apps as django_apps
+
     if not django_apps.ready:
         django.setup()
     from django.conf import settings as _dj_settings
+
     _dj_settings.ULOG_LOGS_PATH = str(db_path)
     _dj_settings.ULOG_LOGS_KIND = "sqlite"
     from ulog.web.viewer import views as _views
+
     _views._adapter = None
     from django.test import Client
+
     return Client()
 
 
@@ -152,19 +167,28 @@ def test_diff_view_short_sha_resolves(sqlite_fixture, repo_with_commits, monkeyp
 
 def test_diff_view_html_escapes_content(sqlite_fixture, repo_with_commits, monkeypatch):
     """Decision D4 — content is HTML-escaped via Django auto-escape."""
-    repo, sha = repo_with_commits
+    repo, _sha = repo_with_commits
     # Add a file with HTML-like content + commit
     (repo / "evil.py").write_text("<script>alert('xss')</script>\n", encoding="utf-8")
     subprocess.run(["git", "add", "evil.py"], cwd=repo, check=True)
     subprocess.run(
         ["git", "commit", "-q", "-m", "<script>"],
         cwd=repo,
-        env={**os.environ, "GIT_AUTHOR_NAME": "A", "GIT_AUTHOR_EMAIL": "a@x",
-             "GIT_COMMITTER_NAME": "A", "GIT_COMMITTER_EMAIL": "a@x"},
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "A",
+            "GIT_AUTHOR_EMAIL": "a@x",
+            "GIT_COMMITTER_NAME": "A",
+            "GIT_COMMITTER_EMAIL": "a@x",
+        },
         check=True,
     )
     new_sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True,
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
     monkeypatch.setenv("ULOG_AUTHOR_REPO", str(repo))
     client = _make_django_client(sqlite_fixture)

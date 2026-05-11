@@ -1,4 +1,5 @@
 """Story 2.8 — detail-view "Authored by" panel."""
+
 from __future__ import annotations
 
 import os
@@ -30,6 +31,7 @@ def sqlite_fixture(tmp_path: Path) -> Path:
     ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
     ulog.get_logger("svc").info("hello world")
     import logging
+
     for h in logging.getLogger().handlers:
         h.flush()
     ulog.clear()
@@ -43,14 +45,18 @@ def _make_django_client(db_path: Path):
     os.environ["ULOG_DEBUG"] = "0"
     import django
     from django.apps import apps as django_apps
+
     if not django_apps.ready:
         django.setup()
     from django.conf import settings as _dj_settings
+
     _dj_settings.ULOG_LOGS_PATH = str(db_path)
     _dj_settings.ULOG_LOGS_KIND = "sqlite"
     from ulog.web.viewer import views as _views
+
     _views._adapter = None
     from django.test import Client
+
     return Client()
 
 
@@ -99,13 +105,15 @@ def test_authored_by_panel_renders(sqlite_fixture, tmp_path):
         ts=int(time.time()) - 6 * 86400,
     )
     # Replace sha length to be exactly 40 chars
-    a = Author(name="Alice", email="alice@example.com", sha="a" * 40, ts=int(time.time()) - 6 * 86400)
+    a = Author(
+        name="Alice", email="alice@example.com", sha="a" * 40, ts=int(time.time()) - 6 * 86400
+    )
     basename = "test_authors_detail_panel.py"  # the test file emitting the log
     idx = AuthorIndex(tmp_path)
     stub = tmp_path / basename
     stub.write_text("stub\n", encoding="utf-8")
     mtime = os.stat(stub).st_mtime
-    idx._cache[basename] = _FileCache(mtime=mtime, blames={i: a for i in range(1, 500)})
+    idx._cache[basename] = _FileCache(mtime=mtime, blames=dict.fromkeys(range(1, 500), a))
     set_global_index(idx)
 
     client = _make_django_client(sqlite_fixture)

@@ -24,6 +24,7 @@ Examples
 
     ulog.clear()          # unbinds everything in this context
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -34,9 +35,10 @@ from typing import Any
 # Single ContextVar holding a snapshot dict. Each `bind` replaces it
 # with a NEW dict (immutable-style) so concurrent tasks see consistent
 # state — `contextvars.copy_context().run(...)` semantics are preserved.
-_bound: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "ulog_bound", default={}
-)
+# No `default=`: a shared mutable default on a ContextVar would be a
+# footgun across contexts. We pass `{}` at each `.get()` site instead,
+# so a fresh empty dict is materialized only when needed.
+_bound: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar("ulog_bound")
 
 
 def bind(**fields: Any) -> None:
@@ -48,7 +50,7 @@ def bind(**fields: Any) -> None:
     """
     if not fields:
         return
-    current = _bound.get()
+    current = _bound.get({})
     merged = {**current, **fields}
     _bound.set(merged)
 
@@ -57,7 +59,7 @@ def unbind(*keys: str) -> None:
     """Remove the given keys from the bound dict, if present."""
     if not keys:
         return
-    current = _bound.get()
+    current = _bound.get({})
     remaining = {k: v for k, v in current.items() if k not in keys}
     _bound.set(remaining)
 
@@ -69,14 +71,14 @@ def clear() -> None:
 
 def get_bound() -> dict[str, Any]:
     """Return a copy of the currently bound fields. Read-only."""
-    return dict(_bound.get())
+    return dict(_bound.get({}))
 
 
 @contextlib.contextmanager
 def context(**fields: Any) -> Iterator[None]:
     """Block-scoped `bind`. Restores the previous bound dict on exit
     (including exception paths)."""
-    token = _bound.set({**_bound.get(), **fields})
+    token = _bound.set({**_bound.get({}), **fields})
     try:
         yield
     finally:

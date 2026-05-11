@@ -1,4 +1,5 @@
 """Tests for ulog.bind / context / unbind / clear (FR4, FR5)."""
+
 from __future__ import annotations
 
 import io

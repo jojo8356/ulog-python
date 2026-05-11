@@ -18,6 +18,7 @@ Setup (one-time, in venv):
 Usage:
   python3 scripts/qa_screenshots.py [--demo-dir /tmp/ulog-demo] [--no-optimize]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -47,7 +48,7 @@ def _wait_for_server(port: int, *, timeout_s: float = 20.0) -> None:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=2) as r:
                 if r.status == 200:
                     return
-        except Exception:  # noqa: BLE001
+        except Exception:
             time.sleep(0.3)
     raise RuntimeError(f"viewer never responded on port {port} within {timeout_s}s")
 
@@ -67,7 +68,10 @@ def _discover_ids(demo_dir: Path) -> dict[str, object]:
             out["sample_test_id"] = str(row[1])
     proc = subprocess.run(
         ["git", "rev-parse", "HEAD"],
-        cwd=demo_dir, capture_output=True, text=True, check=True,
+        cwd=demo_dir,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     out["sha"] = proc.stdout.strip()
     return out
@@ -84,7 +88,7 @@ def _qs_test_id(test_id: str) -> str:
 # Each entry: slug → dict(path, desc, kind, **kind-specific args)
 #   kind = "full"     — page.screenshot(full_page=True)
 #   kind = "viewport" — page.screenshot()  (viewport-only, default size)
-#   kind = "narrow"   — viewport=900×700 + page.screenshot()
+#   kind = "narrow"   — viewport=900x700 + page.screenshot()
 #   kind = "locator"  — page.locator(selector).screenshot()
 # All captures hit ?qa_screenshot=1 to suppress the tutorial overlay
 # AND the max-h-60 cap on the Tests sidebar.
@@ -128,7 +132,6 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
             "kind": "viewport",
             "desc": "QA checklist page itself",
         },
-
         # ------ Viewport-default (records list + sidebars) ---------------
         "section-1-1": {
             "path": "/?qa_screenshot=1",
@@ -160,14 +163,12 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
             "kind": "viewport",
             "desc": "Default records list — v0.1/v0.2 features baseline",
         },
-
         # ------ Narrow viewport (responsive scroll demo) -----------------
         "item-1.1-8": {
             "path": "/?qa_screenshot=1",
             "kind": "narrow",
             "desc": "Records table at viewport <1024px — horizontal scroll inside its pane",
         },
-
         # ------ Locator-only (sidebar Tests block, much smaller PNG) -----
         # Per user request: shoot ONLY the sidebar instead of the whole
         # page for the "tests visible" / "outcome mix" checks. Saves tons
@@ -176,9 +177,10 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
             "path": "/?qa_screenshot=1",
             "kind": "locator",
             "selector": "aside",  # the entire left sidebar
-            "viewport_h": 8000,   # let the aside extend past the default
-                                  # 1200px viewport so we capture all the
-                                  # way down to the last test file group
+            "auto_height": True,  # measure aside.scrollHeight after load and
+            # size the viewport to fit — avoids a fixed
+            # 8000px cap that silently crops once the
+            # sidebar grows past it.
             "desc": "Sidebar only — full height end-to-end (no truncation)",
         },
         "item-1.1-5-full": {
@@ -199,10 +201,12 @@ def _capture_all(catalog: dict[str, dict], port: int, out_dir: Path) -> int:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print("error: playwright not installed.\n"
-              "  pip install playwright\n"
-              "  python -m playwright install chromium",
-              file=sys.stderr)
+        print(
+            "error: playwright not installed.\n"
+            "  pip install playwright\n"
+            "  python -m playwright install chromium",
+            file=sys.stderr,
+        )
         return 0
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -229,11 +233,40 @@ def _capture_all(catalog: dict[str, dict], port: int, out_dir: Path) -> int:
                 try:
                     page.goto(url, wait_until="networkidle", timeout=15_000)
 
+                    if kind == "locator" and spec.get("auto_height"):
+                        # The aside is `h-[calc(100vh-3rem)] overflow-y-auto`
+                        # so its own bounding box == viewport height and
+                        # scrollHeight clamps to clientHeight. We need to
+                        # size the viewport from the aside's *inner*
+                        # content, not the aside itself: measure the
+                        # bottom edge of the last rendered child of
+                        # aside > form, plus the form's vertical padding.
+                        real_h = page.evaluate(
+                            """
+                            () => {
+                              const aside = document.querySelector('aside');
+                              if (!aside) return 0;
+                              const form = aside.querySelector('form') || aside;
+                              const asideTop = aside.getBoundingClientRect().top;
+                              const cs = getComputedStyle(aside);
+                              const padBottom = parseFloat(cs.paddingBottom) || 0;
+                              let bottom = 0;
+                              for (const el of form.children) {
+                                const b = el.getBoundingClientRect().bottom;
+                                if (b > bottom) bottom = b;
+                              }
+                              return Math.ceil(bottom - asideTop + padBottom);
+                            }
+                            """
+                        )
+                        if real_h and real_h > viewport["height"]:
+                            page.set_viewport_size(
+                                {"width": viewport["width"], "height": real_h + 50}
+                            )
+
                     if kind == "full":
                         page.screenshot(path=str(out_path), full_page=True)
-                    elif kind == "viewport":
-                        page.screenshot(path=str(out_path), full_page=False)
-                    elif kind == "narrow":
+                    elif kind == "viewport" or kind == "narrow":
                         page.screenshot(path=str(out_path), full_page=False)
                     elif kind == "locator":
                         sel = spec["selector"]
@@ -260,10 +293,11 @@ def _capture_all(catalog: dict[str, dict], port: int, out_dir: Path) -> int:
                         raise ValueError(f"unknown kind: {kind}")
 
                     size_kb = out_path.stat().st_size / 1024
-                    print(f"  ✓ {slug:22s} ({size_kb:7.1f} KB, {kind:8s}) — {desc}",
-                          file=sys.stderr)
+                    print(
+                        f"  ✓ {slug:22s} ({size_kb:7.1f} KB, {kind:8s}) — {desc}", file=sys.stderr
+                    )
                     n_ok += 1
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     print(f"  ✗ {slug:22s} FAILED: {e}", file=sys.stderr)
                 finally:
                     ctx.close()
@@ -278,16 +312,21 @@ def _capture_all(catalog: dict[str, dict], port: int, out_dir: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--demo-dir", type=Path, default=Path("/tmp/ulog-demo"),
-                        help="Directory with logs.sqlite + git repo (default: /tmp/ulog-demo)")
+    parser.add_argument(
+        "--demo-dir",
+        type=Path,
+        default=Path("/tmp/ulog-demo"),
+        help="Directory with logs.sqlite + git repo (default: /tmp/ulog-demo)",
+    )
     parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
-    parser.add_argument("--no-optimize", action="store_true",
-                        help="Skip pngquant post-processing")
+    parser.add_argument("--no-optimize", action="store_true", help="Skip pngquant post-processing")
     args = parser.parse_args()
 
     if not (args.demo_dir / "logs.sqlite").exists():
-        print(f"error: {args.demo_dir / 'logs.sqlite'} missing — run scripts/seed_demo_db.py first",
-              file=sys.stderr)
+        print(
+            f"error: {args.demo_dir / 'logs.sqlite'} missing — run scripts/seed_demo_db.py first",
+            file=sys.stderr,
+        )
         return 2
 
     ids = _discover_ids(args.demo_dir)
@@ -296,17 +335,27 @@ def main() -> int:
     port = _free_port()
     print(f"spawning viewer on port {port} ...", file=sys.stderr)
     proc = subprocess.Popen(
-        [sys.executable, "-m", "ulog.web.cli",
-         "--no-open", "--port", str(port),
-         "--repo", str(args.demo_dir),
-         str(args.demo_dir / "logs.sqlite")],
-        stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True,
+        [
+            sys.executable,
+            "-m",
+            "ulog.web.cli",
+            "--no-open",
+            "--port",
+            str(port),
+            "--repo",
+            str(args.demo_dir),
+            str(args.demo_dir / "logs.sqlite"),
+        ],
+        stderr=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        text=True,
     )
     try:
         _wait_for_server(port)
-        print(f"viewer ready on http://127.0.0.1:{port}/\n"
-              f"writing screenshots to {args.out_dir}/ ...",
-              file=sys.stderr)
+        print(
+            f"viewer ready on http://127.0.0.1:{port}/\nwriting screenshots to {args.out_dir}/ ...",
+            file=sys.stderr,
+        )
         n_ok = _capture_all(catalog, port, args.out_dir)
         print(f"\n{n_ok}/{len(catalog)} screenshots written", file=sys.stderr)
     finally:

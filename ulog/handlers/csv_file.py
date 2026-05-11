@@ -4,6 +4,7 @@ Columns: ts, level, logger, msg, file, line, context_json, exc_json
 (FR29). The bound context dict and exception info are JSON-stringified
 into single columns to keep CSV's flat-row contract.
 """
+
 from __future__ import annotations
 
 import csv
@@ -60,7 +61,9 @@ class CSVHandler(logging.Handler):
         # `newline=""` per stdlib csv docs — prevents extra \r on Windows
         is_new = not self._path.exists() or self._path.stat().st_size == 0
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._fh = open(self._path, "a", newline="", encoding="utf-8")
+        # Long-lived handle owned by the logging handler; closed in
+        # self.close(). Reopening per emit would tank perf.
+        self._fh = open(self._path, "a", newline="", encoding="utf-8")  # noqa: SIM115
         self._writer = csv.writer(self._fh, dialect=self._dialect)
         if is_new:
             self._writer.writerow(_COLUMNS)
@@ -85,8 +88,7 @@ class CSVHandler(logging.Handler):
                         "type": etype.__name__ if etype else None,
                         "msg": str(evalue) if evalue else None,
                         "tb": [
-                            line.rstrip("\n")
-                            for line in (traceback.format_tb(etb) if etb else [])
+                            line.rstrip("\n") for line in (traceback.format_tb(etb) if etb else [])
                         ],
                     },
                     ensure_ascii=False,
@@ -104,7 +106,7 @@ class CSVHandler(logging.Handler):
                 )
             )
             self._fh.flush()
-        except Exception:  # noqa: BLE001 — handler.emit MUST not raise
+        except Exception:
             self.handleError(record)
 
     def close(self) -> None:
@@ -121,10 +123,28 @@ class CSVHandler(logging.Handler):
 # in sync with formatters.JsonFormatter._RESERVED).
 _RESERVED = frozenset(
     {
-        "args", "asctime", "created", "exc_info", "exc_text", "filename",
-        "funcName", "levelname", "levelno", "lineno", "message", "module",
-        "msecs", "msg", "name", "pathname", "process", "processName",
-        "relativeCreated", "stack_info", "thread", "threadName",
+        "args",
+        "asctime",
+        "created",
+        "exc_info",
+        "exc_text",
+        "filename",
+        "funcName",
+        "levelname",
+        "levelno",
+        "lineno",
+        "message",
+        "module",
+        "msecs",
+        "msg",
+        "name",
+        "pathname",
+        "process",
+        "processName",
+        "relativeCreated",
+        "stack_info",
+        "thread",
+        "threadName",
         "taskName",
     }
 )

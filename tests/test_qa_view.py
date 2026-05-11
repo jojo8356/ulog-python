@@ -1,4 +1,5 @@
 """Tests for the debug-only QA checklist page (/_qa/)."""
+
 from __future__ import annotations
 
 import os
@@ -15,6 +16,7 @@ def sqlite_fixture(tmp_path: Path) -> Path:
     ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
     ulog.get_logger("svc").info("hi")
     import logging
+
     for h in logging.getLogger().handlers:
         h.flush()
     ulog.clear()
@@ -28,16 +30,20 @@ def _make_django_client(db_path: Path, *, debug: bool):
     os.environ["ULOG_DEBUG"] = "1" if debug else "0"
     import django
     from django.apps import apps as django_apps
+
     if not django_apps.ready:
         django.setup()
     from django.conf import settings as _dj_settings
+
     _dj_settings.ULOG_LOGS_PATH = str(db_path)
     _dj_settings.ULOG_LOGS_KIND = "sqlite"
     # DEBUG is read at import time, so for tests we force-update:
     _dj_settings.DEBUG = debug
     from ulog.web.viewer import views as _views
+
     _views._adapter = None
     from django.test import Client
+
     return Client()
 
 
@@ -53,7 +59,8 @@ def test_qa_view_200_when_debug_on(sqlite_fixture):
     assert resp.status_code == 200
     body = resp.content.decode("utf-8")
     assert "QA manual checklist" in body
-    assert "Epic 1" in body and "Epic 2" in body
+    assert "Epic 1" in body
+    assert "Epic 2" in body
 
 
 def test_qa_view_includes_persistence_script(sqlite_fixture):
@@ -70,6 +77,7 @@ def test_qa_view_includes_persistence_script(sqlite_fixture):
 def test_qa_view_renders_all_checkboxes_with_unique_ids(sqlite_fixture):
     """Every checkbox must have a unique data-qa-id (else localStorage collides)."""
     import re
+
     client = _make_django_client(sqlite_fixture, debug=True)
     resp = client.get("/_qa/")
     body = resp.content.decode("utf-8")

@@ -69,6 +69,7 @@
   {# ====== 1. Epic 1 ====== #}
   <section class="mb-8">
     <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+      <input type="checkbox" data-qa-epic-toggle="e1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this Epic">
       {% lucide "flask-conical" size=18 %}
       <span data-i18n-key="section-1-title">1. Epic 1 — Test integration (v0.3)</span>
     </h2>
@@ -122,6 +123,7 @@
   {# ====== 2. Epic 2 ====== #}
   <section class="mb-8">
     <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-purple-600 dark:text-purple-400">
+      <input type="checkbox" data-qa-epic-toggle="e2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this Epic">
       {% lucide "user" size=18 %}
       <span data-i18n-key="section-2-title">2. Epic 2 — Author attribution (v0.4)</span>
     </h2>
@@ -204,6 +206,7 @@
   {# ====== 4. Cross-epic regressions ====== #}
   <section class="mb-8">
     <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-slate-600 dark:text-slate-300">
+      <input type="checkbox" data-qa-epic-toggle="e4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this section">
       {% lucide "history" size=18 %}
       <span data-i18n-key="section-4-title">4. v0.1 / v0.2 features still work</span>
     </h2>
@@ -224,6 +227,7 @@
   {# ====== 5. Stability ====== #}
   <section class="mb-8">
     <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-rose-600 dark:text-rose-400">
+      <input type="checkbox" data-qa-epic-toggle="e5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this section">
       {% lucide "shield-check" size=18 %}
       <span data-i18n-key="section-5-title">5. Stability watchpoints</span>
     </h2>
@@ -316,9 +320,13 @@
         if (cb.checked) localStorage.setItem(KEY_PREFIX + id, '1');
         else            localStorage.removeItem(KEY_PREFIX + id);
         updateProgress();
-        // Update the section toggle's checked/indeterminate state.
+        // Refresh the (optional) section toggle for this item, AND the epic
+        // toggle one level up. Section toggles exist only for e1- / e2-
+        // (the multi-section epics); flat sections (e4-, e5-) skip it.
         const sectionPrefix = id.match(/^(e\d+-\d+\.\d+-)/)?.[1];
         if (sectionPrefix) refreshSectionToggle(sectionPrefix);
+        const epicPrefix = id.match(/^(e\d+-)/)?.[1];
+        if (epicPrefix) refreshEpicToggle(epicPrefix);
       });
     });
 
@@ -349,6 +357,44 @@
         toggle.indeterminate = false;
       });
       refreshSectionToggle(prefix);  // initial state
+    });
+
+    // ---- Per-Epic "select all" toggles ----
+    // One level above the section toggles. data-qa-epic-toggle="e1-" cascades
+    // to every item starting with e1-, INCLUDING the per-section toggles
+    // nested under it. Indeterminate state reflects partial completion.
+    const epicToggles = root.querySelectorAll('[data-qa-epic-toggle]');
+    const refreshEpicToggle = (prefix) => {
+      const toggle = root.querySelector(`[data-qa-epic-toggle="${prefix}"]`);
+      if (!toggle) return;
+      const items = root.querySelectorAll(`input[type="checkbox"][data-qa-id^="${prefix}"]`);
+      const checked = Array.from(items).filter(cb => cb.checked).length;
+      if (checked === 0)                 { toggle.checked = false; toggle.indeterminate = false; }
+      else if (checked === items.length) { toggle.checked = true;  toggle.indeterminate = false; }
+      else                               { toggle.checked = false; toggle.indeterminate = true; }
+    };
+    epicToggles.forEach(toggle => {
+      const prefix = toggle.dataset.qaEpicToggle;
+      const items = root.querySelectorAll(`input[type="checkbox"][data-qa-id^="${prefix}"]`);
+      toggle.addEventListener('change', (ev) => {
+        ev.stopPropagation();
+        const target = toggle.checked;
+        items.forEach(cb => {
+          if (cb.checked !== target) {
+            cb.checked = target;
+            cb.dispatchEvent(new Event('change'));
+          }
+        });
+        toggle.indeterminate = false;
+        // Bring child section toggles back in line — their indeterminate
+        // state lifts now that everything below them matches.
+        sectionToggles.forEach(t => {
+          if (t.dataset.qaSectionToggle.startsWith(prefix)) {
+            refreshSectionToggle(t.dataset.qaSectionToggle);
+          }
+        });
+      });
+      refreshEpicToggle(prefix);  // initial state
     });
 
     resetBtn.addEventListener('click', () => {

@@ -163,8 +163,10 @@ def _catalog(ids: dict[str, object]) -> dict[str, dict]:
         },
         "section-2-1": {
             "path": "/?qa_screenshot=1",
-            "kind": "viewport",
-            "desc": "Authors sidebar (8 authors + <unknown>)",
+            "kind": "locator",
+            "selector": "aside",
+            "auto_height": True,
+            "desc": "Full sidebar — proves Authors block sits between Files and Time range (AC e2-2.1-1)",
         },
         "section-2-3": {
             "path": "/?show_unknown=0&qa_screenshot=1",

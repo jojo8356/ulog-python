@@ -392,8 +392,11 @@
   </div>
 </div>
 <script>
-    // Show the tutorial once, unless localStorage says we already did.
-    if (!localStorage.getItem('ulogTutorialDismissed')) {
+    // Show the tutorial once, unless localStorage says we already did
+    // OR the page was opened with ?qa_screenshot=1 (used by the
+    // headless screenshot script to bypass the overlay deterministically).
+    const _qaShot = new URLSearchParams(window.location.search).get('qa_screenshot');
+    if (!_qaShot && !localStorage.getItem('ulogTutorialDismissed')) {
         document.getElementById('tutorial').classList.remove('hidden');
     }
     document.getElementById('tutorial-dismiss').addEventListener('click', () => {

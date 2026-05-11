@@ -152,10 +152,23 @@ def _shot_plan(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
 
 
 def _shot_plan_narrow(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
-    """Captures requiring a narrow viewport (≠ default width)."""
+    """Captures requiring a narrow viewport (≠ default width).
+    Uses ?qa_screenshot=1 to bypass the tutorial overlay."""
     return {
-        "item-1.1-8": ("/",
+        "item-1.1-8": ("/?qa_screenshot=1",
                        "Records table at viewport <1024px — horizontal scroll inside the pane only"),
+    }
+
+
+def _shot_plan_tall(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
+    """Captures requiring an unusually tall viewport (to capture the full
+    Tests sidebar with all file groups visible at once, the max-h-60 cap
+    being already removed via ?qa_screenshot=1)."""
+    return {
+        "item-1.1-3-full": ("/?qa_screenshot=1",
+                            "Tall viewport: full Tests sidebar — confirms 5 first <details> open, rest collapsed"),
+        "item-1.1-5-full": ("/?qa_screenshot=1",
+                            "Tall viewport: full outcome icon mix scattered across all test files"),
     }
 
 
@@ -230,7 +243,20 @@ def main() -> int:
             except Exception as e:  # noqa: BLE001
                 print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
 
-        total = len(plan) + len(narrow)
+        # Tall-viewport captures (full Tests sidebar visible at once)
+        tall = _shot_plan_tall(ids)
+        for slug, (path, desc) in tall.items():
+            url = f"http://127.0.0.1:{port}{path}"
+            out_path = args.out_dir / f"{slug}.png"
+            try:
+                _take_shot(browser, url, out_path, width=1920, height=4000)
+                size_kb = out_path.stat().st_size / 1024
+                print(f"  ✓ {slug:20s} ({size_kb:6.1f} KB, 1920×4000) — {desc}",
+                      file=sys.stderr)
+            except Exception as e:  # noqa: BLE001
+                print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
+
+        total = len(plan) + len(narrow) + len(tall)
         print(f"\ndone — {total} screenshots in {args.out_dir}/",
               file=sys.stderr)
         return 0

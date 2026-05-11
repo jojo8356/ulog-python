@@ -186,30 +186,19 @@
     </ul>
   </section>
 
-  {# ====== 3. Perf ====== #}
-  <section class="mb-8">
-    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-      {% lucide "gauge" size=18 %}
-      <span data-i18n-key="section-3-title">3. Perf v0.4.1 — page load &lt; 3s (PRD-v0.4.1)</span>
+  {# ====== 3. Perf — fully automated by tests/test_qa_perf_e2e.py ====== #}
+  <section class="mb-8 p-3 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+    <h2 class="font-semibold mb-1 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+      {% lucide "circle-check" size=16 %}
+      <span data-i18n-key="section-3-title">§3 Perf v0.4.1 — automated</span>
     </h2>
-    <p class="text-sm text-slate-600 dark:text-slate-400 mb-2" data-i18n-key="section-3-desc">
-      Run in another terminal (replace NNNNN with your viewer port):
+    <p class="text-xs text-emerald-800 dark:text-emerald-200" data-i18n-key="section-3-desc">
+      Perf budgets per PRD-v0.4.1 (cold ✓, warm ✓, level filter ✓, author filter ✓, pagination ✓, detail view ✓, hard ceiling 3s ✓) are now covered by <code>tests/test_qa_perf_e2e.py</code>. Run:
     </p>
-    <pre class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-xs mb-3 overflow-x-auto"><code>time curl -sS -o /dev/null http://127.0.0.1:NNNNN/                              # cold
-time curl -sS -o /dev/null http://127.0.0.1:NNNNN/                              # warm
-time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/?level=ERROR'                # filter
-time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/?author=alice@globex.io'    # author filter
-time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/?page=10'                    # pagination
-time curl -sS -o /dev/null 'http://127.0.0.1:NNNNN/r/100/'                      # detail</code></pre>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e3-perf-1" label="Cold cache (1st request) < 1s" %}
-      {% include "ulog/_qa_item.html" with id="e3-perf-2" label="Warm cache (2nd+) < 200ms" %}
-      {% include "ulog/_qa_item.html" with id="e3-perf-3" label="Filter level/sector/file < 200ms" %}
-      {% include "ulog/_qa_item.html" with id="e3-perf-4" label="Author filter < 2s" %}
-      {% include "ulog/_qa_item.html" with id="e3-perf-5" label="Pagination < 200ms" %}
-      {% include "ulog/_qa_item.html" with id="e3-perf-6" label="Detail view < 100ms" %}
-      {% include "ulog/_qa_item.html" with id="e3-perf-7" label="No response > 3s on any path" %}
-    </ul>
+    <pre class="bg-white/60 dark:bg-slate-900/40 rounded p-2 text-xs mt-1 overflow-x-auto"><code>python3 -m pytest tests/test_qa_perf_e2e.py -v</code></pre>
+    <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1" data-i18n-key="section-3-footer">
+      If green → §3 done. Skip to §4 below.
+    </p>
   </section>
 
   {# ====== 4. Cross-epic regressions ====== #}

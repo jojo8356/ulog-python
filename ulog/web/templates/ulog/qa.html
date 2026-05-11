@@ -250,7 +250,14 @@
       {% include "ulog/_qa_item.html" with id="e4-reg-5" label="Time range filter (from/to ISO-8601)" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-6" label="Bound fields filter (?bound=tenant_id=tenant_001)" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-7" label="Pagination buttons (prev/next at bottom)" %}
-      {% include "ulog/_qa_item.html" with id="e4-reg-8" label="Tutorial overlay on first launch (FR38)" %}
+      {% comment %}
+        e4-reg-8 (Tutorial overlay FR38) — fully automated by
+        tests/test_tutorial_overlay_e2e.py: 9 tests cover first-visit
+        visibility, dismiss → localStorage flag + hide, reload +
+        navigation persistence, ?qa_screenshot=1 bypass, preset-flag
+        suppression, modal click trap, and cross-page-same-context
+        flag propagation.
+      {% endcomment %}
       {% include "ulog/_qa_item.html" with id="e4-reg-9" label="Dark mode toggle in header — preference persisted" %}
       {% include "ulog/_qa_item.html" with id="e4-reg-11" label="Detail view shows: ts, level, logger, msg, file:line, context, exception (when present)" %}
     </ul>

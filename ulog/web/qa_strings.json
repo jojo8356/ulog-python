@@ -87,7 +87,6 @@
     "e4-reg-5": "Time range filter (from/to ISO-8601)",
     "e4-reg-6": "Bound fields filter (?bound=tenant_id=tenant_001)",
     "e4-reg-7": "Pagination buttons (prev/next at bottom)",
-    "e4-reg-8": "Tutorial overlay on first launch (FR38)",
     "e4-reg-9": "Dark mode toggle in header — preference persisted",
     "e4-reg-11": "Detail view shows: ts, level, logger, msg, file:line, context, exception (when present)",
 
@@ -191,7 +190,6 @@
     "e4-reg-5": "Filtre time range (from/to ISO-8601)",
     "e4-reg-6": "Filtre bound fields (?bound=tenant_id=tenant_001)",
     "e4-reg-7": "Boutons pagination (prev/next en bas)",
-    "e4-reg-8": "Tutorial overlay au premier launch (FR38)",
     "e4-reg-9": "Toggle dark mode dans le header — préférence persistée",
     "e4-reg-11": "Vue détail affiche : ts, level, logger, msg, file:line, context, exception (si présent)",
 

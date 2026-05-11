@@ -16,6 +16,9 @@ uv.lock
 # Backup files from BMad install / installer reruns.
 *.bak
 
+# pngquant binary built locally by scripts/install_pngquant.sh
+tools/bin/
+
 # Claude Code project-local install (skills installed by `bmad install`).
 # Re-create on a fresh clone with `bmad install` reading _bmad/config.toml.
 .claude/

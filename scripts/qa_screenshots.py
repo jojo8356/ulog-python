@@ -1,20 +1,26 @@
-"""QA screenshots generator — captures full-page PNG of key viewer URLs.
+"""QA screenshots generator — captures key viewer URLs into PNG.
 
-Outputs go to `ulog/web/static/ulog/qa-screenshots/<slug>.png` so that
-the `/_qa/` page can render them inline under each section, letting the
-human visually verify behaviors without re-clicking through the UI.
+Outputs go to `ulog/web/static/ulog/qa-screenshots/<slug>.png` so the
+`/_qa/` page can render them inline under each section.
+
+Uses Playwright (chromium) for:
+- proper full-page captures (no viewport-height hacks)
+- locator-based sub-region shots (sidebar Tests only, etc.)
+- narrow-viewport responsive captures
+
+After capture, optionally runs scripts/optimize_screenshots.sh to
+shrink the PNGs via pngquant.
+
+Setup (one-time, in venv):
+  pip install playwright
+  python -m playwright install chromium
 
 Usage:
-  python3 scripts/qa_screenshots.py [--demo-dir /tmp/ulog-demo] [--width 1920]
-
-Requires a Chromium-based browser on PATH (brave-browser / chromium /
-google-chrome). Firefox not supported (different headless screenshot
-syntax). No Python dep added — just shells out to the browser binary.
+  python3 scripts/qa_screenshots.py [--demo-dir /tmp/ulog-demo] [--no-optimize]
 """
 from __future__ import annotations
 
 import argparse
-import shutil
 import socket
 import sqlite3
 import subprocess
@@ -25,18 +31,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO_ROOT / "ulog" / "web" / "static" / "ulog" / "qa-screenshots"
-
-
-def _find_browser() -> str:
-    for cmd in ("brave-browser", "chromium", "chromium-browser",
-                "google-chrome", "google-chrome-stable"):
-        path = shutil.which(cmd)
-        if path:
-            return path
-    raise RuntimeError(
-        "no Chromium-based browser found. Install one of: "
-        "brave-browser, chromium, chromium-browser, google-chrome."
-    )
+OPTIMIZE_SCRIPT = REPO_ROOT / "scripts" / "optimize_screenshots.sh"
 
 
 def _free_port() -> int:
@@ -57,36 +52,12 @@ def _wait_for_server(port: int, *, timeout_s: float = 20.0) -> None:
     raise RuntimeError(f"viewer never responded on port {port} within {timeout_s}s")
 
 
-def _take_shot(browser: str, url: str, out_path: Path, *,
-               width: int = 1920, height: int = 1200) -> None:
-    """Capture a full-page screenshot via Chromium headless. Idempotent."""
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        browser,
-        "--headless=new",
-        "--disable-gpu",
-        "--hide-scrollbars",
-        "--no-sandbox",
-        "--virtual-time-budget=3000",  # let JS settle a bit
-        f"--window-size={width},{height}",
-        f"--screenshot={out_path}",
-        url,
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    if proc.returncode != 0 or not out_path.exists():
-        raise RuntimeError(
-            f"screenshot failed for {url}\n--- stdout ---\n{proc.stdout}\n"
-            f"--- stderr ---\n{proc.stderr}"
-        )
-
-
 def _discover_ids(demo_dir: Path) -> dict[str, object]:
     """Pull live IDs from the demo DB + git repo so URLs are real."""
     db = demo_dir / "logs.sqlite"
     out: dict[str, object] = {}
     with sqlite3.connect(str(db)) as conn:
         out["first_record_id"] = int(conn.execute("SELECT MIN(id) FROM logs").fetchone()[0])
-        # A record that carries test_id (so the Test context panel renders)
         row = conn.execute(
             "SELECT id, json_extract(context, '$.test_id') "
             "FROM logs WHERE json_extract(context, '$.test_id') IS NOT NULL LIMIT 1"
@@ -94,8 +65,6 @@ def _discover_ids(demo_dir: Path) -> dict[str, object]:
         if row:
             out["record_with_test_id"] = int(row[0])
             out["sample_test_id"] = str(row[1])
-
-    # Resolve a real commit sha from the demo repo
     proc = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=demo_dir, capture_output=True, text=True, check=True,
@@ -104,89 +73,213 @@ def _discover_ids(demo_dir: Path) -> dict[str, object]:
     return out
 
 
-# Each entry: section slug → (relative URL builder, human description)
-def _shot_plan(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
-    test_id_qs = urllib_quote_test_id(str(ids.get("sample_test_id", "")))
-    plan: dict[str, tuple[str, str]] = {
-        # Epic 1
-        "section-1-1": ("/",
-                        "Records list with sidebar (Tests block visible between Level and Sectors)"),
-        "section-1-2": ("/?failed_only=1",
-                        "Failed-only quick filter active"),
-        "section-1-3": (f"/?test_id={test_id_qs}",
-                        "Records filtered by test_id (mix of ulog.test + globex.*)"),
-        "section-1-4": (f"/r/{ids.get('record_with_test_id', 1)}/",
-                        "Detail view with Test context panel + Authored by panel"),
-        "section-1-5": ("/docs/test-integration/",
-                        "Test integration doc page"),
-        # Epic 2
-        "section-2-1": ("/",
-                        "Authors sidebar visible (8 authors + <unknown>)"),
-        "section-2-3": ("/?show_unknown=0",
-                        "Show unknown OFF — unknown records hidden"),
-        "section-2-4": (f"/r/{ids.get('first_record_id', 1)}/",
-                        "Detail view (any record)"),
-        "section-2-5": (f"/diff/{ids['sha']}/",
-                        "Diff view (git show <sha>)"),
-        "section-2-6": ("/docs/author-filter/",
-                        "Author filter doc page"),
-        # Cross-epic
-        "section-4":   ("/",
-                        "Default records list — all v0.1/v0.2 features visible (sidebars, table)"),
-        # QA page itself (meta)
-        "section-qa":  ("/_qa/",
-                        "QA checklist page (debug-only)"),
-
-        # Targeted captures for items the standard /  shot can't show
-        # (because the Tests sidebar has max-h-60 overflow-y-auto and
-        # narrow viewports require width tuning).
-        # Use ?qa_screenshot=1 to remove the max-h-60 cap so all
-        # deployed file groups are visible at once.
-        "item-1.1-3": ("/?qa_screenshot=1",
-                       "Tests sidebar with all groups visible — confirms 5 first <details> are open"),
-        "item-1.1-5": ("/?qa_screenshot=1",
-                       "Tests sidebar showing the full outcome mix (✓ passed / ✗ failed / 🔥 errored / ⊘ skipped)"),
-        # item-1.1-8 is captured at narrow window via _shot_plan_narrow below
-    }
-    return plan
+def _qs_test_id(test_id: str) -> str:
+    """Same encoding as Django's |urlencode on a test_id: '/' kept,
+    '::' → '%3A%3A'."""
+    return test_id.replace("::", "%3A%3A") if test_id else ""
 
 
-def _shot_plan_narrow(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
-    """Captures requiring a narrow viewport (≠ default width).
-    Uses ?qa_screenshot=1 to bypass the tutorial overlay."""
+# ---- Capture catalog -----------------------------------------------------
+#
+# Each entry: slug → dict(path, desc, kind, **kind-specific args)
+#   kind = "full"     — page.screenshot(full_page=True)
+#   kind = "viewport" — page.screenshot()  (viewport-only, default size)
+#   kind = "narrow"   — viewport=900×700 + page.screenshot()
+#   kind = "locator"  — page.locator(selector).screenshot()
+# All captures hit ?qa_screenshot=1 to suppress the tutorial overlay
+# AND the max-h-60 cap on the Tests sidebar.
+
+
+def _catalog(ids: dict[str, object]) -> dict[str, dict]:
+    test_qs = _qs_test_id(str(ids.get("sample_test_id", "")))
+    rec_id = ids.get("record_with_test_id", 1)
+    first_id = ids.get("first_record_id", 1)
+    sha = ids["sha"]
+
     return {
-        "item-1.1-8": ("/?qa_screenshot=1",
-                       "Records table at viewport <1024px — horizontal scroll inside the pane only"),
+        # ------ Full-page (used for doc-pages and detail views) ---------
+        "section-1-4": {
+            "path": f"/r/{rec_id}/?qa_screenshot=1",
+            "kind": "full",
+            "desc": "Detail view with Test context + Authored by panels",
+        },
+        "section-1-5": {
+            "path": "/docs/test-integration/?qa_screenshot=1",
+            "kind": "full",
+            "desc": "Test integration doc page",
+        },
+        "section-2-4": {
+            "path": f"/r/{first_id}/?qa_screenshot=1",
+            "kind": "full",
+            "desc": "Detail view (Authored by panel)",
+        },
+        "section-2-5": {
+            "path": f"/diff/{sha}/?qa_screenshot=1",
+            "kind": "full",
+            "desc": "Diff view (git show <sha>)",
+        },
+        "section-2-6": {
+            "path": "/docs/author-filter/?qa_screenshot=1",
+            "kind": "full",
+            "desc": "Author filter doc page",
+        },
+        "section-qa": {
+            "path": "/_qa/",
+            "kind": "viewport",
+            "desc": "QA checklist page itself",
+        },
+
+        # ------ Viewport-default (records list + sidebars) ---------------
+        "section-1-1": {
+            "path": "/?qa_screenshot=1",
+            "kind": "viewport",
+            "desc": "Records list with Tests sidebar block visible",
+        },
+        "section-1-2": {
+            "path": "/?failed_only=1&qa_screenshot=1",
+            "kind": "viewport",
+            "desc": "Failed-only quick filter active",
+        },
+        "section-1-3": {
+            "path": f"/?test_id={test_qs}&qa_screenshot=1",
+            "kind": "viewport",
+            "desc": "Records filtered by test_id (mix of ulog.test + globex.*)",
+        },
+        "section-2-1": {
+            "path": "/?qa_screenshot=1",
+            "kind": "viewport",
+            "desc": "Authors sidebar (8 authors + <unknown>)",
+        },
+        "section-2-3": {
+            "path": "/?show_unknown=0&qa_screenshot=1",
+            "kind": "viewport",
+            "desc": "Show unknown OFF — unknown records hidden",
+        },
+        "section-4": {
+            "path": "/?qa_screenshot=1",
+            "kind": "viewport",
+            "desc": "Default records list — v0.1/v0.2 features baseline",
+        },
+
+        # ------ Narrow viewport (responsive scroll demo) -----------------
+        "item-1.1-8": {
+            "path": "/?qa_screenshot=1",
+            "kind": "narrow",
+            "desc": "Records table at viewport <1024px — horizontal scroll inside its pane",
+        },
+
+        # ------ Locator-only (sidebar Tests block, much smaller PNG) -----
+        # Per user request: shoot ONLY the sidebar instead of the whole
+        # page for the "tests visible" / "outcome mix" checks. Saves tons
+        # of disk + crops directly to the relevant area.
+        "item-1.1-3-full": {
+            "path": "/?qa_screenshot=1",
+            "kind": "locator",
+            "selector": "aside",  # the entire left sidebar
+            "desc": "Sidebar only — confirms 5 first <details> open + rest collapsed",
+        },
+        "item-1.1-5-full": {
+            "path": "/?qa_screenshot=1",
+            "kind": "locator",
+            "selector": "aside",
+            "max_height": 1500,  # crop to first ~1500px of the sidebar
+            "desc": "Sidebar only (cropped) — outcome icon mix ✓/✗/🔥/⊘ visible",
+        },
     }
 
 
-def _shot_plan_tall(ids: dict[str, object]) -> dict[str, tuple[str, str]]:
-    """Captures requiring an unusually tall viewport (to capture the full
-    Tests sidebar with all file groups visible at once, the max-h-60 cap
-    being already removed via ?qa_screenshot=1)."""
-    return {
-        "item-1.1-3-full": ("/?qa_screenshot=1",
-                            "Tall viewport: full Tests sidebar — confirms 5 first <details> open, rest collapsed"),
-        "item-1.1-5-full": ("/?qa_screenshot=1",
-                            "Tall viewport: full outcome icon mix scattered across all test files"),
-    }
+# ---- Playwright runner ---------------------------------------------------
 
 
-def urllib_quote_test_id(test_id: str) -> str:
-    """Same encoding as Django's |urlencode filter on a test_id string:
-    leave '/' alone, encode '::' as %3A%3A."""
-    if not test_id:
-        return ""
-    return test_id.replace("::", "%3A%3A")
+def _capture_all(catalog: dict[str, dict], port: int, out_dir: Path) -> int:
+    """Drive Playwright through the catalog. Returns number of successes."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("error: playwright not installed.\n"
+              "  pip install playwright\n"
+              "  python -m playwright install chromium",
+              file=sys.stderr)
+        return 0
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    n_ok = 0
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        try:
+            for slug, spec in catalog.items():
+                kind = spec["kind"]
+                path = spec["path"]
+                desc = spec["desc"]
+                url = f"http://127.0.0.1:{port}{path}"
+                out_path = out_dir / f"{slug}.png"
+
+                # Per-shot viewport
+                if kind == "narrow":
+                    viewport = {"width": 900, "height": 700}
+                else:
+                    viewport = {"width": 1920, "height": 1200}
+
+                ctx = browser.new_context(viewport=viewport)
+                page = ctx.new_page()
+                try:
+                    page.goto(url, wait_until="networkidle", timeout=15_000)
+
+                    if kind == "full":
+                        page.screenshot(path=str(out_path), full_page=True)
+                    elif kind == "viewport":
+                        page.screenshot(path=str(out_path), full_page=False)
+                    elif kind == "narrow":
+                        page.screenshot(path=str(out_path), full_page=False)
+                    elif kind == "locator":
+                        sel = spec["selector"]
+                        loc = page.locator(sel).first
+                        max_h = spec.get("max_height")
+                        if max_h:
+                            # Crop to the top of the locator's bounding box
+                            box = loc.bounding_box()
+                            if box:
+                                page.screenshot(
+                                    path=str(out_path),
+                                    clip={
+                                        "x": box["x"],
+                                        "y": box["y"],
+                                        "width": box["width"],
+                                        "height": min(box["height"], max_h),
+                                    },
+                                )
+                            else:
+                                loc.screenshot(path=str(out_path))
+                        else:
+                            loc.screenshot(path=str(out_path))
+                    else:
+                        raise ValueError(f"unknown kind: {kind}")
+
+                    size_kb = out_path.stat().st_size / 1024
+                    print(f"  ✓ {slug:22s} ({size_kb:7.1f} KB, {kind:8s}) — {desc}",
+                          file=sys.stderr)
+                    n_ok += 1
+                except Exception as e:  # noqa: BLE001
+                    print(f"  ✗ {slug:22s} FAILED: {e}", file=sys.stderr)
+                finally:
+                    ctx.close()
+        finally:
+            browser.close()
+
+    return n_ok
+
+
+# ---- Entrypoint ----------------------------------------------------------
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--demo-dir", type=Path, default=Path("/tmp/ulog-demo"),
                         help="Directory with logs.sqlite + git repo (default: /tmp/ulog-demo)")
-    parser.add_argument("--width", type=int, default=1920)
-    parser.add_argument("--height", type=int, default=1200)
     parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
+    parser.add_argument("--no-optimize", action="store_true",
+                        help="Skip pngquant post-processing")
     args = parser.parse_args()
 
     if not (args.demo_dir / "logs.sqlite").exists():
@@ -194,15 +287,8 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
-    try:
-        browser = _find_browser()
-    except RuntimeError as e:
-        print(f"error: {e}", file=sys.stderr)
-        return 2
-    print(f"using browser: {browser}", file=sys.stderr)
-
     ids = _discover_ids(args.demo_dir)
-    plan = _shot_plan(ids)
+    catalog = _catalog(ids)
 
     port = _free_port()
     print(f"spawning viewer on port {port} ...", file=sys.stderr)
@@ -215,57 +301,11 @@ def main() -> int:
     )
     try:
         _wait_for_server(port)
-        print(f"viewer ready on http://127.0.0.1:{port}/", file=sys.stderr)
-        print(f"writing screenshots to {args.out_dir}/ ...", file=sys.stderr)
-
-        for slug, (path, desc) in plan.items():
-            url = f"http://127.0.0.1:{port}{path}"
-            out_path = args.out_dir / f"{slug}.png"
-            try:
-                _take_shot(browser, url, out_path,
-                           width=args.width, height=args.height)
-                size_kb = out_path.stat().st_size / 1024
-                print(f"  ✓ {slug:20s} ({size_kb:6.1f} KB) — {desc}",
-                      file=sys.stderr)
-            except Exception as e:  # noqa: BLE001
-                print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
-
-        # Narrow-viewport captures (e.g. responsive scroll demo)
-        narrow = _shot_plan_narrow(ids)
-        for slug, (path, desc) in narrow.items():
-            url = f"http://127.0.0.1:{port}{path}"
-            out_path = args.out_dir / f"{slug}.png"
-            try:
-                _take_shot(browser, url, out_path, width=900, height=700)
-                size_kb = out_path.stat().st_size / 1024
-                print(f"  ✓ {slug:20s} ({size_kb:6.1f} KB, 900×700) — {desc}",
-                      file=sys.stderr)
-            except Exception as e:  # noqa: BLE001
-                print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
-
-        # Tall-viewport captures (full Tests sidebar visible at once).
-        # We use a deliberately oversized viewport (12000px tall) so the
-        # entire page — including the sidebar with all <details> visible
-        # AND the records table — fits without truncation. Excess white
-        # space at the bottom is acceptable; the alternative would be a
-        # CDP roundtrip to measure content height, requiring a JSON-RPC
-        # over websocket dance with no stdlib support.
-        tall = _shot_plan_tall(ids)
-        for slug, (path, desc) in tall.items():
-            url = f"http://127.0.0.1:{port}{path}"
-            out_path = args.out_dir / f"{slug}.png"
-            try:
-                _take_shot(browser, url, out_path, width=1920, height=12000)
-                size_kb = out_path.stat().st_size / 1024
-                print(f"  ✓ {slug:20s} ({size_kb:6.1f} KB, 1920×12000) — {desc}",
-                      file=sys.stderr)
-            except Exception as e:  # noqa: BLE001
-                print(f"  ✗ {slug:20s} FAILED: {e}", file=sys.stderr)
-
-        total = len(plan) + len(narrow) + len(tall)
-        print(f"\ndone — {total} screenshots in {args.out_dir}/",
+        print(f"viewer ready on http://127.0.0.1:{port}/\n"
+              f"writing screenshots to {args.out_dir}/ ...",
               file=sys.stderr)
-        return 0
+        n_ok = _capture_all(catalog, port, args.out_dir)
+        print(f"\n{n_ok}/{len(catalog)} screenshots written", file=sys.stderr)
     finally:
         if proc.poll() is None:
             proc.terminate()
@@ -274,6 +314,13 @@ def main() -> int:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
+
+    # Optimize via pngquant unless disabled
+    if not args.no_optimize and OPTIMIZE_SCRIPT.exists():
+        print("\noptimizing PNGs via pngquant ...", file=sys.stderr)
+        subprocess.run(["bash", str(OPTIMIZE_SCRIPT)], check=False)
+
+    return 0 if n_ok == len(catalog) else 1
 
 
 if __name__ == "__main__":

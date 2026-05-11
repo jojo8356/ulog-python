@@ -96,7 +96,7 @@ development_status:
   # Epic 3: v0.5 — Storage core & chain integrity (12 stories)
   # ========================================================================
   epic-3: in-progress
-  3-1-schema-extension-immutable-chain-pos-record-hash-prev-hash-columns: ready-for-dev
+  3-1-schema-extension-immutable-chain-pos-record-hash-prev-hash-columns: done
   3-2-sql-trigger-blocking-update-delete-on-immutable-rows: backlog
   3-3-schemaerror-upgrade-message-with-literal-alter-table-sql: backlog
   3-4-chainwriter-protocol-sqlitechainwriter-impl: backlog

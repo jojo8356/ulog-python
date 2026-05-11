@@ -1,6 +1,6 @@
 # Story 3.1: Schema extension — `immutable` + `chain_pos` + `record_hash` + `prev_hash` columns
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -159,10 +159,26 @@ The most recent uncommitted change set is a sweeping lint cleanup (139 ruff + 57
 
 ### Agent Model Used
 
-_To be populated by dev agent._
+claude-opus-4-7[1m]
 
 ### Debug Log References
 
+n/a — additive schema only, no surprises.
+
 ### Completion Notes List
 
+- All 4 columns + 2 indexes land in `Table` definition. `LargeBinary` added
+  to the lazy SQLAlchemy import block.
+- `Record` dataclass extended with 4 defaulted fields; SQLite adapter
+  populates via `getattr` so reflected v0.4 schemas don't crash.
+- 3 new tests pass; 290 total pytest green.
+- ruff / ruff format / mypy --strict / deptry all clean.
+- `_verify_or_create_schema` auto-surfaces the 4 missing columns for
+  v0.4 DBs via set-diff (no code change needed — Story 3.3 will replace
+  the wording with the literal ALTER TABLE hint).
+
 ### File List
+
+- `ulog/handlers/sql.py` — Table schema extension (4 columns + 2 indexes)
+- `ulog/web/viewer/adapters.py` — Record dataclass extension + SQLiteAdapter._row_to_record
+- `tests/test_handlers.py` — 3 new tests under v0.5 schema block

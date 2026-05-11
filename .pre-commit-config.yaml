@@ -1,0 +1,59 @@
+# Pre-commit hooks for ulog-python.
+#
+# Setup once after clone:
+#   pip install -e ".[dev]"
+#   pre-commit install
+#
+# Manual run:
+#   pre-commit run --all-files
+#
+# Hooks:
+#   - ruff: lint + format (replaces black + isort + flake8 + pyupgrade)
+#   - mypy: type check (--strict via pyproject.toml)
+#   - deptry: dependency audit (catches missing/unused declared deps)
+#   - pip-audit: CVE scan against installed packages
+#   - generic checks: trailing whitespace, EOF newline, JSON/YAML syntax
+
+repos:
+  # ---- Code style + correctness ----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # ---- Type checking ----
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        files: ^ulog/
+        additional_dependencies: [sqlalchemy>=2.0, django>=5.0]
+
+  # ---- Dependency audit ----
+  - repo: https://github.com/fpgmaas/deptry
+    rev: 0.20.0
+    hooks:
+      - id: deptry
+
+  # ---- CVE / vulnerability scan ----
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+
+  # ---- Generic hygiene ----
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]   # >1 MB needs explicit override
+      - id: mixed-line-ending
+        args: [--fix=lf]

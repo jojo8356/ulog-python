@@ -30,14 +30,45 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "mypy>=1.0"]
+# Storage backend for SQL handler + viewer adapters.
 storage = ["sqlalchemy>=2.0"]
-web = ["django>=5.0", "sqlalchemy>=2.0", "django-lucide>=1.3"]
-# Auto-refresh browser when running `ulog-web --debug ...`. Adds
-# django-browser-reload over the [web] base. Gated on DEBUG=True at
-# runtime so plain [web] installs see zero impact.
-web-dev = ["django>=5.0", "sqlalchemy>=2.0", "django-lucide>=1.3", "django-browser-reload>=1.18"]
-testing = ["pytest>=7.0"]
+# Inspection viewer (Django + Tailwind + lucide icons).
+web = [
+    "django>=5.0",
+    "sqlalchemy>=2.0",
+    "django-lucide>=1.3",
+]
+# Web dev workflow: auto-refresh browser on .py change + headless
+# screenshot generation (scripts/qa_screenshots.py).
+# Gated on DEBUG=True at runtime so plain [web] installs see zero impact.
+web-dev = [
+    "django>=5.0",
+    "sqlalchemy>=2.0",
+    "django-lucide>=1.3",
+    "django-browser-reload>=1.18",
+    "playwright>=1.40",
+]
+# Pytest plugin runtime (Story 1.1 entry-point).
+testing = ["pytest>=7.0", "pytest-xdist>=3.0"]
+# Full dev environment — runtime + tests + linters + audit.
+dev = [
+    # runtime + test deps
+    "pytest>=7.0",
+    "pytest-xdist>=3.0",
+    "sqlalchemy>=2.0",
+    "django>=5.0",
+    "django-lucide>=1.3",
+    "django-browser-reload>=1.18",
+    "playwright>=1.40",
+    # linters + formatters (one tool per concern)
+    "ruff>=0.6",          # lint + format (replaces black + isort + flake8 + pyupgrade)
+    "mypy>=1.10",         # type checking (--strict)
+    # deps + security audit
+    "deptry>=0.20",       # detect missing/unused dependencies
+    "pip-audit>=2.7",     # CVE scan against installed packages
+    # workflow
+    "pre-commit>=4.0",    # orchestrate the above on every commit
+]
 
 [project.entry-points.pytest11]
 ulog = "ulog.testing.pytest_plugin"
@@ -61,3 +92,55 @@ testpaths = ["tests"]
 
 [tool.mypy]
 strict = true
+exclude = ["scripts/", "vendor/"]
+
+# ---- Ruff: lint + format (replaces black + isort + flake8 + pyupgrade) ----
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["vendor", "_bmad-output", "_bmad", ".claude"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle errors + pyflakes + warnings
+    "I",             # isort (import order)
+    "UP",            # pyupgrade (modernize syntax)
+    "B",             # flake8-bugbear (sneaky bugs)
+    "C4",            # comprehensions
+    "SIM",           # flake8-simplify
+    "PT",            # pytest style
+    "RET",           # return statements
+    "PIE",           # misc improvements
+    "RUF",           # ruff-specific rules
+]
+ignore = [
+    "E501",          # line too long — handled by formatter
+    "B008",          # function-call-in-default-argument (Django/FastAPI patterns)
+    "PT011",         # pytest.raises too broad — over-strict for tests
+    "RET504",        # unnecessary assignment before return — readability matters
+    "SIM108",        # ternary if — sometimes if/else is clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011", "PT012"]   # tests legitimately use assert + multi-statement raises
+"scripts/**" = ["B007"]          # scripts have one-off loops with unused vars
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---- Deptry: catch missing/unused declared dependencies ----
+[tool.deptry]
+known_first_party = ["ulog"]
+extend_exclude = ["vendor", "scripts", "_bmad", "_bmad-output"]
+
+[tool.deptry.per_rule_ignores]
+# Used as Django INSTALLED_APPS / middleware, never imported in our code.
+DEP002 = ["django-lucide", "django-browser-reload", "pytest-xdist"]
+# Optional/lazy imports — deptry can't see the try/except gates.
+DEP004 = ["sqlalchemy", "playwright"]
+
+[tool.deptry.package_module_name_map]
+django-browser-reload = "django_browser_reload"
+django-lucide = "lucide"
+pytest-xdist = "xdist"

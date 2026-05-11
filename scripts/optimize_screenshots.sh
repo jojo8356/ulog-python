@@ -1,58 +1,41 @@
 #!/usr/bin/env bash
-# Optimize ULog QA screenshots via pngquant.
-# If pngquant is missing, install it locally first via install_pngquant.sh.
+# Optimize ULog QA screenshots via pngquant (lossless palette quantization).
+# Runs install_pngquant.sh first if pngquant is missing.
 #
 # Target: ulog/web/static/ulog/qa-screenshots/*.png
 # (the assets served inline under the /_qa/ checklist items).
-#
-# Usage:
-#   ./scripts/optimize_screenshots.sh
 
 set -uo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$PROJECT_ROOT/scripts/_lib.sh"
+
 TOOLS_BIN="$PROJECT_ROOT/tools/bin"
 TARGET_DIR="$PROJECT_ROOT/ulog/web/static/ulog/qa-screenshots"
 
-# Ensure pngquant is available (will install locally if needed).
-"$PROJECT_ROOT/scripts/install_pngquant.sh"
-INSTALL_EXIT=$?
-if [ $INSTALL_EXIT -ne 0 ]; then
-  echo "[abort] pngquant could not be installed"
-  exit $INSTALL_EXIT
-fi
+# Ensure pngquant is reachable (PATH or tools/bin/).
+"$PROJECT_ROOT/scripts/install_pngquant.sh" || die "pngquant could not be installed" $?
 
-# Pick the binary: PATH first, then local tools/bin/.
+# Resolve binary path (prefer PATH, fallback to local build).
 PNGQUANT="$(command -v pngquant 2>/dev/null || true)"
-if [ -z "$PNGQUANT" ]; then
-  if [ -x "$TOOLS_BIN/pngquant" ]; then
-    PNGQUANT="$TOOLS_BIN/pngquant"
-  elif [ -x "$TOOLS_BIN/pngquant.exe" ]; then
-    PNGQUANT="$TOOLS_BIN/pngquant.exe"
-  else
-    echo "[error] pngquant not found after install"
-    exit 1
-  fi
-fi
+[ -z "$PNGQUANT" ] && [ -x "$TOOLS_BIN/pngquant"     ] && PNGQUANT="$TOOLS_BIN/pngquant"
+[ -z "$PNGQUANT" ] && [ -x "$TOOLS_BIN/pngquant.exe" ] && PNGQUANT="$TOOLS_BIN/pngquant.exe"
+[ -z "$PNGQUANT" ] && die "pngquant not found after install"
 
-if [ ! -d "$TARGET_DIR" ]; then
-  echo "[error] $TARGET_DIR does not exist"
-  exit 1
-fi
+[ -d "$TARGET_DIR" ] || die "$TARGET_DIR does not exist"
 
 shopt -s nullglob
 files=("$TARGET_DIR"/*.png)
 if [ ${#files[@]} -eq 0 ]; then
-  echo "[info] no PNG to optimize in $TARGET_DIR"
+  info "no PNG to optimize in $TARGET_DIR"
   exit 0
 fi
 
-echo "[info] using $PNGQUANT"
-echo "[info] before:"
-du -ch "${files[@]}" | tail -1
+info "using $PNGQUANT"
+info "before: $(du -ch "${files[@]}" | tail -1 | awk '{print $1}')"
 
 # --quality=65-85: skip if cannot get below 85, accept down to 65
-# --strip: remove metadata (smaller files)
+# --strip:         remove metadata (smaller files)
 # --skip-if-larger: never replace with a larger file
 # --force --ext .png: overwrite the original PNG in place
 "$PNGQUANT" \
@@ -63,6 +46,5 @@ du -ch "${files[@]}" | tail -1
   --ext .png \
   "${files[@]}"
 
-echo "[info] after:"
-du -ch "${files[@]}" | tail -1
-echo "[ok] optimization done"
+info "after:  $(du -ch "${files[@]}" | tail -1 | awk '{print $1}')"
+ok "optimization done"

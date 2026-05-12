@@ -226,12 +226,14 @@ class TestSchemaErrorCopyPaste:
     EXPECTED_ALTERS = (
         "ALTER TABLE logs ADD COLUMN chain_pos INTEGER NOT NULL DEFAULT 0;",
         "ALTER TABLE logs ADD COLUMN immutable INTEGER NOT NULL DEFAULT 0;",
+        "ALTER TABLE logs ADD COLUMN is_replay INTEGER NOT NULL DEFAULT 0;",
         "ALTER TABLE logs ADD COLUMN prev_hash BLOB;",
         "ALTER TABLE logs ADD COLUMN record_hash BLOB;",
     )
     EXPECTED_INDEXES = (
         "CREATE INDEX ix_logs_chain_pos ON logs(chain_pos);",
         "CREATE INDEX ix_logs_immutable ON logs(immutable);",
+        "CREATE INDEX ix_logs_is_replay ON logs(is_replay);",
     )
 
     @pytest.fixture
@@ -300,7 +302,7 @@ class TestSchemaErrorCopyPaste:
             for line in msg.splitlines()
             if line.strip().startswith(("ALTER", "CREATE"))
         ]
-        assert len(statements) == 6, statements
+        assert len(statements) == 8, statements
         engine = create_engine(url, future=True)
         with engine.begin() as conn:
             for stmt in statements:

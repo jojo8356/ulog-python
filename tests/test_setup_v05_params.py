@@ -68,10 +68,13 @@ def test_integrity_none_string_runs_v04_compatible_path(tmp_path):
     engine = create_engine(url, future=True)
     with engine.begin() as conn:
         row = conn.execute(
-            text("SELECT chain_pos, immutable, record_hash, prev_hash FROM logs WHERE msg='plain'")
+            text(
+                "SELECT chain_pos, immutable, record_hash, prev_hash, is_replay "
+                "FROM logs WHERE msg='plain'"
+            )
         ).first()
     engine.dispose()
-    assert row == (0, 0, None, None)
+    assert row == (0, 0, None, None, 0)
 
 
 # ---- immutable_when ------------------------------------------------------

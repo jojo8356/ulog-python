@@ -57,12 +57,14 @@ _RESERVED = frozenset(
 _CHAIN_COLUMN_ALTER_DDL: dict[str, str] = {
     "chain_pos": "ALTER TABLE {t} ADD COLUMN chain_pos INTEGER NOT NULL DEFAULT 0;",
     "immutable": "ALTER TABLE {t} ADD COLUMN immutable INTEGER NOT NULL DEFAULT 0;",
+    "is_replay": "ALTER TABLE {t} ADD COLUMN is_replay INTEGER NOT NULL DEFAULT 0;",
     "prev_hash": "ALTER TABLE {t} ADD COLUMN prev_hash BLOB;",
     "record_hash": "ALTER TABLE {t} ADD COLUMN record_hash BLOB;",
 }
 _CHAIN_COLUMN_INDEX_DDL: dict[str, str] = {
     "chain_pos": "CREATE INDEX ix_{t}_chain_pos ON {t}(chain_pos);",
     "immutable": "CREATE INDEX ix_{t}_immutable ON {t}(immutable);",
+    "is_replay": "CREATE INDEX ix_{t}_is_replay ON {t}(is_replay);",
 }
 
 
@@ -156,12 +158,17 @@ class SQLHandler(logging.Handler):
             Column("record_hash", LargeBinary, nullable=True),
             Column("prev_hash", LargeBinary, nullable=True),
             Column("immutable", Integer, nullable=False, server_default="0"),
+            # Story 4.2 — set to 1 by `_record_to_row` when emitted
+            # from inside a `replay()` body. Distinguishes replay-
+            # induced records from production records (FR99 / Gap G2).
+            Column("is_replay", Integer, nullable=False, server_default="0"),
             Index(f"ix_{table}_ts", "ts"),
             Index(f"ix_{table}_level", "level"),
             Index(f"ix_{table}_logger", "logger"),
             Index(f"ix_{table}_file", "file"),
             Index(f"ix_{table}_chain_pos", "chain_pos"),
             Index(f"ix_{table}_immutable", "immutable"),
+            Index(f"ix_{table}_is_replay", "is_replay"),
         )
         # Lazy-create on first emit; expose for tests.
         self._metadata = metadata
@@ -391,6 +398,12 @@ class SQLHandler(logging.Handler):
                     self._immutable_when_warned = True
                 immutable_flag = 1  # fail-safe: preserve evidence
         row["immutable"] = immutable_flag
+        # Story 4.2 / Gap G2 — stamp is_replay at insert time. The
+        # ContextVar is set by `ulog.replay()` around the callback;
+        # outside replay context it's False → is_replay=0.
+        from ..replay import is_replaying
+
+        row["is_replay"] = 1 if is_replaying() else 0
         return row
 
     def _safe_flush(self) -> None:

@@ -328,11 +328,12 @@ def test_sql_v05_schema_has_chain_and_immutable_columns(tmp_path):
     engine = create_engine(url, future=True)
     insp = inspect(engine)
     cols = {c["name"]: c for c in insp.get_columns("logs")}
-    expected_new = {"chain_pos", "record_hash", "prev_hash", "immutable"}
+    expected_new = {"chain_pos", "record_hash", "prev_hash", "immutable", "is_replay"}
     assert expected_new <= cols.keys(), f"missing columns: {expected_new - cols.keys()}"
-    # `chain_pos` and `immutable` are NOT NULL with default 0.
+    # `chain_pos`, `immutable` and `is_replay` are NOT NULL with default 0.
     assert cols["chain_pos"]["nullable"] is False
     assert cols["immutable"]["nullable"] is False
+    assert cols["is_replay"]["nullable"] is False
     # `record_hash` / `prev_hash` are nullable BLOBs.
     assert cols["record_hash"]["nullable"] is True
     assert cols["prev_hash"]["nullable"] is True
@@ -340,6 +341,7 @@ def test_sql_v05_schema_has_chain_and_immutable_columns(tmp_path):
     idx_names = {i["name"] for i in insp.get_indexes("logs")}
     assert "ix_logs_chain_pos" in idx_names
     assert "ix_logs_immutable" in idx_names
+    assert "ix_logs_is_replay" in idx_names
     engine.dispose()
 
 
@@ -358,13 +360,14 @@ def test_sql_v05_default_values(tmp_path):
     engine = create_engine(url, future=True)
     with engine.begin() as conn:
         row = conn.execute(
-            text("SELECT chain_pos, immutable, record_hash, prev_hash FROM logs")
+            text("SELECT chain_pos, immutable, record_hash, prev_hash, is_replay FROM logs")
         ).first()
     assert row is not None
     assert row[0] == 0  # chain_pos
     assert row[1] == 0  # immutable
     assert row[2] is None  # record_hash
     assert row[3] is None  # prev_hash
+    assert row[4] == 0  # is_replay (Story 4.2)
     engine.dispose()
 
 
@@ -416,10 +419,12 @@ def test_sql_v04_upgrade_path_raises_schema_error(tmp_path):
     for stmt in (
         "ALTER TABLE logs ADD COLUMN chain_pos INTEGER NOT NULL DEFAULT 0;",
         "ALTER TABLE logs ADD COLUMN immutable INTEGER NOT NULL DEFAULT 0;",
+        "ALTER TABLE logs ADD COLUMN is_replay INTEGER NOT NULL DEFAULT 0;",
         "ALTER TABLE logs ADD COLUMN prev_hash BLOB;",
         "ALTER TABLE logs ADD COLUMN record_hash BLOB;",
         "CREATE INDEX ix_logs_chain_pos ON logs(chain_pos);",
         "CREATE INDEX ix_logs_immutable ON logs(immutable);",
+        "CREATE INDEX ix_logs_is_replay ON logs(is_replay);",
     ):
         assert stmt in msg, f"missing statement {stmt!r} in SchemaError: {msg!r}"
     assert "pre-chain" in msg.lower(), f"Gap G1 phrasing missing: {msg!r}"
@@ -631,7 +636,9 @@ def test_sql_v05_upgrade_message_resolved_after_manual_alter(tmp_path):
         for line in msg.splitlines()
         if line.strip().startswith(("ALTER", "CREATE"))
     ]
-    assert len(stmts) == 6, f"expected 6 upgrade statements, got {len(stmts)}: {stmts!r}"
+    # Post-Story 4.2: 5 ALTERs (chain_pos, immutable, is_replay, prev_hash, record_hash)
+    # + 3 CREATE INDEX (chain_pos, immutable, is_replay) = 8 statements.
+    assert len(stmts) == 8, f"expected 8 upgrade statements, got {len(stmts)}: {stmts!r}"
 
     # Apply them manually.
     engine = create_engine(url, future=True)
@@ -682,9 +689,10 @@ def test_sql_v05_upgrade_partial_chain_columns(tmp_path):
         handler._ensure_schema()
     handler.close()
     msg = str(excinfo.value)
-    # The 3 remaining ALTERs must appear.
+    # The 4 remaining ALTERs must appear (post-Story 4.2: is_replay added).
     for stmt in (
         "ALTER TABLE logs ADD COLUMN immutable INTEGER NOT NULL DEFAULT 0;",
+        "ALTER TABLE logs ADD COLUMN is_replay INTEGER NOT NULL DEFAULT 0;",
         "ALTER TABLE logs ADD COLUMN prev_hash BLOB;",
         "ALTER TABLE logs ADD COLUMN record_hash BLOB;",
     ):
@@ -743,6 +751,7 @@ def test_sql_v05_non_chain_missing_column_uses_legacy_message(tmp_path):
         Column("record_hash", BLOB, nullable=True),
         Column("prev_hash", BLOB, nullable=True),
         Column("immutable", Integer, nullable=False, server_default="0"),
+        Column("is_replay", Integer, nullable=False, server_default="0"),
     )
     md.create_all(engine)
     engine.dispose()

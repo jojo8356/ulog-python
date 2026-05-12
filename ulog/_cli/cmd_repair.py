@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .cmd_verify import _parse_ts
+from .._chain import parse_stored_ts as _parse_ts
 
 
 def register(subparsers: Any) -> None:
@@ -44,7 +44,7 @@ def _find_first_break(conn: Any) -> int | None:
     rows = conn.execute(
         text(
             "SELECT chain_pos, ts, level, logger, msg, file, line, "
-            "exc, context, immutable, record_hash, prev_hash "
+            "exc, context, immutable, record_hash, prev_hash, is_replay "
             "FROM logs WHERE record_hash IS NOT NULL ORDER BY chain_pos"
         )
     ).all()
@@ -64,6 +64,7 @@ def _find_first_break(conn: Any) -> int | None:
             "exc": json.loads(row[7]) if isinstance(row[7], str) else row[7],
             "context": json.loads(row[8]) if isinstance(row[8], str) else row[8],
             "immutable": row[9],
+            "is_replay": row[12],  # Story 4.2 — part of the canonical hash
         }
         if sha256_record(rec, actual_prev) != bytes(row[10]):
             return int(row[0])

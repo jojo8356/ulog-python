@@ -29,6 +29,7 @@ from .formatters import (
     register_formatter,
 )
 from .handlers import CSVHandler, JSONLineHandler, SchemaError, SQLHandler
+from .replay import is_replaying, replay, replay_to_pytest
 from .setup import (
     LOG_LEVELS,
     PROFILES,
@@ -67,7 +68,13 @@ __all__ = [
     "get_bound",
     "get_logger",
     "is_configured",
+    # Replay state (v0.5, Story 4.2)
+    "is_replaying",
     "register_formatter",
+    # Replay (v0.5, Story 4.1)
+    "replay",
+    # Replay-to-pytest generator (v0.5, Story 4.3)
+    "replay_to_pytest",
     "set_level",
     # Setup
     "setup",

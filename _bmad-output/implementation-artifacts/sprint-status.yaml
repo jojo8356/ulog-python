@@ -115,12 +115,12 @@ development_status:
   # Listed in implementation order per epics.md validation:
   # 4.1 → 4.2 → 4.9 → 4.3 → 4.4 → 4.5 → 4.6 → 4.7 → 4.8 → 4.10
   # ========================================================================
-  epic-4: backlog
-  4-1-replay-core-mappingproxytype-callback: backlog
-  4-2-replay-active-contextvar-is-replaying-flag: backlog
-  4-9-replay-records-context-manager-in-ulog-testing: backlog
-  4-3-replay-to-pytest-generator: backlog
-  4-4-filter-dsl-parser: backlog
+  epic-4: in-progress
+  4-1-replay-core-mappingproxytype-callback: done
+  4-2-replay-active-contextvar-is-replaying-flag: done
+  4-9-replay-records-context-manager-in-ulog-testing: done
+  4-3-replay-to-pytest-generator: done
+  4-4-filter-dsl-parser: done
   4-5-correlate-core-lift-formula-group-by-sql: backlog
   4-6-correlate-small-sample-warnings-axis-skip: backlog
   4-7-bisect-binary-search-over-chain: backlog

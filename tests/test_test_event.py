@@ -235,15 +235,16 @@ def test_test_event_outcome_record_level_matches_outcome(configured_db):
 # ============================================================================
 
 
-def test_replay_records_importable_and_stub_raises():
-    """AC7 — replay_records is importable but raises NotImplementedError
-    when called (full impl in v0.5 / Story 4.9)."""
-    from ulog.testing import replay_records
+def test_replay_records_importable_and_works():
+    """Story 4.9 — replay_records is now a real context manager (the
+    v0.3 NotImplementedError stub has been replaced)."""
+    from ulog.testing import ReplaySession, replay_records
 
     assert callable(replay_records)
-    # Match on "Story 4.9" — more stable than "v0.5" (versioning may evolve).
-    with pytest.raises(NotImplementedError, match=r"Story 4\.9"):
-        replay_records([])
+    # Context manager: usable in a `with` block, yields a ReplaySession.
+    with replay_records([]) as session:
+        assert isinstance(session, ReplaySession)
+        assert session.captured == ()
 
 
 def test_test_session_importable_and_constructible():
@@ -257,13 +258,21 @@ def test_test_session_importable_and_constructible():
     assert s.records == []
 
 
-def test_testing_module_all_lists_three_exports():
-    """AC8 — ulog.testing.__all__ contains exactly the three locked names."""
+def test_testing_module_all_lists_exports():
+    """AC8 + Story 4.9 — ulog.testing.__all__ contains the locked names.
+
+    Story 4.9 added `CapturedRecord` + `ReplaySession` alongside the
+    original 3 (TestSession, replay_records, test_event).
+    """
     import ulog.testing as t
 
-    # Python's default sorted() is case-sensitive: uppercase 'T' < lowercase
-    # 'r'/'t' by ASCII, so TestSession sorts first.
-    assert sorted(t.__all__) == ["TestSession", "replay_records", "test_event"]
+    assert sorted(t.__all__) == [
+        "CapturedRecord",
+        "ReplaySession",
+        "TestSession",
+        "replay_records",
+        "test_event",
+    ]
 
 
 # ============================================================================

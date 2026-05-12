@@ -17,24 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-
-def _parse_ts(raw: Any) -> Any:
-    """Re-parse a SQLite-stored datetime string back to `datetime`.
-
-    Raw `text()` SQL bypasses SQLAlchemy's DateTime adapter, so
-    `ts` comes back as `"YYYY-MM-DD HH:MM:SS[.ffffff]"`. The chain
-    hash was computed over the original `datetime` (via
-    `.isoformat()`, T-separated), so we must restore that form
-    before recomputing the hash.
-    """
-    if not isinstance(raw, str):
-        return raw
-    try:
-        return datetime.datetime.fromisoformat(raw)
-    except ValueError:
-        # Python 3.10's fromisoformat doesn't accept the space
-        # separator — try swapping to T.
-        return datetime.datetime.fromisoformat(raw.replace(" ", "T", 1))
+from .._chain import parse_stored_ts as _parse_ts
 
 
 def _parse_range(s: str) -> tuple[int, int]:
@@ -99,7 +82,7 @@ def run(args: argparse.Namespace) -> int:
         rows = conn.execute(
             text(
                 "SELECT chain_pos, ts, level, logger, msg, file, line, "
-                "exc, context, immutable, record_hash, prev_hash "
+                "exc, context, immutable, record_hash, prev_hash, is_replay "
                 f"FROM logs WHERE {where_sql} ORDER BY chain_pos"
             ),
             params,
@@ -131,6 +114,7 @@ def run(args: argparse.Namespace) -> int:
             "exc": json.loads(row[7]) if isinstance(row[7], str) else row[7],
             "context": json.loads(row[8]) if isinstance(row[8], str) else row[8],
             "immutable": row[9],
+            "is_replay": row[12],  # Story 4.2 — part of the canonical hash
         }
         actual_record_hash = bytes(row[10])
         actual_prev_hash = bytes(row[11])

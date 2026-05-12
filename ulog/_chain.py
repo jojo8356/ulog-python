@@ -203,3 +203,26 @@ def sha256_record(record: Mapping[str, Any], prev_hash: bytes) -> bytes:
     Decision: stdlib hashlib, no external crypto lib.
     """
     return _hashlib.sha256(canonical_record_json(record) + prev_hash).digest()
+
+
+def parse_stored_ts(raw: Any) -> Any:
+    """Re-parse a SQLite-stored datetime string back to `datetime`.
+
+    Raw `text()` SQL bypasses SQLAlchemy's DateTime adapter, so `ts`
+    comes back as `"YYYY-MM-DD HH:MM:SS[.ffffff]"` instead of a
+    `datetime` object. The chain hash was computed over the original
+    `datetime` (via `.isoformat()`, T-separated), so any chain walker
+    must restore that form before recomputing or sharing the row.
+
+    Used by `ulog verify` (Story 3.7), `ulog repair` (Story 3.8), and
+    `replay()` (Story 4.1). Originally lived in `_cli/cmd_verify.py`;
+    extracted here for cross-module reuse.
+    """
+    if not isinstance(raw, str):
+        return raw
+    try:
+        return _dt.datetime.fromisoformat(raw)
+    except ValueError:
+        # Python 3.10's fromisoformat doesn't accept the space
+        # separator — try swapping to T.
+        return _dt.datetime.fromisoformat(raw.replace(" ", "T", 1))

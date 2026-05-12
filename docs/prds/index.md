@@ -31,6 +31,7 @@ Chaque ligne pointe vers le PRD complet.
 | v0.14.0 | [PRD-v0.14-known-bugs-auto-lookup.md](./PRD-v0.14-known-bugs-auto-lookup.md) | LONG-TERM — known-bugs auto-lookup. Detects language + framework from the stack, queries a local cache of scraped SO Data Dump + GitHub issues + official docs. "Known matches" panel shows top-3 results with accepted-answer badge. Zero LLM. `ulog bug-cache refresh` daily. | draft v1 | 248 |
 | v0.15.0 | [PRD-v0.15-community-solutions-site.md](./PRD-v0.15-community-solutions-site.md) | LONG-TERM — `ulog.solutions` hosted community site. Devs push their v0.13 fixes signed via ed25519 keypair bound to GH OAuth identity; same signatures across orgs surface each other's solutions. CC BY-SA 4.0. Self-host Docker Compose ships from day 1. | draft v1 | 281 |
 | v0.16.0 | [PRD-v0.16-unified-solution-search.md](./PRD-v0.16-unified-solution-search.md) | Unified solution search — ONE "Search solutions" button on every detail view (when signature present). Per-record consent dialog → parallel fan-out: community (v0.15) + local DB (v0.13) + known-bugs (v0.14 when shipped) → merged + reranked + deduped. Payload = signature only. Modes: `off` / `opt-in` (default) / `auto-consent` (banner-warned). | draft v1 | 320 |
+| v0.17.0 | [PRD-v0.17-log-import.md](./PRD-v0.17-log-import.md) | Log import — `ulog import <file>… --db <out>.sqlite` ingests external log files (.log, .txt, JSONL, CSV, nginx/apache combined, syslog 3164/5424, journald JSON, raw, custom regex) into ulog's storage. Imported rows marked `is_imported=1`, out-of-chain (chain integrity preserved). Streaming reader; .gz/.bz2 stdlib, .zst opt-in. 6 built-in parsers + regex escape hatch. | draft v1 | — |
 
 ## Filiation
 
@@ -59,6 +60,9 @@ PRD-v0.1-core.md
                                         ├── PRD-v0.14-known-bugs-auto-lookup.md  (LONG-TERM — scrape SO Data Dump + GH issues + docs, viewer panel "Known matches" cache-only)
                                         └── PRD-v0.15-community-solutions-site.md  (LONG-TERM — hosted `ulog.solutions` site, ed25519-signed submissions, GH OAuth, CC BY-SA 4.0, self-host Docker recipe shipped)
                                             └── PRD-v0.16-unified-solution-search.md  (draft v1 — merges v0.13 + v0.14 + v0.15 into ONE consent-gated "Search solutions" button + merged ranked panel)
+
+PRD-v0.5-forensic-archive.md
+└── PRD-v0.17-log-import.md  (draft v1 — `ulog import` ingests arbitrary log files into a ulog SQLite DB; out-of-chain via is_imported=1; 6 built-in parsers + regex escape hatch)
 ```
 
 ## Conventions

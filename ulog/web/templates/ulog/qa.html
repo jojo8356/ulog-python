@@ -421,103 +421,22 @@ python3 -m pytest tests/test_chain_concurrency.py -m slow -v   # ~91s</code></pr
     </div>
   </section>
 
-  {# ====== 7. Epic 4 — v0.5 queryability (replay / correlate / bisect / CLI) ====== #}
-  <section class="mb-8">
-    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-cyan-600 dark:text-cyan-400">
-      <input type="checkbox" data-qa-epic-toggle="e4q-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this Epic">
-      {% lucide "search" size=18 %}
-      <span data-i18n-key="section-7-title">7. Epic 4 — Queryability (v0.5)</span>
+  {# ====== 7. Epic 4 — v0.5 queryability — fully automated ====== #}
+  <section class="mb-8 p-3 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+    <h2 class="font-semibold mb-1 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+      {% lucide "circle-check" size=18 %}
+      <span data-i18n-key="section-7-title">7. Epic 4 — Queryability (v0.5) — automated</span>
     </h2>
-    <p class="text-xs text-slate-600 dark:text-slate-400 mb-2" data-i18n-key="section-7-intro">
-      Manual checks for CLI output readability, generated-file ergonomics, and end-user error wording. Programmatic coverage lives in <code>tests/test_replay_*.py</code> / <code>tests/test_filter_dsl.py</code> / <code>tests/test_correlate.py</code> / <code>tests/test_bisect.py</code> / <code>tests/test_cli_queryability.py</code> (113 tests). Sub-sections below cover what auto-tests can't eyeball.
+    <p class="text-xs text-emerald-800 dark:text-emerald-200" data-i18n-key="section-7-desc">
+      `ulog replay` / `correlate` / `bisect` CLI output ✓, generated regression test file ✓, DSL parse-error wording ✓, Python API ergonomics (MappingProxyType, is_replaying, replay_records) ✓, chain integrity after replay ✓ — all covered by <code>tests/test_replay_*.py</code> / <code>test_filter_dsl.py</code> / <code>test_correlate.py</code> / <code>test_bisect.py</code> / <code>test_cli_queryability.py</code> (113 tests). Nothing to eyeball in the browser. Run:
     </p>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e4q-7.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-7-1-title">7.1 ulog replay CLI output (Story 4.8)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run: <code>python -m ulog._cli replay 'level=ERROR' --db ./demo.sqlite</code></p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4q-7.1-1" label="Each record line: chain_pos=N + ts + level + logger + msg readable in terminal" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.1-2" label="Trailing summary: 'N records replayed.' visible" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.1-3" label="Empty filter (e.g. level=NEVER_USED) → '0 records replayed.' + exit 0" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.1-4" label="Invalid DSL (e.g. 'level=') → stderr 'invalid filter — empty filter expression' + exit 2 (echo $?)" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e4q-7.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-7-2-title">7.2 ulog correlate CLI report layout (Story 4.5 / 4.6 / 4.8)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run: <code>python -m ulog._cli correlate 'level=ERROR' --db ./demo.sqlite</code></p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4q-7.2-1" label="Header line 'filter: N  baseline: M  wall: <ms>' visible" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.2-2" label="Sections '=== top_over ===' and '=== bottom_under ===' rendered when there are matches" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.2-3" label="Each row: 'context.<key> = <value>  in_filter=N  in_baseline=N  lift=<float>' aligned in columns" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.2-4" label="Infinite lift renders as '∞' glyph (NOT 'inf' or 'Infinity')" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.2-5" label="Small-sample rows annotated '⚠ small_sample'" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.2-6" label="Axis section '=== axis_rows (filter dimension; excluded from rank) ===' present when filter is a simple level= or logger=" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.2-7" label="Filter that matches zero records → empty top/bottom + header shows 'filter: 0'" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e4q-7.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-7-3-title">7.3 ulog bisect CLI output (Story 4.7 / 4.8)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run: <code>python -m ulog._cli bisect 'timeout' --db ./demo.sqlite</code></p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4q-7.3-1" label="Found: 'Found at chain_pos=N (wall <ms>)' header + ts/level/logger/file:line/msg block readable" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.3-2" label="Record's context (if any) renders under 'context:' with 'key = value' lines" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.3-3" label="No match: 'No record matched pattern.' + exit 0 (NOT exit 1)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.3-4" label="Invalid regex (e.g. '(unclosed') → stderr 'invalid regex' + exit 2" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.3-5" label="Regex literal honoured: pattern 'a.b' matches 'axb' (NOT just literal 'a.b')" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e4q-7.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-7-4-title">7.4 Generated regression test file readable (Story 4.3 / 4.8)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run: <code>python -m ulog._cli replay 'level=ERROR' --db ./demo.sqlite --to-pytest /tmp/test_inc.py --incident-hash abc123 --topic dbtimeout --force</code></p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-1" label="Stdout: 'Wrote /tmp/test_inc.py (N records snapshotted).' visible" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-2" label="Open /tmp/test_inc.py — header docstring lists incident_hash + topic + date + db + filter" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-3" label="Imports: 'import pytest' + 'from ulog.testing import replay_records' present" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-4" label="INCIDENT_RECORDS = [...] visible, pretty-printed (one record per item, aligned)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-5" label="Test function name 'def test_incident_abc123_dbtimeout():' (hash slugged, topic slugged)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-6" label="TODO comment in the test body explains how to write the actual assertion (with example)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-7" label="Run 'pytest /tmp/test_inc.py' — collects + passes (stub assertion green)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.4-8" label="Re-run replay --to-pytest /tmp/test_inc.py WITHOUT --force → stderr 'refused to overwrite' + exit 2" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e4q-7.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-7-5-title">7.5 DSL parse-error wording (Story 4.4)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Try each malformed filter via the CLI and eyeball the stderr message:</p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4q-7.5-1" label="Empty filter '' → 'empty filter expression' (clear)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.5-2" label="Unclosed paren '(level=ERROR' → mentions 'expected' RPAREN at column N" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.5-3" label="Missing value 'level=' → mentions 'expected value' or 'unexpected end'" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.5-4" label="Trailing garbage 'level=ERROR junk' → mentions 'unexpected token'" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.5-5" label="Injection 'level=ERROR; DROP TABLE' → ParseError BEFORE any SQL is generated (no DB damage)" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e4q-7.6-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-7-6-title">7.6 Python API ergonomics (Stories 4.1 / 4.2 / 4.9)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Try from a Python REPL or scratch script:</p>
-    <pre class="bg-slate-100 dark:bg-slate-900 rounded p-2 text-xs overflow-x-auto"><code>import ulog
-ulog.replay('./demo.sqlite', where_dsl='level=ERROR',
-            on=lambda r: print(r['chain_pos'], r['msg']))
-# Inside the callback: ulog.is_replaying() returns True.
-# Records passed to `on` are MappingProxyType — mutation raises TypeError.
-
-from ulog.testing import replay_records
-RECORDS = [{'level': 'ERROR', 'logger': 'svc', 'msg': 'boom',
-            'context': {'db_timeout': True}}]
-with replay_records(RECORDS) as session:
-    print(ulog.is_replaying())   # True
-    print(session.matches(lambda r: r.extras.get('db_timeout')))  # True</code></pre>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4q-7.6-1" label="ulog.replay() iterates records in chain_pos order (1, 2, 3, ...)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.6-2" label="Callback gets MappingProxyType; record['msg']='x' inside the callback raises TypeError with 'mappingproxy' wording" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.6-3" label="ulog.is_replaying() returns True inside the callback / `with replay_records(...)` body, False outside" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.6-4" label="Records emitted inside replay land with is_replay=1, chain_pos=0 (do NOT advance the chain — Story 4.10)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.6-5" label="session.matches(predicate) returns True/False as expected; session.captured is a tuple (immutable)" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e4q-7.7-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-7-7-title">7.7 Chain integrity after replay activity (Story 4.10)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Setup a chain-mode DB, emit some records, then run a replay that itself emits more records, then verify:</p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e4q-7.7-1" label="ulog verify ./demo.sqlite still reports '✓ Integrity verified' AFTER replay activity (replay records skipped via record_hash IS NOT NULL)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.7-2" label="sqlite3 'SELECT MAX(chain_pos) FROM logs' is unchanged after replay (no new chain entries)" %}
-      {% include "ulog/_qa_item.html" with id="e4q-7.7-3" label="sqlite3 'SELECT COUNT(*) FROM logs WHERE is_replay=1' reflects the replay-emitted records (chain_pos=0, hashes NULL)" %}
-    </ul>
+    <pre class="bg-white/60 dark:bg-slate-900/40 rounded p-2 text-xs mt-1 overflow-x-auto"><code>python3 -m pytest tests/test_replay_core.py tests/test_replay_state.py tests/test_replay_to_pytest.py tests/test_filter_dsl.py tests/test_correlate.py tests/test_bisect.py tests/test_cli_queryability.py -v</code></pre>
+    <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1" data-i18n-key="section-7-footer">
+      If green → §7 done. Skip to §8 below.
+    </p>
   </section>
 
-  {# ====== 8. Epic 5 — v0.5 incident lifecycle ====== #}
+  {# ====== 8. Epic 5 — v0.5 incident lifecycle — GUI items only ====== #}
   <section class="mb-8">
     <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-rose-600 dark:text-rose-400">
       <input type="checkbox" data-qa-epic-toggle="e5q-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this Epic">
@@ -525,66 +444,31 @@ with replay_records(RECORDS) as session:
       <span data-i18n-key="section-8-title">8. Epic 5 — Incident lifecycle (v0.5)</span>
     </h2>
     <p class="text-xs text-slate-600 dark:text-slate-400 mb-2" data-i18n-key="section-8-intro">
-      Manual checks for incident CLI output readability, Markdown rendering, and Python API ergonomics. Programmatic coverage lives in <code>tests/test_incidents*.py</code> (27 tests). Sub-sections below cover what auto-tests can't eyeball.
+      GUI-only manual checks. CLI / Python API / Markdown shape are fully covered by <code>tests/test_incidents.py</code> + <code>test_incidents_cli.py</code> (20 tests). Run <code>python3 -m pytest tests/test_incidents.py tests/test_incidents_cli.py -v</code> for those.
     </p>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e5q-8.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-8-1-title">8.1 ulog incidents --status CLI (Story 5.4 / FR107)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run: <code>python -m ulog._cli incidents --db ./demo.sqlite --status open ; echo "exit=$?"</code></p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e5q-8.1-1" label="Each row: '#<short-hash>  <ts>  [<state>]  age=<rel>' aligned in columns" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.1-2" label="Exit code printed equals the number of open incidents (CI gate signal)" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.1-3" label="--status all lists every incident (open + closed + reopened) with [state] tag visible" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.1-4" label="Bare 'incidents --db ...' (no flags) prints summary 'incidents: N open, M closed (of K tracked).'" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.1-5" label="Missing DB → stderr 'DB not found: <path>' + exit 2" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e5q-8.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-8-2-title">8.2 ulog incidents --report Markdown (Story 5.5 / FR108)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run: <code>python -m ulog._cli incidents --db ./demo.sqlite --report --since 1y > /tmp/r.md</code></p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e5q-8.2-1" label="Header '# Incidents report — since <iso>' visible" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.2-2" label="All 7 KPI rows present: Opened, Closed, Net debt, MTTR, P95 time-to-close, Reopens, Top closers" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.2-3" label="Open /tmp/r.md in a Markdown viewer (VSCode preview / pandoc / GitHub) — table renders correctly, no raw '|' artifacts" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.2-4" label="MTTR / P95 are human-readable (e.g. '2h', '45m', '3.4d') — NOT raw seconds like '7200'" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.2-5" label="Empty DB / no resolves → MTTR + P95 show '—' (em-dash); Top closers '—'" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.2-6" label="--report without --since → stderr '--report requires --since' + exit 2" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e5q-8.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-8-3-title">8.3 Python API: ulog.resolve / ulog.reopen (Stories 5.1 / 5.2)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Try from a Python REPL after <code>ulog.setup(integrity='hash-chain', handlers=['sql'], sql_url='sqlite:///./demo.sqlite')</code>:</p>
-    <pre class="bg-slate-100 dark:bg-slate-900 rounded p-2 text-xs overflow-x-auto"><code>import ulog
-ulog.get_logger().error("boom")          # creates an incident
-# Grab its record_hash from sqlite (or `ulog incidents --status open`).
-ulog.resolve("3f7c12a", by="Johan", note="rolled back deploy")  # 4+ hex prefix OK
-ulog.reopen("3f7c12a", reason="recurrence")</code></pre>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e5q-8.3-1" label="resolve() with unknown hash (e.g. '00000000deadbeef') raises LookupError with the hash visible in the message" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.3-2" label="Hex prefix ≥ 4 chars works — short prefix < 4 raises LookupError mentioning 'too short'" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.3-3" label="resolve() on an already-resolved hash is ALLOWED — emits another RESOLVED record (latest wins)" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.3-4" label="Without `setup(handlers=['sql'], integrity='hash-chain')` → RuntimeError 'require a SQL handler'" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e5q-8.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-8-4-title">8.4 Detail-page Incident panel (Story 6.7 / FR114)</span></h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e5q-8.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-8-1-title">8.1 Detail-page Incident panel (Story 6.7 / FR114)</span></h3>
     <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">After seeding ≥1 incident + 1 resolve, navigate to the incident's detail page (<code>/r/&lt;id&gt;/</code>):</p>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e5q-8.4-1" label="On the original ERROR record → 'Incident' panel shows 'Resolved by: #N · RESOLVED — <by> · <ts>'" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.4-2" label="Note (if any) rendered italic under the line: \"<note>\"" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.4-3" label="On the RESOLVED record → panel shows 'Resolves: #N · <original msg>' linking back to /r/N/" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.4-4" label="On a normal INFO record (not an incident, not a resolve) → no Incident panel rendered" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.4-5" label="Cross-links are <a> tags — clicking navigates correctly + browser back-button works" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.1-1" label="On the original ERROR record → 'Incident' panel shows 'Resolved by: #N · RESOLVED — <by> · <ts>'" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.1-2" label="Note (if any) rendered italic under the line: \"<note>\"" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.1-3" label="On the RESOLVED record → panel shows 'Resolves: #N · <original msg>' linking back to /r/N/" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.1-4" label="On a normal INFO record (not an incident, not a resolve) → no Incident panel rendered" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.1-5" label="Cross-links are <a> tags — clicking navigates correctly + browser back-button works" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e5q-8.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-8-5-title">8.5 Sidebar Incidents quick filters (Story 6.8 / FR115)</span></h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e5q-8.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-8-2-title">8.2 Sidebar Incidents quick filters (Story 6.8 / FR115)</span></h3>
     <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Navigate to the list view (<code>/</code>) of a chain-integrity SQLite DB:</p>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e5q-8.5-1" label="Sidebar 'Incidents' section visible with siren icon + three radio choices (Open / Closed last 7d / Reopened) + 'All / none'" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.5-2" label="Per-choice count visible to the right of each label" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.5-3" label="Selecting 'Open' + submitting form → records list filters down to currently-open incidents only" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.5-4" label="Selecting 'Reopened' → records list excludes closed-and-never-reopened incidents" %}
-      {% include "ulog/_qa_item.html" with id="e5q-8.5-5" label="Opening a JSONL/CSV log file (no chain) → no 'Incidents' section rendered" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.2-1" label="Sidebar 'Incidents' section visible with siren icon + three radio choices (Open / Closed last 7d / Reopened) + 'All / none'" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.2-2" label="Per-choice count visible to the right of each label" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.2-3" label="Selecting 'Open' + submitting form → records list filters down to currently-open incidents only" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.2-4" label="Selecting 'Reopened' → records list excludes closed-and-never-reopened incidents" %}
+      {% include "ulog/_qa_item.html" with id="e5q-8.2-5" label="Opening a JSONL/CSV log file (no chain) → no 'Incidents' section rendered" %}
     </ul>
   </section>
 
-  {# ====== 9. Epic 6 — v0.5 cross-service & UI extensions ====== #}
+  {# ====== 9. Epic 6 — v0.5 cross-service & UI extensions — GUI items only ====== #}
   <section class="mb-8">
     <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
       <input type="checkbox" data-qa-epic-toggle="e6q-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle every item in this Epic">
@@ -592,72 +476,41 @@ ulog.reopen("3f7c12a", reason="recurrence")</code></pre>
       <span data-i18n-key="section-9-title">9. Epic 6 — Cross-service & UI extensions (v0.5)</span>
     </h2>
     <p class="text-xs text-slate-600 dark:text-slate-400 mb-2" data-i18n-key="section-9-intro">
-      Manual checks for OTel auto-bind behaviour, CLI/HTML output, multi-track interactivity, integrity badge states, locale fallback. Programmatic coverage lives in <code>tests/test_otel_bind.py</code> / <code>test_cli_trace.py</code> / <code>test_glyphs.py</code> / <code>test_issue_url.py</code> / <code>test_multi_track_*.py</code> / <code>test_integrity_badge.py</code> / <code>test_incidents_detail_links.py</code> / <code>test_incidents_sidebar.py</code> (50 tests).
+      GUI-only manual checks. OTel auto-bind, <code>ulog trace</code> CLI, locale glyph fallback are fully covered by <code>tests/test_otel_bind.py</code> + <code>test_cli_trace.py</code> + <code>test_glyphs.py</code> (21 tests). Run <code>python3 -m pytest tests/test_otel_bind.py tests/test_cli_trace.py tests/test_glyphs.py -v</code> for those.
     </p>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-1-title">9.1 OTel auto-bind from contextvar/env (Story 6.1 / FR109)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">From a shell:</p>
-    <pre class="bg-slate-100 dark:bg-slate-900 rounded p-2 text-xs overflow-x-auto"><code>traceparent=00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01 \
-  python -c "import ulog; ulog.setup(handlers=['sql'], sql_url='sqlite:///./otel.sqlite'); ulog.get_logger().error('x')"
-sqlite3 ./otel.sqlite "SELECT context FROM logs"</code></pre>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e6q-9.1-1" label="DB context column shows trace_id=4bf92f3577b34da6a3ce929d0e0e4736 + span_id=00f067aa0ba902b7" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.1-2" label="Without traceparent env → context has no trace_id field; NO warning printed on stderr" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.1-3" label="Malformed traceparent (e.g. 'garbage') → no crash, no trace_id attached, no warning" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.1-4" label="grep -RE 'import opentelemetry' ulog/ returns 0 matches (NFR-DEP-50 — zero PyPI dep)" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-2-title">9.2 ulog trace CLI (Story 6.2 / FR110)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run: <code>python -m ulog._cli trace 4bf92f3577b34da6a3ce929d0e0e4736 --db ./otel.sqlite</code></p>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e6q-9.2-1" label="Each row: 'ts  level  logger  msg' aligned columns" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.2-2" label="Header line 'N record(s) for trace_id <hex>:' visible above rows" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.2-3" label="No match → 'No records for trace_id <hex>.' + exit 0" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.2-4" label="Missing --db → argparse 'the following arguments are required: --db' + exit 2" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-3-title">9.3 Issue-template URL button (Story 6.3 / FR111)</span></h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-1-title">9.1 Issue-template URL button (Story 6.3 / FR111)</span></h3>
     <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Configure then navigate to any record detail:</p>
     <pre class="bg-slate-100 dark:bg-slate-900 rounded p-2 text-xs overflow-x-auto"><code>import ulog
 ulog.setup(handlers=['sql'], integrity='hash-chain',
            sql_url='sqlite:///./demo.sqlite',
            issue_template_url='https://linear.app/team/new?title={msg}&description={body}')</code></pre>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e6q-9.3-1" label="Detail page footer shows amber 'Open issue' button with external-link icon" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.3-2" label="Click → opens new tab (target=_blank rel=noopener) to issue URL with placeholders filled in" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.3-3" label="Inspect URL: msg/body contain percent-encoded chars (e.g. %20 for spaces, %22 for quotes) — NFR-SEC-51" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.3-4" label="body parameter contains JSON list of 5 records (2 before + target + 2 after by chain_pos) — Gap G3" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.3-5" label="Without `setup(issue_template_url=...)` configured → button absent (NOT a broken empty link)" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.1-1" label="Detail page footer shows amber 'Open issue' button with external-link icon" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.1-2" label="Click → opens new tab (target=_blank rel=noopener) to issue URL with placeholders filled in" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.1-3" label="Without `setup(issue_template_url=...)` configured → button absent (NOT a broken empty link)" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-4-title">9.4 Multi-track view (Stories 6.4 / 6.5 / FR112)</span></h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-2-title">9.2 Multi-track view (Stories 6.4 / 6.5 / FR112)</span></h3>
     <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Navigate to <code>/multi-track</code> (or click "Multi-track" in header nav):</p>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e6q-9.4-1" label="Header nav 'Multi-track' link visible (activity icon)" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.4-2" label="Page shows 4 horizontal SVG strips (level / service / author / file), one per track row" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.4-3" label="Each strip has a 'Mute' checkbox in its top-right" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.4-4" label="Ticking 'Mute' on a track dims the strip (opacity-30) without page reload" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.4-5" label="From/To inputs + Apply button update the window correctly" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.4-6" label="Window with zero records → each strip shows '(no data)' placeholder + top hint 'try widening the window'" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.4-7" label="Hover a rect tick → tooltip 'bucket · value · count'" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.2-1" label="Header nav 'Multi-track' link visible (activity icon)" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.2-2" label="Page shows 4 horizontal SVG strips (level / service / author / file), one per track row" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.2-3" label="Each strip has a 'Mute' checkbox in its top-right" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.2-4" label="Ticking 'Mute' on a track dims the strip (opacity-30) without page reload" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.2-5" label="From/To inputs + Apply button update the window correctly" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.2-6" label="Window with zero records → each strip shows '(no data)' placeholder + top hint 'try widening the window'" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.2-7" label="Hover a rect tick → tooltip 'bucket · value · count'" %}
     </ul>
 
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-5-title">9.5 Integrity badge header pill (Story 6.6 / FR113)</span></h3>
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-3-title">9.3 Integrity badge header pill (Story 6.6 / FR113)</span></h3>
     <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">With a chain-integrity SQLite DB open in <code>ulog-web</code>:</p>
     <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e6q-9.5-1" label="Initial state: gray pill 'Integrity: never verified' (shield icon) — tooltip hints at `ulog verify <path>`" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.5-2" label="Run `python -m ulog._cli verify ./demo.sqlite` then reload page → green pill 'Integrity ✓ #N' (shield-check icon)" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.5-3" label="Tooltip on green badge: 'verified up to #N · last check <relative>' (e.g. '5s ago')" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.5-4" label="Corrupt a row (sqlite3 UPDATE logs SET msg='tampered' WHERE chain_pos=2) → re-verify → red pill 'Integrity ✗ BROKEN at #N'" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.5-5" label="Pill appears on EVERY page (records list, detail, multi-track, docs) — base.html injection works everywhere" %}
-    </ul>
-
-    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e6q-9.6-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-9-6-title">9.6 Locale glyph fallback (Story 6.9 / NFR-PORT-50)</span></h3>
-    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Force a non-UTF-8 locale and run correlate:</p>
-    <pre class="bg-slate-100 dark:bg-slate-900 rounded p-2 text-xs overflow-x-auto"><code>LC_ALL=C python -m ulog._cli correlate 'level=ERROR' --db ./demo.sqlite</code></pre>
-    <ul class="space-y-1.5 text-sm">
-      {% include "ulog/_qa_item.html" with id="e6q-9.6-1" label="Output uses ASCII fallback: 'inf' (NOT ∞), 'WARN' (NOT ⚠) — no mojibake / replacement chars" %}
-      {% include "ulog/_qa_item.html" with id="e6q-9.6-2" label="With normal UTF-8 locale (default) → Unicode glyphs ∞ ⚠ ✓ rendered" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.3-1" label="Initial state: gray pill 'Integrity: never verified' (shield icon) — tooltip hints at `ulog verify <path>`" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.3-2" label="After `ulog verify` + reload → green pill 'Integrity ✓ #N' (shield-check icon)" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.3-3" label="Tooltip on green badge: 'verified up to #N · last check <relative>' (e.g. '5s ago')" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.3-4" label="After corrupting a row + re-verify → red pill 'Integrity ✗ BROKEN at #N'" %}
+      {% include "ulog/_qa_item.html" with id="e6q-9.3-5" label="Pill appears on EVERY page (records list, detail, multi-track, docs) — base.html injection works everywhere" %}
     </ul>
   </section>
 

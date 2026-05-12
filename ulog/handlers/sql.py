@@ -208,7 +208,12 @@ class SQLHandler(logging.Handler):
         try:
             self._ensure_schema()
             row = self._record_to_row(record)
-            if self._chain_mode:
+            # Story 4.10 — records emitted during replay (is_replay=1)
+            # MUST NOT advance the chain even when chain_mode is on.
+            # They take the buffered/batched path with NULL hash columns
+            # (server defaults). The chain stays untouched; verify still
+            # passes (it filters `record_hash IS NOT NULL`).
+            if self._chain_mode and row.get("is_replay", 0) == 0:
                 self._chain_append(row)
                 return
             with self._lock:

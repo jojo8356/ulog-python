@@ -5,10 +5,13 @@ Single `ulog` console-script entry point. Subcommands live in
 `register(subparsers)`. Each subcommand exposes `run(args) -> int`
 returning a POSIX exit code.
 
-Currently shipped subcommands (Story 3.7+):
-  - verify   — walk the chain and report OK/BROKEN (Story 3.7)
-  - repair   — archive orphans + truncate the chain (Story 3.8)
-  - purge    — delete rotable rows older than --before (Story 3.9)
+Currently shipped subcommands:
+  - verify    — walk the chain and report OK/BROKEN (Story 3.7)
+  - repair    — archive orphans + truncate the chain (Story 3.8)
+  - purge     — delete rotable rows older than --before (Story 3.9)
+  - correlate — over/under-represented dimensions for a filter (Story 4.8)
+  - bisect    — first chain record matching a regex (Story 4.8)
+  - replay    — iterate matching records or generate a regression test (Story 4.8)
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import cmd_purge, cmd_repair, cmd_verify
+from . import cmd_bisect, cmd_correlate, cmd_purge, cmd_repair, cmd_replay, cmd_verify
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,6 +31,9 @@ def main(argv: list[str] | None = None) -> int:
     cmd_verify.register(subparsers)
     cmd_repair.register(subparsers)
     cmd_purge.register(subparsers)
+    cmd_correlate.register(subparsers)
+    cmd_bisect.register(subparsers)
+    cmd_replay.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

@@ -20,6 +20,8 @@ Quick start:
 
 from __future__ import annotations
 
+from ._bisect import BisectResult, bisect
+from ._correlate import CorrelationReport, CorrelationRow, correlate
 from .context import bind, clear, context, get_bound, unbind
 from .formatters import (
     JsonFormatter,
@@ -47,7 +49,12 @@ __version__ = "0.1.0"
 __all__ = [
     "LOG_LEVELS",
     "PROFILES",
+    # Bisect (v0.5, Story 4.7)
+    "BisectResult",
     "CSVHandler",
+    # Correlate (v0.5, Story 4.5)
+    "CorrelationReport",
+    "CorrelationRow",
     "JSONLineHandler",
     "JsonFormatter",
     "LogLevel",
@@ -62,8 +69,10 @@ __all__ = [
     "__version__",
     # Context binding
     "bind",
+    "bisect",
     "clear",
     "context",
+    "correlate",
     "default_db_path",
     "get_bound",
     "get_logger",

@@ -144,9 +144,10 @@ def test_record_emitted_inside_replay_marked_is_replay_1(tmp_path):
     assert flag == 1
 
 
-def test_record_inside_replay_chain_mode_persists_is_replay_1(tmp_path):
-    """Same as above, but with chain mode active — the record_hash
-    must also include is_replay=1 in its canonical form."""
+def test_record_inside_replay_chain_mode_does_not_advance_chain(tmp_path):
+    """Story 4.10 — replay-emitted records get is_replay=1 BUT
+    do NOT advance the chain. chain_pos stays 0 (server default),
+    record_hash/prev_hash stay NULL."""
     from sqlalchemy import create_engine, text
 
     db = tmp_path / "chain.sqlite"
@@ -166,10 +167,23 @@ def test_record_inside_replay_chain_mode_persists_is_replay_1(tmp_path):
     engine = create_engine(url, future=True)
     with engine.begin() as conn:
         rows = conn.execute(
-            text("SELECT msg, is_replay, chain_pos FROM logs ORDER BY chain_pos")
+            text("SELECT msg, is_replay, chain_pos, record_hash, prev_hash FROM logs ORDER BY id")
         ).all()
     engine.dispose()
-    assert rows == [("seed", 0, 1), ("during-replay", 1, 2)]
+    # seed: chain_pos=1, is_replay=0, hashes populated.
+    seed = rows[0]
+    assert seed[0] == "seed"
+    assert seed[1] == 0
+    assert seed[2] == 1
+    assert seed[3] is not None  # record_hash set
+    assert seed[4] is not None  # prev_hash set
+    # during-replay: chain_pos=0 (default), is_replay=1, hashes NULL.
+    replay_row = rows[1]
+    assert replay_row[0] == "during-replay"
+    assert replay_row[1] == 1
+    assert replay_row[2] == 0
+    assert replay_row[3] is None
+    assert replay_row[4] is None
 
 
 # ---- chain hash includes is_replay --------------------------------------
@@ -192,6 +206,75 @@ def test_chain_hash_canonical_includes_is_replay():
     }
     payload = canonical_record_json(rec)
     assert b'"is_replay":1' in payload
+
+
+# ---- Story 4.10 — replay write attempt edge case -------------------------
+
+
+def test_chain_pos_max_unchanged_after_replay(tmp_path):
+    """No new chain_pos > 0 records added by a replay body."""
+    from sqlalchemy import create_engine, text
+
+    db = tmp_path / "chain.sqlite"
+    url = f"sqlite:///{db}"
+    ulog.setup(integrity="hash-chain", handlers=["sql"], sql_url=url, sql_batch_size=1)
+    log = ulog.get_logger()
+    for i in range(3):
+        log.info("seed %d", i)
+    for h in logging.getLogger().handlers:
+        h.flush()
+
+    engine = create_engine(url, future=True)
+    with engine.begin() as conn:
+        max_before = conn.execute(text("SELECT MAX(chain_pos) FROM logs")).scalar()
+    engine.dispose()
+
+    def cb(_r):
+        for i in range(5):
+            ulog.get_logger().info("replay-emit-%d", i)
+
+    ulog.replay(db, on=cb)
+    for h in logging.getLogger().handlers:
+        h.flush()
+
+    engine = create_engine(url, future=True)
+    with engine.begin() as conn:
+        max_after = conn.execute(text("SELECT MAX(chain_pos) FROM logs")).scalar()
+    engine.dispose()
+    assert max_after == max_before, "replay emits MUST NOT advance the chain"
+
+
+def test_verify_skips_replay_records(tmp_path, capsys):
+    """ulog verify continues to pass after a replay (replay records are
+    excluded by the WHERE record_hash IS NOT NULL filter)."""
+    from ulog._cli import main as cli_main
+
+    db = tmp_path / "v.sqlite"
+    url = f"sqlite:///{db}"
+    ulog.setup(integrity="hash-chain", handlers=["sql"], sql_url=url, sql_batch_size=1)
+    log = ulog.get_logger()
+    for i in range(3):
+        log.info("seed %d", i)
+    for h in logging.getLogger().handlers:
+        h.flush()
+
+    def cb(_r):
+        ulog.get_logger().info("polluter")
+
+    ulog.replay(db, on=cb)
+    for h in logging.getLogger().handlers:
+        h.flush()
+    ulog.clear()
+    for h in list(logging.getLogger().handlers):
+        if getattr(h, "_ulog_managed", False):
+            with contextlib.suppress(Exception):
+                h.close()
+            logging.getLogger().removeHandler(h)
+
+    rc = cli_main(["verify", str(db)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "✓ Integrity verified" in out
 
 
 # ---- upgrade message regression (Story 3.3) ------------------------------

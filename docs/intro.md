@@ -1,12 +1,3 @@
----
-docType: intro
-project_name: ulog
-date: 2026-05-11
-author: jojo8356
----
-
-# ULog — Présentation projet
-
 Salut tout le monde, je viens vous partager **ULog**, un projet que je
 développe en solo depuis cet été.
 
@@ -14,8 +5,6 @@ C'est un **système de logging universel cross-langages** : tes logs
 s'écrivent dans un format wire commun (SQLite + JSONL + CSV), et un
 viewer browser local les visualise tous, peu importe le langage qui
 les a produits. Zéro infra, zéro cloud, MIT.
-
-## Pourquoi
 
 Le marché du logging actuel a deux extrêmes :
 
@@ -27,8 +16,6 @@ Le marché du logging actuel a deux extrêmes :
 Personne n'occupe le milieu : **logs locaux + UI moderne +
 multi-langages dans le même viewer**. C'est là que ULog se place.
 
-## Comment
-
 Le format wire est figé depuis la v0.2 — c'est le contrat universel.
 La libe Python (`ulog-py`) est la première implémentation et tient
 sur zéro dépendance runtime. Les ports satellites (`ulog-js`,
@@ -37,7 +24,7 @@ langage-agnostic dès aujourd'hui** : il consomme le format, pas le
 langage. Roadmap target ≥ 3 langages portés avant tag v2.0.
 
 Pour la pitch détaillée de la vision multi-langages, voir
-[docs/vision-cross-language.md](./vision-cross-language.md).
+https://github.com/jojo8356/ulog-python/blob/main/docs/vision-cross-language.md.
 
 ## Stack actuelle
 
@@ -50,7 +37,7 @@ Pour la pitch détaillée de la vision multi-langages, voir
 - **mypy --strict + ruff + deptry + pip-audit** verts à zéro erreur
 - Cible v0.5 : intégrité hash-chain pour archive forensique
   (HIPAA / SOC2 lite)
-
+  
 ## Où en est le projet
 
 - **v0.1** : core API (4 formatters, contextvars binding, ucolor) —
@@ -66,7 +53,7 @@ Pour la pitch détaillée de la vision multi-langages, voir
 - **v0.6-v0.8** : static-export, test-execution-stack, modern
   frontend (Tailwind CLI + Alpine + HTMX) — draft v1
 
-Tous les PRDs : [docs/prds/](./prds/index.md).
+Tous les PRDs : https://github.com/jojo8356/ulog-python/tree/main/docs/prds.
 
 ## Snippet "hello world" en Python
 
@@ -79,14 +66,18 @@ log.error("boom")     # → qlnes: error: boom  (rouge sur TTY)
 
 ## Liens
 
-- **GitHub (lib Python)** : <https://github.com/jojo8356/ulog-python>
-- **Vision cross-langages** : [docs/vision-cross-language.md](./vision-cross-language.md)
-- **PRD roadmap** : [docs/prds/index.md](./prds/index.md)
+- **GitHub (lib Python)** : https://github.com/jojo8356/ulog-python
+- **Vision cross-langages** : https://github.com/jojo8356/ulog-python/blob/main/docs/vision-cross-language.md
+- **PRD roadmap** : https://github.com/jojo8356/ulog-python/blob/main/docs/prds/index.md
 
-C'est mon deuxième vrai projet Python sérieux donc côté code il y a
-sûrement à redire, je suis preneur de toute critique constructive.
-Si vous avez des questions ou des idées de features (ou êtes chaud
-pour porter ulog dans un autre langage), n'hésitez pas.
+Ce que je cherche : **du feedback**. Sur la pertinence du créneau
+(logs locaux + UI moderne + multi-langages), sur la lib Python en
+elle-même, sur la roadmap, sur la DX, sur le naming, sur tout. C'est
+un projet solo et j'ai besoin de regards extérieurs pour valider /
+invalider les choix avant que les ports satellites soient ouverts.
+
+Si vous êtes chauds pour porter ulog dans un autre langage
+(`ulog-js`, `ulog-go`, `ulog-rs`…) je suis aussi très preneur.
 
 Une petite étoile sur GitHub aide à attirer d'autres devs sur le
 projet.

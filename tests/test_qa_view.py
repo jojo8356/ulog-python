@@ -82,7 +82,11 @@ def test_qa_view_renders_all_checkboxes_with_unique_ids(sqlite_fixture):
     resp = client.get("/_qa/")
     body = resp.content.decode("utf-8")
     ids = re.findall(r'data-qa-id="([^"]+)"', body)
-    assert len(ids) >= 50, f"expected ≥50 checkboxes, got {len(ids)}"
+    # Floor (not exact count) — sections get retired as their FRs are
+    # automated by e2e tests, so the count drifts down over time. The
+    # load-bearing assertion below is uniqueness; this floor only
+    # catches a catastrophic template break that drops everything.
+    assert len(ids) >= 30, f"expected ≥30 checkboxes (floor), got {len(ids)}"
     assert len(ids) == len(set(ids)), "duplicate data-qa-id detected — localStorage would collide"
 
 

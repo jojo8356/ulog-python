@@ -1,7 +1,7 @@
 {
   "en": {
     "page-title": "QA manual checklist",
-    "page-desc": "Epic 1 (v0.3 Test integration) + Epic 2 (v0.4 Author attribution) + perf v0.4.1. State persisted client-side (localStorage). Visible only when launched with `ulog-web --debug ...`.",
+    "page-desc": "Epic 1 (v0.3 Test integration) + Epic 2 (v0.4 Author attribution) + perf v0.4.1 + Epic 3 (v0.5 chain integrity — manual CLI checks). State persisted client-side (localStorage). Visible only when launched with `ulog-web --debug ...`.",
     "progress-done-suffix": "done",
     "progress-pct-suffix": "%",
     "btn-reset": "Reset all",
@@ -96,14 +96,22 @@
     "section-signoff-title": "Sign-off",
     "section-signoff-desc": "When all sections are green (or bugs noted to Claude), tell Claude:",
     "section-signoff-line-1": "\"QA done, bugs: ...\" → Claude files the patches",
-    "section-signoff-line-2": "\"QA 100% green\" → Claude starts Epic 3 (v0.5 chain integrity)",
+    "section-signoff-line-2": "\"QA 100% green\" → Claude starts Epic 4 (v0.5 queryability — replay / correlate / bisect)",
+
+    "section-6-title": "6. Epic 3 — Chain integrity (v0.5) — automated",
+    "section-6-automation-title": "§6.1 → §6.7 — automated mirror",
+    "section-6-automation-desc": "Chain emit smoke ✓, ulog verify output (✓ line / records:N / wall_time / BROKEN with 8-char hex / exit codes 0/1/2) ✓, SchemaError copy-paste-able SQL (extract from message, replay via SQLAlchemy, assert no syntax error + re-bootstrap clean) ✓, Gap G1 wording ✓, repair sidecar JSONL Windows-safe filename + per-line JSON + 64-char lowercase hex ✓, repair refusal stderr ✓, purge dry-run/--confirm/immutable-spared/retention-floor/invalid-date ✓, immutable trigger 'immutable row' + 'invariant I4' wording ✓, verify_state.json pretty-print (indent=2 round-trip) + key schema + OK/BROKEN values + --range no-overwrite + post-repair removal ✓ — all 38 covered by tests/test_qa_epic3_e2e.py. Run:",
+    "section-6-automation-footer": "If green → §6.1 to §6.7 done. Skip to §6.8 below.",
+    "section-6-8-title": "§6.8 Edge cases + 80K stress (Stories 3.11 / 3.12) — automated",
+    "section-6-8-desc": "BROKEN blocks chain-setup ✓, immutable_when raise → fail-safe immutable=1 + stderr message ✓, tampered record_hash detected ✓, retention-floor regression ✓, repair clears sidecar ✓ (test_chain_edge_cases.py). 8 procs × 10K records, chain unbroken under real multi-process contention ✓ (test_chain_concurrency.py, slow-marked). Run:",
+    "section-6-8-footer": "If both green → §6.8 done.",
 
     "link-open": "open",
     "link-try": "try"
   },
   "fr": {
     "page-title": "Checklist QA manuelle",
-    "page-desc": "Epic 1 (v0.3 intégration tests) + Epic 2 (v0.4 attribution auteur) + perf v0.4.1. État persisté côté client (localStorage). Visible uniquement quand lancé avec `ulog-web --debug ...`.",
+    "page-desc": "Epic 1 (v0.3 intégration tests) + Epic 2 (v0.4 attribution auteur) + perf v0.4.1 + Epic 3 (v0.5 intégrité chaîne — vérifs CLI manuelles). État persisté côté client (localStorage). Visible uniquement quand lancé avec `ulog-web --debug ...`.",
     "progress-done-suffix": "fait",
     "progress-pct-suffix": "%",
     "btn-reset": "Tout réinitialiser",
@@ -198,7 +206,15 @@
     "section-signoff-title": "Sign-off",
     "section-signoff-desc": "Quand toutes les sections sont vertes (ou bugs notés à Claude), dis à Claude :",
     "section-signoff-line-1": "\"QA done, bugs: ...\" → Claude file les patches",
-    "section-signoff-line-2": "\"QA 100% green\" → Claude démarre Epic 3 (v0.5 chain integrity)",
+    "section-signoff-line-2": "\"QA 100% green\" → Claude démarre Epic 4 (v0.5 queryability — replay / correlate / bisect)",
+
+    "section-6-title": "6. Epic 3 — Intégrité chaîne (v0.5) — automatisé",
+    "section-6-automation-title": "§6.1 → §6.7 — miroir automatisé",
+    "section-6-automation-desc": "Chain emit smoke ✓, output ulog verify (ligne ✓ / records:N / wall_time / BROKEN avec hex 8-char / exit codes 0/1/2) ✓, SQL SchemaError copy-paste-able (extrait du message, replay via SQLAlchemy, assert no syntax error + re-bootstrap clean) ✓, wording Gap G1 ✓, sidecar JSONL repair filename Windows-safe + JSON par ligne + hex 64-char lowercase ✓, refus repair stderr ✓, purge dry-run/--confirm/immutable-spared/retention-floor/invalid-date ✓, wording trigger immutable 'immutable row' + 'invariant I4' ✓, verify_state.json pretty-print (round-trip indent=2) + schema keys + valeurs OK/BROKEN + --range no-overwrite + suppression post-repair ✓ — les 38 couverts par tests/test_qa_epic3_e2e.py. Lance :",
+    "section-6-automation-footer": "Si vert → §6.1 à §6.7 fait. Passe à §6.8 ci-dessous.",
+    "section-6-8-title": "§6.8 Edge cases + stress 80K (Stories 3.11 / 3.12) — automatisé",
+    "section-6-8-desc": "BROKEN bloque chain-setup ✓, immutable_when raise → fail-safe immutable=1 + stderr ✓, record_hash trafiqué détecté ✓, régression retention-floor ✓, repair clear le sidecar ✓ (test_chain_edge_cases.py). 8 procs × 10K records, chaîne unbroken sous vraie contention multi-process ✓ (test_chain_concurrency.py, slow-marked). Lance :",
+    "section-6-8-footer": "Si les deux verts → §6.8 fait.",
 
     "link-open": "ouvrir",
     "link-try": "tester"

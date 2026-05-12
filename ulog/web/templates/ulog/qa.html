@@ -290,6 +290,137 @@
     </p>
   </section>
 
+  {# ====== 6. Epic 3 — v0.5 chain integrity ====== #}
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold mb-2 flex items-center gap-2 text-amber-600 dark:text-amber-400">
+      {% lucide "shield-check" size=18 %}
+      <span data-i18n-key="section-6-title">6. Epic 3 — Chain integrity (v0.5) — automated</span>
+    </h2>
+
+    {% comment %}
+      §6.1 → §6.7 — fully automated by tests/test_qa_epic3_e2e.py
+      (38 tests covering chain emit smoke, ulog verify CLI output,
+      SchemaError copy-paste-able SQL via SQLAlchemy text() replay,
+      repair sidecar JSONL audit incl. Windows-safe UTC-no-colons
+      filename pattern, purge dry-run/--confirm semantics, immutable
+      trigger 'invariant I4' wording, verify_state.json pretty-print
+      + key schema + healthy/broken values + --range no-overwrite +
+      post-repair removal).
+    {% endcomment %}
+    <div class="mt-2 p-3 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+      <h3 class="font-semibold mb-1 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+        {% lucide "circle-check" size=16 %}
+        <span data-i18n-key="section-6-automation-title">§6.1 → §6.7 — automated mirror</span>
+      </h3>
+      <p class="text-xs text-emerald-800 dark:text-emerald-200" data-i18n-key="section-6-automation-desc">
+        Chain emit smoke ✓, <code>ulog verify</code> output (✓ line / records:N / wall_time / BROKEN with 8-char hex / exit codes 0/1/2) ✓, SchemaError <em>copy-paste-able</em> SQL (extract from message, replay via SQLAlchemy, assert no syntax error + re-bootstrap clean) ✓, Gap G1 wording ✓, repair sidecar JSONL Windows-safe filename + per-line JSON + 64-char lowercase hex ✓, repair refusal stderr ✓, purge dry-run/--confirm/immutable-spared/retention-floor/invalid-date ✓, immutable trigger '<code>immutable row</code>' + '<code>invariant I4</code>' wording ✓, <code>verify_state.json</code> pretty-print (indent=2 round-trip) + key schema + OK/BROKEN values + <code>--range</code> no-overwrite + post-repair removal ✓ — all 38 covered by <code>tests/test_qa_epic3_e2e.py</code>. Run:
+      </p>
+      <pre class="bg-white/60 dark:bg-slate-900/40 rounded p-2 text-xs mt-1 overflow-x-auto"><code>python3 -m pytest tests/test_qa_epic3_e2e.py -v</code></pre>
+      <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1" data-i18n-key="section-6-automation-footer">
+        If green → §6.1 to §6.7 done. Skip to §6.8 below.
+      </p>
+    </div>
+{# manual sub-sections §6.1-§6.7 retired 2026-05-12 — see test_qa_epic3_e2e.py #}
+{% comment %}
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e3-6.1-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-6-1-title">6.1 Chain emit smoke (Stories 3.1/3.5/3.6) — eyeball SQL columns</span></h3>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run a tiny chain-mode demo from a Python REPL or scratch script:</p>
+    <pre class="bg-slate-100 dark:bg-slate-900 rounded p-2 text-xs overflow-x-auto"><code>import ulog
+ulog.setup(integrity='hash-chain', handlers=['sql'], sql_url='sqlite:///./demo.sqlite', sql_batch_size=1)
+log = ulog.get_logger()
+for i in range(3): log.info('rec %d', i)
+import logging; [h.flush() for h in logging.getLogger().handlers]</code></pre>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-1">Then in shell: <code>sqlite3 ./demo.sqlite "SELECT chain_pos, hex(record_hash), hex(prev_hash) FROM logs"</code></p>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-6.1-1" label="chain_pos sequence is 1, 2, 3 (no gaps)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.1-2" label="row 1 prev_hash is 64 zeros (b'\\x00' * 32 → hex 0000…0000)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.1-3" label="row 2 prev_hash equals row 1 record_hash (chain link)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.1-4" label="row 3 prev_hash equals row 2 record_hash" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.1-5" label="PRAGMA journal_mode reports 'wal' (sqlite3 ./demo.sqlite 'PRAGMA journal_mode')" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e3-6.2-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-6-2-title">6.2 ulog verify CLI output readability (Story 3.7)</span></h3>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Run <code>python -m ulog._cli verify ./demo.sqlite</code> (or <code>ulog verify ./demo.sqlite</code> after reinstall).</p>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-6.2-1" label="Healthy chain: '✓ Integrity verified' line + 'records: N' + 'wall_time: <ms>' visible" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.2-2" label="Exit code 0 on healthy (echo $?)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.2-3" label="--range 1-2 partial walk: reports only 2 records" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.2-4" label="On corrupted DB (manually UPDATE a msg): output mentions 'BROKEN at record #N' with 8-char hex+'...' on both expected and got" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.2-5" label="Exit code 1 on broken chain" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.2-6" label="Exit code 2 on missing/nonexistent DB argument (stderr message clear)" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e3-6.3-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-6-3-title">6.3 SchemaError v0.4 → v0.5 upgrade message (Story 3.3) — copy-paste-able</span></h3>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">The hardest UX claim of the epic: the user can copy the SQL OUT OF the error message and paste it into <code>sqlite3 logs.sqlite</code> without editing. Procedure: create a v0.4-shaped table (only the first 9 cols), then attempt chain-mode setup, capture the SchemaError text.</p>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-6.3-1" label="Error message contains the 4 literal ALTER TABLE statements (chain_pos / immutable / prev_hash / record_hash, alphabetical)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.3-2" label="Error message contains the 2 literal CREATE INDEX statements (ix_logs_chain_pos, ix_logs_immutable)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.3-3" label="Pasted into sqlite3 CLI without modification, all 6 statements execute cleanly (no syntax error)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.3-4" label="After running them, re-opening the SQLHandler in chain mode raises no error" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.3-5" label="Gap G1 paragraph readable: 'pre-chain' and 'fresh chain' wording present + b'\\x00' * 32 sentinel explained" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e3-6.4-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-6-4-title">6.4 ulog repair --confirm sidecar JSONL audit (Story 3.8)</span></h3>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Corrupt a row (UPDATE msg='tampered'), run <code>ulog repair --confirm ./demo.sqlite</code>, then open the <code>./demo.chain_break_*.log</code> sidecar.</p>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-6.4-1" label="Sidecar filename has UTC-no-colons timestamp (Windows-safe): demo.chain_break_2026-MM-DDThh-mm-ssZ.log" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.4-2" label="One JSON object per line (jq . ./demo.chain_break_*.log parses cleanly)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.4-3" label="Each line contains: chain_pos, ts, level, logger, msg, file, line, immutable, record_hash (hex), prev_hash (hex)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.4-4" label="record_hash and prev_hash are 64-char lowercase hex strings (not raw bytes)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.4-5" label="repair without --confirm prints stderr 'Use --confirm to proceed...' and exits 2 (no sidecar written)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.4-6" label="repair on healthy chain prints '✓ Chain is healthy — nothing to repair.' and exits 0" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e3-6.5-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-6-5-title">6.5 ulog purge --before dry-run vs --confirm (Story 3.9)</span></h3>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-6.5-1" label="Without --confirm: output marked '(dry-run)' and rows NOT deleted (COUNT before/after equal)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.5-2" label="With --confirm: rows older than --before deleted (COUNT decreases by expected delta)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.5-3" label="Rows with immutable=1 are NEVER deleted (verify with SELECT WHERE immutable=1 unchanged)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.5-4" label="With min_retention_days=N set, --before within N days → stderr 'Refused' + exit 1" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.5-5" label="--before with non-ISO format (e.g. 2024/06/01) → argparse error + exit 2" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e3-6.6-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-6-6-title">6.6 Immutable trigger end-user error message (Story 3.2)</span></h3>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Insert an immutable row directly via <code>sqlite3 ./demo.sqlite "INSERT INTO logs (ts,level,logger,msg,file,line,immutable,chain_pos) VALUES ('2026-05-12','INFO','t','sealed','f.py',1,1,0)"</code>, then try UPDATE / DELETE from the sqlite3 CLI.</p>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-6.6-1" label="UPDATE attempt fails with error message containing 'immutable row' (substring grep-able)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.6-2" label="DELETE attempt fails with same wording" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.6-3" label="Error message references 'invariant I4' (so ops can grep logs for the cause)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.6-4" label="Rotable rows (immutable=0) can still be UPDATEd / DELETEd cleanly" %}
+    </ul>
+
+    <h3 class="font-semibold text-sm mt-4 mb-1.5 flex items-center gap-2"><input type="checkbox" data-qa-section-toggle="e3-6.7-" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" title="Toggle all checkboxes in this section"><span data-i18n-key="section-6-7-title">6.7 verify_state.json sidecar audit (Story 3.10)</span></h3>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">After <code>ulog verify ./demo.sqlite</code>, open <code>./demo.verify_state.json</code>.</p>
+    <ul class="space-y-1.5 text-sm">
+      {% include "ulog/_qa_item.html" with id="e3-6.7-1" label="File is valid JSON (pretty-printed, indent=2)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.7-2" label="Keys present: version, status, broken_at, verified_up_to_chain_pos, last_check_ts, walk_time_s" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.7-3" label="On healthy chain: status='OK', broken_at=null, verified_up_to_chain_pos=<N>" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.7-4" label="After corrupting + re-verify: status='BROKEN', broken_at=<pos>, verified_up_to_chain_pos=<pos-1>" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.7-5" label="ulog verify --range A-B does NOT write/overwrite the sidecar (partial walk, would mislead the badge)" %}
+      {% include "ulog/_qa_item.html" with id="e3-6.7-6" label="After ulog repair --confirm, the sidecar is gone (next verify will recreate it OK)" %}
+    </ul>
+{% endcomment %}
+
+    {% comment %}
+      §6.8 immutable_when fail-safe + BROKEN-blocks-chain-setup + tampered hash + concurrency
+      — fully automated by tests/test_chain_edge_cases.py + tests/test_chain_concurrency.py
+      (the latter slow-marked; run with `pytest -m slow`).
+    {% endcomment %}
+    <div class="mt-4 p-3 rounded border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+      <h3 class="font-semibold mb-1 flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+        {% lucide "circle-check" size=16 %}
+        <span data-i18n-key="section-6-8-title">§6.8 Edge cases + 80K stress (Stories 3.11 / 3.12) — automated</span>
+      </h3>
+      <p class="text-xs text-emerald-800 dark:text-emerald-200" data-i18n-key="section-6-8-desc">
+        BROKEN blocks chain-setup ✓, immutable_when raise → fail-safe immutable=1 + stderr message ✓, tampered record_hash detected ✓, retention-floor regression ✓, repair clears sidecar ✓ (test_chain_edge_cases.py). 8 procs × 10K records, chain unbroken under real multi-process contention ✓ (test_chain_concurrency.py, slow-marked). Run:
+      </p>
+      <pre class="bg-white/60 dark:bg-slate-900/40 rounded p-2 text-xs mt-1 overflow-x-auto"><code>python3 -m pytest tests/test_chain_edge_cases.py -v
+python3 -m pytest tests/test_chain_concurrency.py -m slow -v   # ~91s</code></pre>
+      <p class="text-xs text-emerald-800 dark:text-emerald-200 mt-1" data-i18n-key="section-6-8-footer">
+        If both green → §6.8 done.
+      </p>
+    </div>
+  </section>
+
   {# ====== Sign-off ====== #}
   <section class="mb-4 p-4 rounded border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
     <h2 class="text-base font-semibold mb-2 flex items-center gap-2">
@@ -301,7 +432,7 @@
     </p>
     <ul class="text-sm space-y-1 list-disc pl-5">
       <li data-i18n-key="section-signoff-line-1">"<b>QA done, bugs:</b> ..." → Claude files the patches</li>
-      <li data-i18n-key="section-signoff-line-2">"<b>QA 100% green</b>" → Claude starts Epic 3 (v0.5 chain integrity)</li>
+      <li data-i18n-key="section-signoff-line-2">"<b>QA 100% green</b>" → Claude starts Epic 4 (v0.5 queryability — replay / correlate / bisect)</li>
     </ul>
   </section>
 

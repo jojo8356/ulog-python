@@ -1,7 +1,7 @@
 {
   "en": {
     "page-title": "QA manual checklist",
-    "page-desc": "Epic 1 (v0.3 Test integration) + Epic 2 (v0.4 Author attribution) + perf v0.4.1 + Epic 3 (v0.5 chain integrity — manual CLI checks). State persisted client-side (localStorage). Visible only when launched with `ulog-web --debug ...`.",
+    "page-desc": "Epic 1 (v0.3 Test integration) + Epic 2 (v0.4 Author attribution) + perf v0.4.1 + Epic 3 (v0.5 chain integrity) + Epic 4 (v0.5 queryability — manual CLI / file-ergonomics checks). State persisted client-side (localStorage). Visible only when launched with `ulog-web --debug ...`.",
     "progress-done-suffix": "done",
     "progress-pct-suffix": "%",
     "btn-reset": "Reset all",
@@ -96,7 +96,17 @@
     "section-signoff-title": "Sign-off",
     "section-signoff-desc": "When all sections are green (or bugs noted to Claude), tell Claude:",
     "section-signoff-line-1": "\"QA done, bugs: ...\" → Claude files the patches",
-    "section-signoff-line-2": "\"QA 100% green\" → Claude starts Epic 4 (v0.5 queryability — replay / correlate / bisect)",
+    "section-signoff-line-2": "\"QA 100% green\" → Claude starts Epic 5 (v0.5 incident lifecycle)",
+
+    "section-7-title": "7. Epic 4 — Queryability (v0.5)",
+    "section-7-intro": "Manual checks for CLI output readability, generated-file ergonomics, and end-user error wording. Programmatic coverage in tests/test_replay_*.py / tests/test_filter_dsl.py / tests/test_correlate.py / tests/test_bisect.py / tests/test_cli_queryability.py (113 tests). Sub-sections below cover what auto-tests can't eyeball.",
+    "section-7-1-title": "7.1 ulog replay CLI output (Story 4.8)",
+    "section-7-2-title": "7.2 ulog correlate CLI report layout (Story 4.5 / 4.6 / 4.8)",
+    "section-7-3-title": "7.3 ulog bisect CLI output (Story 4.7 / 4.8)",
+    "section-7-4-title": "7.4 Generated regression test file readable (Story 4.3 / 4.8)",
+    "section-7-5-title": "7.5 DSL parse-error wording (Story 4.4)",
+    "section-7-6-title": "7.6 Python API ergonomics (Stories 4.1 / 4.2 / 4.9)",
+    "section-7-7-title": "7.7 Chain integrity after replay activity (Story 4.10)",
 
     "section-6-title": "6. Epic 3 — Chain integrity (v0.5) — automated",
     "section-6-automation-title": "§6.1 → §6.7 — automated mirror",
@@ -111,7 +121,7 @@
   },
   "fr": {
     "page-title": "Checklist QA manuelle",
-    "page-desc": "Epic 1 (v0.3 intégration tests) + Epic 2 (v0.4 attribution auteur) + perf v0.4.1 + Epic 3 (v0.5 intégrité chaîne — vérifs CLI manuelles). État persisté côté client (localStorage). Visible uniquement quand lancé avec `ulog-web --debug ...`.",
+    "page-desc": "Epic 1 (v0.3 intégration tests) + Epic 2 (v0.4 attribution auteur) + perf v0.4.1 + Epic 3 (v0.5 intégrité chaîne) + Epic 4 (v0.5 queryability — vérifs CLI / ergo manuelles). État persisté côté client (localStorage). Visible uniquement quand lancé avec `ulog-web --debug ...`.",
     "progress-done-suffix": "fait",
     "progress-pct-suffix": "%",
     "btn-reset": "Tout réinitialiser",
@@ -206,7 +216,17 @@
     "section-signoff-title": "Sign-off",
     "section-signoff-desc": "Quand toutes les sections sont vertes (ou bugs notés à Claude), dis à Claude :",
     "section-signoff-line-1": "\"QA done, bugs: ...\" → Claude file les patches",
-    "section-signoff-line-2": "\"QA 100% green\" → Claude démarre Epic 4 (v0.5 queryability — replay / correlate / bisect)",
+    "section-signoff-line-2": "\"QA 100% green\" → Claude démarre Epic 5 (v0.5 incident lifecycle)",
+
+    "section-7-title": "7. Epic 4 — Queryability (v0.5)",
+    "section-7-intro": "Vérifs manuelles pour lisibilité output CLI, ergonomie fichier généré, et wording erreurs côté user. Couverture programmatique dans tests/test_replay_*.py / tests/test_filter_dsl.py / tests/test_correlate.py / tests/test_bisect.py / tests/test_cli_queryability.py (113 tests). Les sous-sections ci-dessous couvrent ce que les tests auto ne peuvent pas eye-baller.",
+    "section-7-1-title": "7.1 Output CLI ulog replay (Story 4.8)",
+    "section-7-2-title": "7.2 Layout du report ulog correlate (Story 4.5 / 4.6 / 4.8)",
+    "section-7-3-title": "7.3 Output CLI ulog bisect (Story 4.7 / 4.8)",
+    "section-7-4-title": "7.4 Lisibilité fichier test régression généré (Story 4.3 / 4.8)",
+    "section-7-5-title": "7.5 Wording erreurs parse DSL (Story 4.4)",
+    "section-7-6-title": "7.6 Ergonomie API Python (Stories 4.1 / 4.2 / 4.9)",
+    "section-7-7-title": "7.7 Intégrité chaîne après activité replay (Story 4.10)",
 
     "section-6-title": "6. Epic 3 — Intégrité chaîne (v0.5) — automatisé",
     "section-6-automation-title": "§6.1 → §6.7 — miroir automatisé",

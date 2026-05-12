@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from ._bisect import BisectResult, bisect
 from ._correlate import CorrelationReport, CorrelationRow, correlate
+from ._incidents import IncidentState, compute_states, reopen, resolve
 from .context import bind, clear, context, get_bound, unbind
 from .formatters import (
     JsonFormatter,
@@ -55,6 +56,8 @@ __all__ = [
     # Correlate (v0.5, Story 4.5)
     "CorrelationReport",
     "CorrelationRow",
+    # Incidents (v0.5, Epic 5)
+    "IncidentState",
     "JSONLineHandler",
     "JsonFormatter",
     "LogLevel",
@@ -71,6 +74,7 @@ __all__ = [
     "bind",
     "bisect",
     "clear",
+    "compute_states",
     "context",
     "correlate",
     "default_db_path",
@@ -80,10 +84,13 @@ __all__ = [
     # Replay state (v0.5, Story 4.2)
     "is_replaying",
     "register_formatter",
+    # Incidents (v0.5, Epic 5)
+    "reopen",
     # Replay (v0.5, Story 4.1)
     "replay",
     # Replay-to-pytest generator (v0.5, Story 4.3)
     "replay_to_pytest",
+    "resolve",
     "set_level",
     # Setup
     "setup",

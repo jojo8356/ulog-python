@@ -138,6 +138,43 @@
     </div>
     {% endif %}
 
+    {# Story 6.7 (FR114) — Incident cross-links. #}
+    {% if resolves_target or resolved_by %}
+    <div data-incident-panel="true">
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+        {% lucide "git-pull-request-closed" size=12 %}
+        <span>Incident</span>
+      </h2>
+      <div class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm space-y-2">
+        {% if resolves_target %}
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-slate-500">Resolves:</span>
+          <a href="{% url 'ulog-detail' resolves_target.id %}"
+             class="text-blue-600 dark:text-blue-400 hover:underline font-mono">
+            #{{ resolves_target.chain_pos }} · {{ resolves_target.msg|truncatechars:60 }}
+          </a>
+        </div>
+        {% endif %}
+        {% for r in resolved_by %}
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-slate-500">Resolved by:</span>
+          <a href="{% url 'ulog-detail' r.id %}"
+             class="text-blue-600 dark:text-blue-400 hover:underline font-mono">
+            #{{ r.chain_pos }} · {{ r.msg }}
+          </a>
+          {% if r.context.by %}<span class="text-slate-500">— {{ r.context.by }}</span>{% endif %}
+          <span class="text-slate-500 font-mono text-xs">· {{ r.ts }}</span>
+          {% if r.context.note %}
+          <div class="basis-full text-xs text-slate-600 dark:text-slate-300 italic pl-4">
+            "{{ r.context.note }}"
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {% if record.exc %}
     <div>
       <h2 class="text-xs uppercase font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">
@@ -153,8 +190,23 @@
     {% endif %}
   </div>
 
-  <div class="mt-4 text-sm text-slate-500 dark:text-slate-400">
-    Record id: {{ record.id }}
+  <div class="mt-4 flex items-center justify-between flex-wrap gap-3">
+    <div class="text-sm text-slate-500 dark:text-slate-400">
+      Record id: {{ record.id }}
+    </div>
+    {% if issue_url %}
+    {# Story 6.3 (FR111) — populated issue-tracker URL, target=_blank. #}
+    <a href="{{ issue_url }}"
+       target="_blank"
+       rel="noopener noreferrer"
+       class="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded
+              bg-amber-100 dark:bg-amber-900/40
+              text-amber-800 dark:text-amber-200
+              hover:bg-amber-200 dark:hover:bg-amber-900/60">
+      {% lucide "external-link" size=14 %}
+      <span>Open issue</span>
+    </a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

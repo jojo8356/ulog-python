@@ -131,29 +131,29 @@ development_status:
   # ========================================================================
   # Epic 5: v0.5 — Incident lifecycle (6 stories)
   # ========================================================================
-  epic-5: backlog
-  5-1-ulog-resolve-api-foreign-key-validation: backlog
-  5-2-ulog-reopen-api: backlog
-  5-3-incident-state-walk-chain-derived-latest-wins: backlog
-  5-4-ulog-incidents-status-cli-exit-code: backlog
-  5-5-ulog-incidents-report-since-markdown-kpis: backlog
-  5-6-prd-v0-5-edge-cases-resolve-unknown-already-resolved: backlog
+  epic-5: done
+  5-1-ulog-resolve-api-foreign-key-validation: done
+  5-2-ulog-reopen-api: done
+  5-3-incident-state-walk-chain-derived-latest-wins: done
+  5-4-ulog-incidents-status-cli-exit-code: done
+  5-5-ulog-incidents-report-since-markdown-kpis: done
+  5-6-prd-v0-5-edge-cases-resolve-unknown-already-resolved: done
   epic-5-retrospective: optional
 
   # ========================================================================
   # Epic 6: v0.5 — Cross-service & UI extensions (10 stories)
   # ========================================================================
-  epic-6: backlog
-  6-1-otel-auto-bind-from-contextvar-env: backlog
-  6-2-ulog-trace-id-cli-subcommand: backlog
-  6-3-issue-template-url-placeholder-encoding-body-window: backlog
-  6-4-multi-track-adapter-method-multitrackresult-dataclass: backlog
-  6-5-multi-track-django-view-template-vanilla-js: backlog
-  6-6-integrity-badge-ui-rendering-in-base-html-header: backlog
-  6-7-detail-resolves-resolved-by-cross-links: backlog
-  6-8-sidebar-incidents-section-quick-filters: backlog
-  6-9-locale-fallback-for-multi-track-cli-glyphs: backlog
-  6-10-prd-v0-5-edge-case-otel-sdk-absent: backlog
+  epic-6: done
+  6-1-otel-auto-bind-from-contextvar-env: done
+  6-2-ulog-trace-id-cli-subcommand: done
+  6-3-issue-template-url-placeholder-encoding-body-window: done
+  6-4-multi-track-adapter-method-multitrackresult-dataclass: done
+  6-5-multi-track-django-view-template-vanilla-js: done
+  6-6-integrity-badge-ui-rendering-in-base-html-header: done
+  6-7-detail-resolves-resolved-by-cross-links: done
+  6-8-sidebar-incidents-section-quick-filters: done
+  6-9-locale-fallback-for-multi-track-cli-glyphs: done
+  6-10-prd-v0-5-edge-case-otel-sdk-absent: done
   epic-6-retrospective: optional
 
   # ========================================================================

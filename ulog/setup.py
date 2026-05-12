@@ -80,6 +80,7 @@ def setup(
     min_retention_days: int | None = None,
     json_path: str | None = None,
     csv_path: str | None = None,
+    issue_template_url: str | None = None,
     **formatter_kwargs: Any,
 ) -> logging.Logger:
     """Configure a ulog-managed handler on the named (or root) logger.
@@ -134,6 +135,11 @@ def setup(
         from . import _retention
 
         _retention.set_min_retention_days(min_retention_days)
+
+    if issue_template_url is not None:
+        from . import _issue_template
+
+        _issue_template.set_issue_template_url(issue_template_url)
 
     use_stream = stream if stream is not None else sys.stderr
     color_on = resolve_color(color, use_stream)

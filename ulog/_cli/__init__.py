@@ -19,7 +19,16 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import cmd_bisect, cmd_correlate, cmd_purge, cmd_repair, cmd_replay, cmd_verify
+from . import (
+    cmd_bisect,
+    cmd_correlate,
+    cmd_incidents,
+    cmd_purge,
+    cmd_repair,
+    cmd_replay,
+    cmd_trace,
+    cmd_verify,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,6 +43,8 @@ def main(argv: list[str] | None = None) -> int:
     cmd_correlate.register(subparsers)
     cmd_bisect.register(subparsers)
     cmd_replay.register(subparsers)
+    cmd_trace.register(subparsers)
+    cmd_incidents.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

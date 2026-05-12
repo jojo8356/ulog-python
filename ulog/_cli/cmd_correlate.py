@@ -14,6 +14,7 @@ from typing import Any
 
 from .._correlate import CorrelationReport, CorrelationRow, correlate
 from .._filter_dsl import FilterParseError
+from .._glyphs import g
 
 
 def register(subparsers: Any) -> None:
@@ -60,10 +61,10 @@ def _print_report(report: CorrelationReport) -> None:
 
 def _print_rows(rows: tuple[CorrelationRow, ...]) -> None:
     for r in rows:
-        lift_repr = "∞" if math.isinf(r.lift) else f"{r.lift:.2f}"
+        lift_repr = g("inf") if math.isinf(r.lift) else f"{r.lift:.2f}"
         warning = ""
         if r.warning == "small_sample":
-            warning = "  ⚠ small_sample"
+            warning = f"  {g('warn')} small_sample"
         elif r.warning == "axis":
             warning = "  (axis)"
         print(

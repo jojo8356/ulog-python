@@ -11,6 +11,8 @@ from .viewer import views
 urlpatterns = [
     path("", views.list_view, name="ulog-list"),
     path("r/<int:record_id>/", views.detail_view, name="ulog-detail"),
+    # Story 6.5 (FR112) — multi-track 4-axis SVG view.
+    path("multi-track/", views.multi_track_view, name="ulog-multi-track"),
     path("api/records/", views.api_records, name="ulog-api-records"),
     # Story 2.9 (FR81) — `git show <sha>` rendered after sha validation.
     path("diff/<str:sha>/", views.diff_view, name="ulog-diff"),

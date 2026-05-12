@@ -6,6 +6,7 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
@@ -59,6 +60,8 @@ def _parse_filters(request: HttpRequest) -> Filters:
         # `?author=foo@x&author=bar@y&show_unknown=0` — OR semantics.
         authors=[a for a in qs.getlist("author") if a],
         show_unknown=qs.get("show_unknown", "1").strip().lower() not in ("0", "false", "off"),
+        # Story 6.8 (FR115) — Incidents quick filter.
+        incident_state=qs.get("incident_state", "").strip(),
     )
 
 
@@ -143,6 +146,11 @@ def list_view(request: HttpRequest) -> HttpResponse:
     levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     level_summary = [(lv, result.level_counts.get(lv, 0)) for lv in levels]
 
+    # Story 6.8 (FR115) — Incidents quick filter + counts.
+    incident_summary, result = _apply_incident_state_filter(
+        adapter, filters, result, page, page_size
+    )
+
     total_pages = max(1, (result.total + result.page_size - 1) // result.page_size)
 
     # Story 1.7 — build a query-string fragment EXCLUDING `test_id` and `page`
@@ -170,6 +178,13 @@ def list_view(request: HttpRequest) -> HttpResponse:
         # Story 1.6 — TESTS sidebar: list of TestSummaryRow, empty if no
         # `ulog.test` records exist (template renders nothing in that case).
         "test_summary": result.test_summary,
+        # Story 6.8 (FR115) — Incidents sidebar counts (None when none exist).
+        "incident_summary": incident_summary,
+        "incident_filter_choices": [
+            ("open", "Open"),
+            ("closed_7d", "Closed (last 7d)"),
+            ("reopened", "Reopened"),
+        ],
         # Story 2.6 (FR76/FR79) — author sidebar data; None when indexer
         # is disabled or no .git/ — template hides the block in that case.
         "authors_summary": authors_summary,
@@ -212,6 +227,24 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
     author = idx.author_for(record.file, record.line) if idx else None
     author_relative_date = _relative_date(author.ts) if author else ""
 
+    # Story 6.3 (FR111 / G3) — "Open issue" URL when configured.
+    issue_url = _build_issue_url(adapter, record, author)
+
+    # Story 6.7 (FR114) — incident cross-links. `resolves` is the hash this
+    # record resolves (if any); `resolved_by` is the list of resolve/reopen
+    # records pointing AT this record.
+    resolves_target = None
+    resolved_by: list[Any] = []
+    if record.record_hash:
+        rh_hex = record.record_hash.hex()
+        # If THIS record is a resolve/reopen, walk back to the original.
+        target_hash = record.context.get("resolves")
+        if target_hash and hasattr(adapter, "find_by_record_hash"):
+            resolves_target = adapter.find_by_record_hash(target_hash)
+        # Resolve/reopen records pointing at this incident.
+        if hasattr(adapter, "resolution_records_for"):
+            resolved_by = adapter.resolution_records_for(rh_hex)
+
     return render(
         request,
         "ulog/detail.html",
@@ -225,6 +258,214 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
             "author": author,
             "author_short_sha": author.sha[:7] if author else "",
             "author_relative_date": author_relative_date,
+            # Story 6.3 — None when issue_template_url is not configured.
+            "issue_url": issue_url,
+            # Story 6.7 — cross-link to the resolved incident (this record IS a resolve).
+            "resolves_target": resolves_target,
+            # Story 6.7 — list of resolve/reopen records that touched this incident.
+            "resolved_by": resolved_by,
+        },
+    )
+
+
+def _apply_incident_state_filter(
+    adapter: Adapter,
+    filters: Filters,
+    result: Any,
+    page: int,
+    page_size: int,
+) -> tuple[dict[str, int] | None, Any]:
+    """Story 6.8 (FR115) — Incidents sidebar counts + record post-filter.
+
+    Returns:
+      (summary, result_after_filter). `summary` is the per-state count
+      dict (None when no chain / no incidents). `result_after_filter`
+      is the (possibly post-filtered) QueryResult.
+    """
+    import datetime as _dt
+
+    from ulog._incidents import compute_states
+
+    from .adapters import QueryResult, SQLiteAdapter
+
+    if not isinstance(adapter, SQLiteAdapter):
+        return None, result
+
+    # Walk the chain once to compute states.
+    full = adapter.query(Filters(), page=1, page_size=10_000_000)
+    records_dict = [
+        {
+            "id": r.id,
+            "chain_pos": r.chain_pos,
+            "ts": r.ts,
+            "level": r.level,
+            "msg": r.msg,
+            "record_hash": r.record_hash,
+            "context": dict(r.context),
+        }
+        for r in full.records
+    ]
+    states = compute_states(records_dict)
+    if not states:
+        return None, result
+
+    week_ago = (_dt.datetime.now(_dt.UTC).replace(tzinfo=None) - _dt.timedelta(days=7)).isoformat()
+    # Build hash → state lookup and counts per state.
+    counts = {"open": 0, "closed_7d": 0, "reopened": 0}
+    by_hash_state: dict[str, str] = {}
+    for h, s in states.items():
+        by_hash_state[h] = s.state
+        if s.state == "open":
+            counts["open"] += 1
+        elif s.state == "reopened":
+            counts["reopened"] += 1
+        elif s.state == "closed" and s.last_action_ts >= week_ago:
+            counts["closed_7d"] += 1
+
+    if not filters.incident_state:
+        return counts, result
+
+    # Build allowed record_id set per the requested filter.
+    allowed_ids: set[int] = set()
+    incident_hash_filter: set[str] = set()
+    state_pred = filters.incident_state
+    for h, s in states.items():
+        if (
+            (state_pred == "open" and s.state == "open")
+            or (state_pred == "reopened" and s.state == "reopened")
+            or (state_pred == "closed_7d" and s.state == "closed" and s.last_action_ts >= week_ago)
+        ):
+            incident_hash_filter.add(h)
+    for r in full.records:
+        if r.record_hash and r.record_hash.hex() in incident_hash_filter:
+            allowed_ids.add(r.id)
+
+    kept = [r for r in full.records if r.id in allowed_ids]
+    total = len(kept)
+    start = (page - 1) * page_size
+    new_result = QueryResult(
+        records=kept[start : start + page_size],
+        total=total,
+        page=page,
+        page_size=page_size,
+        sector_counts=result.sector_counts,
+        file_counts=result.file_counts,
+        level_counts=result.level_counts,
+        bound_keys=result.bound_keys,
+        test_summary=result.test_summary,
+    )
+    return counts, new_result
+
+
+def _build_issue_url(adapter: Adapter, record: Any, author: Any) -> str | None:
+    """Build the populated issue URL when a template is configured."""
+    from ulog._issue_template import get_issue_template_url, render_issue_url
+
+    template = get_issue_template_url()
+    if not template:
+        return None
+    window = adapter.body_window(record.chain_pos) if record.chain_pos > 0 else [record]
+    body = [
+        {
+            "id": r.id,
+            "chain_pos": r.chain_pos,
+            "ts": r.ts,
+            "level": r.level,
+            "logger": r.logger,
+            "msg": r.msg,
+            "file": r.file,
+            "line": r.line,
+            "context": dict(r.context),
+        }
+        for r in window
+    ]
+    values = {
+        "msg": record.msg,
+        "level": record.level,
+        "service": record.context.get("service", ""),
+        "author": author.name if author else "",
+        "author_handle": author.email if author else "",
+        "commit_sha": author.sha if author else "",
+        "record_hash": record.record_hash.hex() if record.record_hash else "",
+        "labels": record.level,
+        "body": body,
+    }
+    return render_issue_url(template, values)
+
+
+def multi_track_view(request: HttpRequest) -> HttpResponse:
+    """Story 6.5 (FR112) — 4-axis SVG strip view over a time window.
+
+    Query params:
+      - `from` (ISO 8601, optional; defaults to now-1h)
+      - `to`   (ISO 8601, optional; defaults to now)
+
+    The view assembles a `MultiTrackResult` for level / service / file
+    (native to the adapter), then plumbs `author` via the blame index.
+    """
+    import datetime as _dt
+    from collections import Counter
+
+    from ulog.web.viewer.multi_track import BucketCount, MultiTrackResult
+
+    from .blame import get_global_index
+
+    adapter = _adapter_or_404()
+    now = _dt.datetime.now(_dt.UTC).replace(tzinfo=None, microsecond=0)
+    ws_str = request.GET.get("from", "").strip()
+    we_str = request.GET.get("to", "").strip()
+    try:
+        window_end = _dt.datetime.fromisoformat(we_str) if we_str else now
+    except ValueError:
+        window_end = now
+    try:
+        window_start = (
+            _dt.datetime.fromisoformat(ws_str) if ws_str else window_end - _dt.timedelta(hours=1)
+        )
+    except ValueError:
+        window_start = window_end - _dt.timedelta(hours=1)
+
+    res = adapter.multi_track(
+        filters=Filters(),
+        tracks=["level", "service", "file", "author"],
+        window_start=window_start,
+        window_end=window_end,
+    )
+
+    # Resolve author track here (view layer) — blame index isn't available
+    # in the adapter layer.
+    idx = get_global_index()
+    author_cells: list[BucketCount] = []
+    if idx is not None:
+        c: Counter[tuple[str, str]] = Counter()
+        for r in adapter.iter_records_in_window(window_start, window_end):
+            a = idx.author_for(r.file, r.line)
+            if a is None:
+                continue
+            c[(r.ts[:16], a.name)] += 1
+        author_cells = [BucketCount(bucket=b, value=v, count=n) for (b, v), n in sorted(c.items())]
+
+    new_tracks = dict(res.tracks)
+    new_tracks["author"] = author_cells
+    res = MultiTrackResult(tracks=new_tracks, window=res.window, bucket_size_s=res.bucket_size_s)
+
+    # Build a sorted list of all unique buckets across tracks → time axis.
+    buckets: list[str] = sorted({c.bucket for cells in res.tracks.values() for c in cells})
+
+    return render(
+        request,
+        "ulog/multi_track.html",
+        {
+            "logs_path": settings.ULOG_LOGS_PATH,
+            "window_start": window_start.isoformat(timespec="minutes"),
+            "window_end": window_end.isoformat(timespec="minutes"),
+            "tracks": [
+                ("level", res.tracks.get("level", [])),
+                ("service", res.tracks.get("service", [])),
+                ("author", res.tracks.get("author", [])),
+                ("file", res.tracks.get("file", [])),
+            ],
+            "buckets": buckets,
         },
     )
 

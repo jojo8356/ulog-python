@@ -1,0 +1,91 @@
+{% extends 'ulog/base.html' %}
+{% load lucide %}
+
+{% block title %}ULog — multi-track{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto p-4 md:p-6 space-y-4">
+  <h1 class="text-xl font-bold flex items-center gap-2">
+    {% lucide "activity" size=18 %}
+    <span>Multi-track</span>
+  </h1>
+
+  <form method="get" class="flex items-center gap-2 text-sm">
+    <label class="flex items-center gap-1">
+      <span class="text-slate-500">From</span>
+      <input type="text" name="from" value="{{ window_start }}"
+             class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs w-44">
+    </label>
+    <label class="flex items-center gap-1">
+      <span class="text-slate-500">To</span>
+      <input type="text" name="to" value="{{ window_end }}"
+             class="px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-xs w-44">
+    </label>
+    <button type="submit"
+            class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs">
+      Apply
+    </button>
+  </form>
+
+  {% if not buckets %}
+  <p class="text-sm text-slate-500 italic">(no data) — try widening the window.</p>
+  {% endif %}
+
+  <div data-multi-track-root>
+    {% for name, cells in tracks %}
+    <div class="border border-slate-200 dark:border-slate-800 rounded p-3 mb-3 bg-slate-50 dark:bg-slate-900"
+         data-track="{{ name }}">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm font-semibold uppercase tracking-wide">{{ name }}</h2>
+        <label class="text-xs flex items-center gap-1 cursor-pointer text-slate-500">
+          <input type="checkbox" data-mute="{{ name }}">
+          <span>Mute</span>
+        </label>
+      </div>
+      {% if cells %}
+      <svg viewBox="0 0 1200 60" class="w-full h-12" preserveAspectRatio="none">
+        {# One tiny rectangle per (bucket, value, count) cell. JS scales x via bucket index. #}
+        {% for c in cells %}
+        <rect data-bucket="{{ c.bucket }}"
+              data-value="{{ c.value }}"
+              data-count="{{ c.count }}"
+              x="0" y="20" width="6" height="20"
+              fill="currentColor"
+              class="text-blue-500 dark:text-blue-400 hover:text-amber-500">
+          <title>{{ c.bucket }} · {{ c.value }} · {{ c.count }}</title>
+        </rect>
+        {% endfor %}
+      </svg>
+      {% else %}
+      <p class="text-xs text-slate-500 italic">(no data)</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{{ buckets|json_script:"multi-track-buckets" }}
+<script>
+(() => {
+  // Parse the sorted bucket list once; assign each bucket an x position.
+  const raw = document.getElementById('multi-track-buckets').textContent || '[]';
+  let buckets;
+  try { buckets = JSON.parse(raw); } catch (e) { buckets = []; }
+  const W = 1200, COL = buckets.length ? W / buckets.length : W;
+  const pos = new Map(buckets.map((b, i) => [b, i * COL]));
+  // Place every rect at its bucket-x.
+  for (const r of document.querySelectorAll('rect[data-bucket]')) {
+    const x = pos.get(r.dataset.bucket);
+    if (x !== undefined) { r.setAttribute('x', x); r.setAttribute('width', Math.max(3, COL - 1)); }
+  }
+  // Mute toggles dim the strip and tag the track-root.
+  for (const cb of document.querySelectorAll('input[data-mute]')) {
+    cb.addEventListener('change', () => {
+      const track = cb.closest('[data-track]');
+      track.classList.toggle('opacity-30', cb.checked);
+      track.dataset.muted = cb.checked ? '1' : '0';
+    });
+  }
+})();
+</script>
+{% endblock %}

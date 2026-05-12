@@ -1,5 +1,7 @@
 """Storage adapters — read SQLite / JSONL / CSV into a uniform shape.
 
+Story 6.4: `multi_track(...)` added per-adapter for FR112.
+
 The Django views are storage-agnostic: they call
 `get_adapter(path).query(filters, page)` and receive `(records,
 total_count, sectors, files)`. Each adapter handles its own filtering
@@ -18,8 +20,11 @@ import json
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from .multi_track import SUPPORTED_TRACKS, BucketCount, MultiTrackResult
 
 
 @dataclass
@@ -69,6 +74,8 @@ class Filters:
     # returned None (untracked file / line out of range / no idx).
     authors: list[str] = field(default_factory=list)
     show_unknown: bool = True  # FR78 — default ON
+    # Story 6.8 (FR115) — Incidents quick-filter: "" / "open" / "closed_7d" / "reopened".
+    incident_state: str = ""
 
     def is_empty(self) -> bool:
         return (
@@ -83,6 +90,7 @@ class Filters:
             and not self.slowest_only
             and not self.test_id
             and not self.authors
+            and not self.incident_state
         )
 
 
@@ -190,6 +198,40 @@ class Adapter:
     def count_records_for_test_id(self, test_id: str) -> int:
         """Count records (plugin + propagated app) bound to test_id (Story 1.8)."""
         raise NotImplementedError
+
+    def body_window(self, target_chain_pos: int, before: int = 2, after: int = 2) -> list[Record]:
+        """Symmetric chain-pos window around a target record (Story 6.3 / G3).
+
+        Returns records where `chain_pos BETWEEN target-before AND target+after`,
+        ordered ascending. Chain is SQL-only (Decision B1) → non-SQLite
+        adapters return `[]`.
+        """
+        return []
+
+    def multi_track(
+        self,
+        filters: Filters,
+        tracks: list[str],
+        window_start: datetime,
+        window_end: datetime,
+        bucket_size_s: int = 60,
+    ) -> MultiTrackResult:
+        """Bucketed per-track counts over a time window (Story 6.4 / FR112).
+
+        Default base impl raises — concrete adapters override.
+        """
+        raise NotImplementedError
+
+    def iter_records_in_window(
+        self, window_start: datetime, window_end: datetime
+    ) -> Iterable[Record]:
+        """Yield records with `window_start <= ts < window_end` (Story 6.5).
+
+        Used by the multi-track view to resolve the `author` track via
+        the blame index (which the adapter layer doesn't know about).
+        Default returns nothing — concrete adapters override.
+        """
+        return iter(())
 
 
 # ---- SQLite (SQL via SQLAlchemy core) ------------------------------------
@@ -576,6 +618,108 @@ class SQLiteAdapter(Adapter):
                 if f and isinstance(ln, int) and ln > 0:
                     yield (str(f), int(ln), int(n))
 
+    def body_window(self, target_chain_pos: int, before: int = 2, after: int = 2) -> list[Record]:
+        """Story 6.3 / G3 — symmetric window around `target_chain_pos`."""
+        from sqlalchemy import select
+
+        if target_chain_pos <= 0:
+            return []
+        t = self._table
+        lo = max(1, target_chain_pos - before)
+        hi = target_chain_pos + after
+        with self._engine.connect() as conn:
+            stmt = select(t).where(t.c.chain_pos.between(lo, hi)).order_by(t.c.chain_pos.asc())
+            return [self._row_to_record(row) for row in conn.execute(stmt)]
+
+    def multi_track(
+        self,
+        filters: Filters,
+        tracks: list[str],
+        window_start: datetime,
+        window_end: datetime,
+        bucket_size_s: int = 60,
+    ) -> MultiTrackResult:
+        """Story 6.4 — SQL `GROUP BY strftime('%Y-%m-%dT%H:%M', ts), <track>`."""
+        from sqlalchemy import func, select
+
+        for tr in tracks:
+            if tr not in SUPPORTED_TRACKS:
+                raise KeyError(f"unknown track {tr!r}; supported: {sorted(SUPPORTED_TRACKS)}")
+
+        out: dict[str, list[BucketCount]] = {tr: [] for tr in tracks}
+        t = self._table
+        ws = window_start.isoformat()
+        we = window_end.isoformat()
+        bucket_expr = func.strftime("%Y-%m-%dT%H:%M", t.c.ts)
+
+        with self._engine.connect() as conn:
+            for tr in tracks:
+                if tr == "author":
+                    # Author resolution requires the blame index, plumbed
+                    # by the view layer in Story 6.5.
+                    continue
+                if tr == "level":
+                    col: Any = t.c.level
+                elif tr == "file":
+                    col = t.c.file
+                elif tr == "service":
+                    col = func.json_extract(t.c.context, "$.service")
+                else:
+                    continue  # unreachable — guarded above
+                stmt = (
+                    select(bucket_expr.label("b"), col.label("v"), func.count().label("n"))
+                    .where(t.c.ts >= ws)
+                    .where(t.c.ts < we)
+                    .group_by("b", "v")
+                    .order_by("b")
+                )
+                for row in conn.execute(stmt):
+                    b, v, n = row
+                    if v is None or v == "":
+                        continue
+                    out[tr].append(BucketCount(bucket=str(b), value=str(v), count=int(n)))
+        return MultiTrackResult(
+            tracks=out, window=(window_start, window_end), bucket_size_s=bucket_size_s
+        )
+
+    def iter_records_in_window(
+        self, window_start: datetime, window_end: datetime
+    ) -> Iterable[Record]:
+        """Story 6.5 — SQL scan of rows with `ts` in the window."""
+        from sqlalchemy import select
+
+        t = self._table
+        ws = window_start.isoformat()
+        we = window_end.isoformat()
+        with self._engine.connect() as conn:
+            stmt = select(t).where(t.c.ts >= ws).where(t.c.ts < we).order_by(t.c.ts.asc())
+            for row in conn.execute(stmt):
+                yield self._row_to_record(row)
+
+    def find_by_record_hash(self, hex_hash: str) -> Record | None:
+        """Story 6.7 — look up a row by full-hex record_hash."""
+        from sqlalchemy import select
+
+        if not hex_hash:
+            return None
+        t = self._table
+        with self._engine.connect() as conn:
+            row = conn.execute(select(t).where(t.c.record_hash == bytes.fromhex(hex_hash))).first()
+        return self._row_to_record(row) if row is not None else None
+
+    def resolution_records_for(self, hex_hash: str) -> list[Record]:
+        """Story 6.7 — resolve/reopen records referencing `hex_hash`."""
+        from sqlalchemy import func, select
+
+        t = self._table
+        with self._engine.connect() as conn:
+            stmt = (
+                select(t)
+                .where(func.json_extract(t.c.context, "$.resolves") == hex_hash)
+                .order_by(t.c.chain_pos.asc())
+            )
+            return [self._row_to_record(row) for row in conn.execute(stmt)]
+
 
 # ---- JSONL ---------------------------------------------------------------
 
@@ -638,6 +782,23 @@ class JSONLAdapter(Adapter):
         for non-SQLite formats (Story 1.6 deferred). Returns None so the
         detail-view panel falls back to "outcome unknown" gracefully."""
         return None
+
+    def multi_track(
+        self,
+        filters: Filters,
+        tracks: list[str],
+        window_start: datetime,
+        window_end: datetime,
+        bucket_size_s: int = 60,
+    ) -> MultiTrackResult:
+        return _in_memory_multi_track(
+            self._records, tracks, window_start, window_end, bucket_size_s
+        )
+
+    def iter_records_in_window(
+        self, window_start: datetime, window_end: datetime
+    ) -> Iterable[Record]:
+        return _iter_window_in_memory(self._records, window_start, window_end)
 
 
 # ---- CSV -----------------------------------------------------------------
@@ -709,8 +870,77 @@ class CSVAdapter(Adapter):
         for non-SQLite formats. Returns None; panel falls back gracefully."""
         return None
 
+    def multi_track(
+        self,
+        filters: Filters,
+        tracks: list[str],
+        window_start: datetime,
+        window_end: datetime,
+        bucket_size_s: int = 60,
+    ) -> MultiTrackResult:
+        return _in_memory_multi_track(
+            self._records, tracks, window_start, window_end, bucket_size_s
+        )
+
+    def iter_records_in_window(
+        self, window_start: datetime, window_end: datetime
+    ) -> Iterable[Record]:
+        return _iter_window_in_memory(self._records, window_start, window_end)
+
 
 # ---- Shared helpers ------------------------------------------------------
+
+
+def _iter_window_in_memory(
+    records: list[Record], window_start: datetime, window_end: datetime
+) -> Iterable[Record]:
+    ws = window_start.isoformat()
+    we = window_end.isoformat()
+    for r in records:
+        if r.ts and ws <= r.ts < we:
+            yield r
+
+
+def _in_memory_multi_track(
+    records: list[Record],
+    tracks: list[str],
+    window_start: datetime,
+    window_end: datetime,
+    bucket_size_s: int,
+) -> MultiTrackResult:
+    """Story 6.4 — JSONL/CSV bucketing via `collections.Counter`."""
+    for tr in tracks:
+        if tr not in SUPPORTED_TRACKS:
+            raise KeyError(f"unknown track {tr!r}; supported: {sorted(SUPPORTED_TRACKS)}")
+
+    ws = window_start.isoformat()
+    we = window_end.isoformat()
+    out: dict[str, list[BucketCount]] = {tr: [] for tr in tracks}
+    counters: dict[str, Counter[tuple[str, str]]] = {tr: Counter() for tr in tracks}
+
+    for r in records:
+        if not r.ts or r.ts < ws or r.ts >= we:
+            continue
+        bucket = r.ts[:16]  # 'YYYY-MM-DDTHH:MM' — matches strftime in SQLite
+        for tr in tracks:
+            if tr == "level":
+                val = r.level
+            elif tr == "file":
+                val = r.file
+            elif tr == "service":
+                val = str(r.context.get("service") or "")
+            else:
+                continue  # `author` resolved by view layer (6.5)
+            if not val:
+                continue
+            counters[tr][(bucket, val)] += 1
+
+    for tr in tracks:
+        for (b, v), n in sorted(counters[tr].items()):
+            out[tr].append(BucketCount(bucket=b, value=v, count=n))
+    return MultiTrackResult(
+        tracks=out, window=(window_start, window_end), bucket_size_s=bucket_size_s
+    )
 
 
 def _payload_to_record(payload: dict[str, Any], idx: int) -> Record:

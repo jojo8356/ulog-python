@@ -63,9 +63,15 @@
         </span>
     </div>
     <nav class="flex items-center gap-3 text-sm">
+        {% load integrity %}
+        {% integrity_badge %}
         <a href="{% url 'ulog-list' %}" class="hover:underline flex items-center gap-1.5">
             {% lucide "list" size=16 %}
             <span class="hidden sm:inline">Records</span>
+        </a>
+        <a href="{% url 'ulog-multi-track' %}" class="hover:underline flex items-center gap-1.5">
+            {% lucide "activity" size=16 %}
+            <span class="hidden sm:inline">Multi-track</span>
         </a>
         <a href="{% url 'ulog-docs-index' %}" class="hover:underline flex items-center gap-1.5">
             {% lucide "book-open" size=16 %}

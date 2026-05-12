@@ -114,6 +114,34 @@
         </div>
       {% endif %}
 
+      {# Incidents sidebar (Story 6.8 — FR115). Hidden when no chain. #}
+      {% if incident_summary %}
+        <div>
+          <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
+              title="Incidents = ERROR/CRITICAL records, current state from the chain (resolves/reopens).">
+            {% lucide "siren" size=14 %}
+            <span>Incidents</span>
+          </h3>
+          <div class="space-y-1">
+            {% for value, label in incident_filter_choices %}
+              <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded">
+                <input type="radio" name="incident_state" value="{{ value }}"
+                       {% if filters.incident_state == value %}checked{% endif %}
+                       class="rounded text-red-600 focus:ring-red-500 flex-shrink-0">
+                <span class="font-mono text-xs flex-1">{{ label }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">{{ incident_summary|dict_get:value }}</span>
+              </label>
+            {% endfor %}
+            <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-1 rounded opacity-70">
+              <input type="radio" name="incident_state" value=""
+                     {% if not filters.incident_state %}checked{% endif %}
+                     class="rounded text-slate-500 focus:ring-slate-400 flex-shrink-0">
+              <span class="font-mono text-xs flex-1">All / none</span>
+            </label>
+          </div>
+        </div>
+      {% endif %}
+
       {# Sectors (logger-name tree) — FR44 #}
       <div>
         <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"

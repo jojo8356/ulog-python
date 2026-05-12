@@ -359,6 +359,16 @@ class SQLHandler(logging.Handler):
 
     def _record_to_row(self, record: logging.LogRecord) -> dict[str, Any]:
         bound = dict(get_bound())
+        # Story 6.1 — auto-attach OTel trace_id / span_id when an OTel
+        # context is active (contextvar OR W3C traceparent env). Silent
+        # no-op when neither is set (Gap G4). User-bound keys with the
+        # same name win (so manual override stays possible).
+        from .._otel import current_trace_context
+
+        trace_ctx = current_trace_context()
+        if trace_ctx is not None:
+            for k, v in trace_ctx.items():
+                bound.setdefault(k, v)
         # Merge `extra=...` from the record (mirrors JsonFormatter)
         for k, v in record.__dict__.items():
             if k not in _RESERVED and k not in bound and not k.startswith("_"):

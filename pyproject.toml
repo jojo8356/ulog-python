@@ -75,6 +75,7 @@ ulog = "ulog.testing.pytest_plugin"
 
 [project.scripts]
 ulog-web = "ulog.web.cli:main"
+ulog = "ulog._cli:main"
 
 [project.urls]
 Homepage = "https://github.com/jojo8356/ulog-python"
@@ -89,6 +90,7 @@ exclude = ["tests*", "vendor*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: long-running tests (skip by default; run with `-m slow`)"]
 
 [tool.mypy]
 strict = true

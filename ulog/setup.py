@@ -75,6 +75,9 @@ def setup(
     sql_url: str | None = None,
     sql_table: str = "logs",
     sql_batch_size: int = 100,
+    integrity: str | None = None,
+    immutable_when: Any = None,
+    min_retention_days: int | None = None,
     json_path: str | None = None,
     csv_path: str | None = None,
     **formatter_kwargs: Any,
@@ -125,6 +128,12 @@ def setup(
         raise ValueError(f"unknown log level {level!r}; valid: {', '.join(LOG_LEVELS)}")
     if color not in ("auto", "always", "never"):
         raise ValueError(f"unknown color mode {color!r}; valid: 'auto', 'always', 'never'")
+    if integrity not in (None, "none", "hash-chain"):
+        raise ValueError(f"unknown integrity mode {integrity!r}; valid: None, 'none', 'hash-chain'")
+    if min_retention_days is not None:
+        from . import _retention
+
+        _retention.set_min_retention_days(min_retention_days)
 
     use_stream = stream if stream is not None else sys.stderr
     color_on = resolve_color(color, use_stream)
@@ -171,6 +180,8 @@ def setup(
             sql_url=sql_url,
             sql_table=sql_table,
             sql_batch_size=sql_batch_size,
+            chain_mode=(integrity == "hash-chain"),
+            immutable_when=immutable_when,
             json_path=json_path,
             csv_path=csv_path,
             **formatter_kwargs,
@@ -194,6 +205,8 @@ def _build_handler(
     sql_url: str | None,
     sql_table: str,
     sql_batch_size: int,
+    chain_mode: bool,
+    immutable_when: Any,
     json_path: str | None,
     csv_path: str | None,
     **formatter_kwargs: Any,
@@ -207,7 +220,13 @@ def _build_handler(
     if kind == "sql":
         from .handlers.sql import SQLHandler
 
-        return SQLHandler(sql_url, table=sql_table, batch_size=sql_batch_size)
+        return SQLHandler(
+            sql_url,
+            table=sql_table,
+            batch_size=sql_batch_size,
+            chain_mode=chain_mode,
+            immutable_when=immutable_when,
+        )
     if kind == "json":
         if json_path is None:
             raise ValueError("handlers=['json'] requires a `json_path=` argument.")

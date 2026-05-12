@@ -11,6 +11,7 @@ import atexit
 import contextlib
 import datetime
 import logging
+import sys
 import threading
 import traceback
 from pathlib import Path
@@ -48,6 +49,23 @@ _RESERVED = frozenset(
 )
 
 
+# Story 3.3 / Decision A2 — literal upgrade DDL for v0.4 → v0.5.
+# Map each v0.5 chain column to its ALTER TABLE statement and (when
+# applicable) its CREATE INDEX statement, keyed by column name so the
+# error message can list only the columns actually missing on a given
+# DB. `{t}` placeholder is `_table_name` at format time.
+_CHAIN_COLUMN_ALTER_DDL: dict[str, str] = {
+    "chain_pos": "ALTER TABLE {t} ADD COLUMN chain_pos INTEGER NOT NULL DEFAULT 0;",
+    "immutable": "ALTER TABLE {t} ADD COLUMN immutable INTEGER NOT NULL DEFAULT 0;",
+    "prev_hash": "ALTER TABLE {t} ADD COLUMN prev_hash BLOB;",
+    "record_hash": "ALTER TABLE {t} ADD COLUMN record_hash BLOB;",
+}
+_CHAIN_COLUMN_INDEX_DDL: dict[str, str] = {
+    "chain_pos": "CREATE INDEX ix_{t}_chain_pos ON {t}(chain_pos);",
+    "immutable": "CREATE INDEX ix_{t}_immutable ON {t}(immutable);",
+}
+
+
 class SchemaError(Exception):
     """Raised when the existing DB schema doesn't match what ULog expects.
 
@@ -80,6 +98,8 @@ class SQLHandler(logging.Handler):
         *,
         table: str = "logs",
         batch_size: int = 100,
+        chain_mode: bool = False,
+        immutable_when: Any = None,
     ) -> None:
         super().__init__()
         # Initialize the lock + empty buffer FIRST. logging.Handler.__init__
@@ -94,6 +114,9 @@ class SQLHandler(logging.Handler):
         self._url = url or f"sqlite:///{(Path.cwd() / 'ulog.sqlite').as_posix()}"
         self._table_name = table
         self._batch_size = max(1, batch_size)
+        self._chain_mode = chain_mode
+        self._immutable_when = immutable_when
+        self._immutable_when_warned: bool = False
 
         from sqlalchemy import (
             JSON,
@@ -143,6 +166,32 @@ class SQLHandler(logging.Handler):
         # Lazy-create on first emit; expose for tests.
         self._metadata = metadata
         self._schema_initialized = False
+        # Story 3.5 — chain mode wiring. WAL pragma at engine init so
+        # multi-process writers serialise on chain_pos under BEGIN
+        # IMMEDIATE (which the chain writer registers) without
+        # blocking readers.
+        self._chain_writer: Any = None
+        if self._chain_mode:
+            if self._engine.dialect.name == "sqlite":
+                with self._engine.connect() as conn:
+                    conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+                # Story 3.12 AC1 — refuse to open in chain mode if a
+                # previous verify reported BROKEN. Forces the user to
+                # run `ulog repair --confirm` before any new chain
+                # writes can land.
+                from .._verify_state import read_verify_state
+
+                db_path = Path(self._url.replace("sqlite:///", "", 1))
+                state = read_verify_state(db_path)
+                if state and state.get("status") == "BROKEN":
+                    raise SchemaError(
+                        f"chain integrity is BROKEN at #{state.get('broken_at')}. "
+                        "Run `ulog repair --confirm` to resolve before "
+                        "re-opening the handler in chain mode."
+                    )
+            from .._chain import SQLiteChainWriter
+
+            self._chain_writer = SQLiteChainWriter(self._engine, self._table_name)
         # Process-exit flush — best-effort, prevents lost records.
         atexit.register(self._safe_flush)
 
@@ -152,6 +201,9 @@ class SQLHandler(logging.Handler):
         try:
             self._ensure_schema()
             row = self._record_to_row(record)
+            if self._chain_mode:
+                self._chain_append(row)
+                return
             with self._lock:
                 self._buffer.append(row)
                 buf_len = len(self._buffer)
@@ -159,6 +211,17 @@ class SQLHandler(logging.Handler):
                 self.flush()
         except Exception:
             self.handleError(record)
+
+    def _chain_append(self, row: dict[str, Any]) -> None:
+        # Cross-process serialisation: get-prev + compute-hash + INSERT
+        # MUST happen inside one BEGIN IMMEDIATE txn. Doing
+        # get_last_hash + append as separate txns races between
+        # processes (Story 3.11 stress test surfaced this — two procs
+        # would read the same prev_hash and write diverging chains).
+        from .._chain import sha256_record
+
+        with self._lock:
+            self._chain_writer.append_atomic(row, sha256_record)
 
     def flush(self) -> None:
         with self._lock:
@@ -207,7 +270,6 @@ class SQLHandler(logging.Handler):
             # column-verify path on retry.
             try:
                 self._metadata.create_all(self._engine)
-                return
             except OperationalError as exc:
                 if "already exists" not in str(exc).lower():
                     raise
@@ -215,16 +277,73 @@ class SQLHandler(logging.Handler):
                 inspector = inspect(self._engine)
                 if self._table_name not in inspector.get_table_names():
                     raise  # not the race we expected
+            else:
+                self._install_immutable_triggers()
+                return
         # Existing table — verify columns match.
         existing_cols = {col["name"] for col in inspector.get_columns(self._table_name)}
         expected_cols = {c.name for c in self._table.columns}
         missing = expected_cols - existing_cols
         if missing:
+            chain_missing = sorted(missing & _CHAIN_COLUMN_ALTER_DDL.keys())
+            if chain_missing:
+                t = self._table_name
+                alters = "\n".join(_CHAIN_COLUMN_ALTER_DDL[c].format(t=t) for c in chain_missing)
+                index_cols = [c for c in chain_missing if c in _CHAIN_COLUMN_INDEX_DDL]
+                indexes = "\n".join(_CHAIN_COLUMN_INDEX_DDL[c].format(t=t) for c in index_cols)
+                sep = "\n" if indexes else ""
+                raise SchemaError(
+                    f"table {t!r} in {self._url} is a v0.4 schema; v0.5 "
+                    "requires the following ALTER TABLE / CREATE INDEX "
+                    "statements. v0.2's no-migrations contract is "
+                    "preserved — apply manually:\n\n"
+                    f"{alters}{sep}{indexes}\n\n"
+                    "Note (Gap G1 — pre-chain upgrade discontinuity):\n"
+                    "Existing rows will have NULL record_hash/prev_hash "
+                    "after the ALTER (pre-chain backfilled). The first "
+                    "NEW chain record starts a fresh chain with prev_hash "
+                    '= b"\\x00" * 32. `ulog verify` only walks records '
+                    "with non-NULL hash."
+                )
             raise SchemaError(
                 f"table {self._table_name!r} in {self._url} is missing columns "
                 f"{sorted(missing)}. v0.2 doesn't ship migrations — delete "
                 "the DB / use a fresh URL, or add the columns manually."
             )
+        self._install_immutable_triggers()
+
+    def _install_immutable_triggers(self) -> None:
+        # Story 3.2 / invariant I4 — storage-layer enforcement that
+        # rows with immutable=1 cannot be UPDATEd or DELETEd through
+        # ANY client (not just SQLHandler). SQLite-only; v0.7 Postgres
+        # will install an equivalent via partial-index + rule or
+        # plpgsql function (Decision B3).
+        if self._engine.dialect.name != "sqlite":
+            return
+        from sqlalchemy import text
+
+        t = self._table_name
+        update_trigger = (
+            f"CREATE TRIGGER IF NOT EXISTS trg_{t}_block_update_immutable "
+            f"BEFORE UPDATE ON {t} "
+            "FOR EACH ROW "
+            "WHEN OLD.immutable = 1 "
+            "BEGIN "
+            "SELECT RAISE(ABORT, 'immutable row: UPDATE forbidden (invariant I4)'); "
+            "END;"
+        )
+        delete_trigger = (
+            f"CREATE TRIGGER IF NOT EXISTS trg_{t}_block_delete_immutable "
+            f"BEFORE DELETE ON {t} "
+            "FOR EACH ROW "
+            "WHEN OLD.immutable = 1 "
+            "BEGIN "
+            "SELECT RAISE(ABORT, 'immutable row: DELETE forbidden (invariant I4)'); "
+            "END;"
+        )
+        with self._engine.begin() as conn:
+            conn.execute(text(update_trigger))
+            conn.execute(text(delete_trigger))
 
     def _record_to_row(self, record: logging.LogRecord) -> dict[str, Any]:
         bound = dict(get_bound())
@@ -242,7 +361,7 @@ class SQLHandler(logging.Handler):
             }
         # JSON columns can hold dicts directly with SQLAlchemy 2.x; for
         # SQLite the driver serializes via json.dumps under the hood.
-        return {
+        row: dict[str, Any] = {
             "ts": _ts_aware(record.created),
             "level": record.levelname,
             "logger": record.name,
@@ -252,6 +371,27 @@ class SQLHandler(logging.Handler):
             "exc": exc_payload,
             "context": bound or None,
         }
+        # Decision B5 (Story 3.12) — immutable_when fail-safe: on
+        # exception, treat the record AS IMMUTABLE (preserve forensic
+        # evidence). Stderr print, NOT ulog logging (would recurse).
+        # One-shot guard so a broken callable doesn't flood stderr.
+        immutable_flag = 0
+        if self._immutable_when is not None:
+            try:
+                if self._immutable_when(record):
+                    immutable_flag = 1
+            except Exception as exc:
+                if not self._immutable_when_warned:
+                    print(
+                        f"ulog: immutable_when callable raised "
+                        f"{type(exc).__name__}: {exc!r}; treating as immutable=1 "
+                        "(Decision B5 fail-safe)",
+                        file=sys.stderr,
+                    )
+                    self._immutable_when_warned = True
+                immutable_flag = 1  # fail-safe: preserve evidence
+        row["immutable"] = immutable_flag
+        return row
 
     def _safe_flush(self) -> None:
         with contextlib.suppress(Exception):

@@ -369,9 +369,9 @@ def test_sql_v05_default_values(tmp_path):
 
 
 def test_sql_v04_upgrade_path_raises_schema_error(tmp_path):
-    """Story 3.1 AC4 — pre-existing v0.4 table (no chain columns) →
-    SchemaError listing all 4 missing columns. Story 3.3 will replace
-    the diff-set wording with a literal ALTER TABLE hint."""
+    """Story 3.3 — pre-existing v0.4 table (no chain columns) →
+    SchemaError containing the LITERAL ALTER TABLE + CREATE INDEX SQL
+    (deterministic, copy-paste) plus the Gap G1 discontinuity note."""
     from sqlalchemy import (
         JSON,
         Column,
@@ -413,6 +413,346 @@ def test_sql_v04_upgrade_path_raises_schema_error(tmp_path):
     with pytest.raises(SchemaError) as excinfo:
         handler._ensure_schema()
     msg = str(excinfo.value)
-    for col in ("chain_pos", "record_hash", "prev_hash", "immutable"):
-        assert col in msg, f"missing column {col!r} not surfaced in SchemaError: {msg!r}"
+    for stmt in (
+        "ALTER TABLE logs ADD COLUMN chain_pos INTEGER NOT NULL DEFAULT 0;",
+        "ALTER TABLE logs ADD COLUMN immutable INTEGER NOT NULL DEFAULT 0;",
+        "ALTER TABLE logs ADD COLUMN prev_hash BLOB;",
+        "ALTER TABLE logs ADD COLUMN record_hash BLOB;",
+        "CREATE INDEX ix_logs_chain_pos ON logs(chain_pos);",
+        "CREATE INDEX ix_logs_immutable ON logs(immutable);",
+    ):
+        assert stmt in msg, f"missing statement {stmt!r} in SchemaError: {msg!r}"
+    assert "pre-chain" in msg.lower(), f"Gap G1 phrasing missing: {msg!r}"
+    assert "fresh chain" in msg.lower(), f"Gap G1 phrasing missing: {msg!r}"
     handler.close()
+
+
+# ---- SQLHandler — v0.5 immutable triggers (Story 3.2) --------------------
+
+
+def _bootstrap_v05_db(tmp_path):
+    """Helper — create a v0.5 SQLite DB with one emit so the schema +
+    triggers are installed. Returns the engine."""
+    from sqlalchemy import create_engine
+
+    db = tmp_path / "logs.sqlite"
+    url = f"sqlite:///{db}"
+    ulog.setup(handlers=["sql"], sql_url=url, sql_batch_size=1)
+    ulog.get_logger().info("seed")
+    for h in logging.getLogger().handlers:
+        h.flush()
+    return create_engine(url, future=True)
+
+
+def test_sql_v05_triggers_created_on_fresh_db(tmp_path):
+    """Story 3.2 AC1 — fresh DB has both immutable-blocking triggers
+    after schema bootstrap. Inspect sqlite_master directly."""
+    from sqlalchemy import text
+
+    engine = _bootstrap_v05_db(tmp_path)
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name='logs'")
+        ).all()
+    names = {r[0] for r in rows}
+    assert "trg_logs_block_update_immutable" in names
+    assert "trg_logs_block_delete_immutable" in names
+    bodies = {r[0]: r[1] for r in rows}
+    assert "BEFORE UPDATE" in bodies["trg_logs_block_update_immutable"]
+    assert "BEFORE DELETE" in bodies["trg_logs_block_delete_immutable"]
+    assert "OLD.immutable = 1" in bodies["trg_logs_block_update_immutable"]
+    assert "OLD.immutable = 1" in bodies["trg_logs_block_delete_immutable"]
+    engine.dispose()
+
+
+def test_sql_v05_trigger_blocks_update_on_immutable_row(tmp_path):
+    """Story 3.2 AC3/AC7 — UPDATE on a row with immutable=1 is rolled
+    back by the trigger; original msg is preserved."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError, OperationalError
+
+    engine = _bootstrap_v05_db(tmp_path)
+    # Insert one immutable=1 row via raw SQL (SQLHandler.emit always
+    # sets immutable=0 until Story 3.5).
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO logs "
+                "(ts, level, logger, msg, file, line, immutable, chain_pos) "
+                "VALUES ('2026-05-12 00:00:00', 'INFO', 'test', 'sealed', "
+                "'x.py', 1, 1, 0)"
+            )
+        )
+        rid = conn.execute(text("SELECT id FROM logs WHERE msg='sealed'")).scalar_one()
+
+    with pytest.raises((IntegrityError, OperationalError)) as excinfo, engine.begin() as conn:
+        conn.execute(text(f"UPDATE logs SET msg='tampered' WHERE id={rid}"))
+    assert "immutable row" in str(excinfo.value).lower(), str(excinfo.value)
+
+    with engine.begin() as conn:
+        msg = conn.execute(text(f"SELECT msg FROM logs WHERE id={rid}")).scalar_one()
+    assert msg == "sealed", "UPDATE was not rolled back by the trigger"
+    engine.dispose()
+
+
+def test_sql_v05_trigger_blocks_delete_on_immutable_row(tmp_path):
+    """Story 3.2 AC4/AC7 — DELETE on a row with immutable=1 is blocked;
+    row remains in the table."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError, OperationalError
+
+    engine = _bootstrap_v05_db(tmp_path)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO logs "
+                "(ts, level, logger, msg, file, line, immutable, chain_pos) "
+                "VALUES ('2026-05-12 00:00:00', 'INFO', 'test', 'sealed', "
+                "'x.py', 1, 1, 0)"
+            )
+        )
+        rid = conn.execute(text("SELECT id FROM logs WHERE msg='sealed'")).scalar_one()
+
+    with pytest.raises((IntegrityError, OperationalError)) as excinfo, engine.begin() as conn:
+        conn.execute(text(f"DELETE FROM logs WHERE id={rid}"))
+    assert "immutable row" in str(excinfo.value).lower(), str(excinfo.value)
+
+    with engine.begin() as conn:
+        count = conn.execute(text(f"SELECT COUNT(*) FROM logs WHERE id={rid}")).scalar_one()
+    assert count == 1, "DELETE was not rolled back by the trigger"
+    engine.dispose()
+
+
+def test_sql_v05_trigger_allows_update_on_rotable_row(tmp_path):
+    """Story 3.2 AC5 — UPDATE on a row with immutable=0 succeeds.
+    Story 3.9 (ulog purge) depends on this path staying open."""
+    from sqlalchemy import text
+
+    engine = _bootstrap_v05_db(tmp_path)
+    # The seed record from _bootstrap_v05_db has immutable=0 by default.
+    with engine.begin() as conn:
+        rid = conn.execute(text("SELECT id FROM logs WHERE msg='seed'")).scalar_one()
+        conn.execute(text(f"UPDATE logs SET msg='rotated' WHERE id={rid}"))
+
+    with engine.begin() as conn:
+        msg = conn.execute(text(f"SELECT msg FROM logs WHERE id={rid}")).scalar_one()
+    assert msg == "rotated"
+    engine.dispose()
+
+
+def test_sql_v05_trigger_allows_delete_on_rotable_row(tmp_path):
+    """Story 3.2 AC6 — DELETE on a row with immutable=0 succeeds."""
+    from sqlalchemy import text
+
+    engine = _bootstrap_v05_db(tmp_path)
+    with engine.begin() as conn:
+        rid = conn.execute(text("SELECT id FROM logs WHERE msg='seed'")).scalar_one()
+        conn.execute(text(f"DELETE FROM logs WHERE id={rid}"))
+
+    with engine.begin() as conn:
+        count = conn.execute(text(f"SELECT COUNT(*) FROM logs WHERE id={rid}")).scalar_one()
+    assert count == 0
+    engine.dispose()
+
+
+def test_sql_v05_triggers_idempotent_on_double_bootstrap(tmp_path):
+    """Story 3.2 AC8 — bootstrapping the schema twice against the same
+    DB doesn't raise OperationalError('trigger already exists') —
+    CREATE TRIGGER IF NOT EXISTS handles re-entry."""
+    from ulog.handlers.sql import SQLHandler
+
+    db = tmp_path / "logs.sqlite"
+    url = f"sqlite:///{db}"
+    h1 = SQLHandler(url=url, batch_size=1)
+    h1._ensure_schema()  # fresh-create path: triggers installed
+    h2 = SQLHandler(url=url, batch_size=1)
+    h2._ensure_schema()  # existing-v0.5 path: triggers re-install via IF NOT EXISTS
+    h1.close()
+    h2.close()
+
+
+# ---- SQLHandler — v0.5 upgrade message (Story 3.3) -----------------------
+
+
+def _create_v04_table(url: str) -> None:
+    """Pre-create the v0.4 `logs` shape (9 cols, no chain columns).
+    Helper for Story 3.3 upgrade tests."""
+    from sqlalchemy import (
+        JSON,
+        Column,
+        DateTime,
+        Integer,
+        MetaData,
+        String,
+        Table,
+        Text,
+        create_engine,
+    )
+
+    engine = create_engine(url, future=True)
+    md = MetaData()
+    Table(
+        "logs",
+        md,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("ts", DateTime(timezone=False), nullable=False),
+        Column("level", String(10), nullable=False),
+        Column("logger", String(255), nullable=False),
+        Column("msg", Text, nullable=False),
+        Column("file", String(255), nullable=False),
+        Column("line", Integer, nullable=False),
+        Column("exc", JSON, nullable=True),
+        Column("context", JSON, nullable=True),
+    )
+    md.create_all(engine)
+    engine.dispose()
+
+
+def test_sql_v05_upgrade_message_resolved_after_manual_alter(tmp_path):
+    """Story 3.3 AC4 — parse the SQL out of the SchemaError, run it
+    manually, then v0.5 handler proceeds and emit lands with chain
+    defaults (chain_pos=0, immutable=0, hashes NULL)."""
+    from sqlalchemy import create_engine, text
+
+    from ulog.handlers.sql import SchemaError, SQLHandler
+
+    db = tmp_path / "upgrade.sqlite"
+    url = f"sqlite:///{db}"
+    _create_v04_table(url)
+
+    # Capture the SchemaError + extract statements.
+    h_pre = SQLHandler(url=url, batch_size=1)
+    with pytest.raises(SchemaError) as excinfo:
+        h_pre._ensure_schema()
+    h_pre.close()
+    msg = str(excinfo.value)
+    stmts = [
+        line.strip().rstrip(";")
+        for line in msg.splitlines()
+        if line.strip().startswith(("ALTER", "CREATE"))
+    ]
+    assert len(stmts) == 6, f"expected 6 upgrade statements, got {len(stmts)}: {stmts!r}"
+
+    # Apply them manually.
+    engine = create_engine(url, future=True)
+    with engine.begin() as conn:
+        for stmt in stmts:
+            conn.execute(text(stmt))
+    engine.dispose()
+
+    # Re-bootstrap; schema verification must now pass.
+    ulog.setup(handlers=["sql"], sql_url=url, sql_batch_size=1)
+    ulog.get_logger().info("post-upgrade")
+    for h in logging.getLogger().handlers:
+        h.flush()
+
+    engine = create_engine(url, future=True)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT chain_pos, immutable, record_hash, prev_hash "
+                "FROM logs WHERE msg='post-upgrade'"
+            )
+        ).first()
+    assert row == (0, 0, None, None)
+    engine.dispose()
+
+
+def test_sql_v05_upgrade_partial_chain_columns(tmp_path):
+    """Story 3.3 AC5 — pre-create v0.4 + add chain_pos manually
+    (other 3 chain columns still missing). SchemaError lists only
+    the 3 remaining ALTERs and only the indexes whose column is in
+    chain_missing (so ix_logs_chain_pos must NOT appear since
+    chain_pos is already present)."""
+    from sqlalchemy import create_engine, text
+
+    from ulog.handlers.sql import SchemaError, SQLHandler
+
+    db = tmp_path / "partial.sqlite"
+    url = f"sqlite:///{db}"
+    _create_v04_table(url)
+    # User has applied ONLY the chain_pos ALTER, not the others.
+    engine = create_engine(url, future=True)
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE logs ADD COLUMN chain_pos INTEGER NOT NULL DEFAULT 0"))
+    engine.dispose()
+
+    handler = SQLHandler(url=url, batch_size=1)
+    with pytest.raises(SchemaError) as excinfo:
+        handler._ensure_schema()
+    handler.close()
+    msg = str(excinfo.value)
+    # The 3 remaining ALTERs must appear.
+    for stmt in (
+        "ALTER TABLE logs ADD COLUMN immutable INTEGER NOT NULL DEFAULT 0;",
+        "ALTER TABLE logs ADD COLUMN prev_hash BLOB;",
+        "ALTER TABLE logs ADD COLUMN record_hash BLOB;",
+    ):
+        assert stmt in msg, f"missing ALTER {stmt!r}: {msg!r}"
+    # The already-applied chain_pos ALTER must NOT reappear.
+    assert "ADD COLUMN chain_pos" not in msg, (
+        f"already-applied chain_pos ALTER leaked into message: {msg!r}"
+    )
+    # ix_logs_chain_pos: column already present → pragmatic
+    # simplification (Task 2.4) omits it from the message.
+    assert "ix_logs_chain_pos" not in msg, (
+        f"index for already-present chain_pos column leaked: {msg!r}"
+    )
+    # ix_logs_immutable: its column is in chain_missing → present.
+    assert "CREATE INDEX ix_logs_immutable ON logs(immutable);" in msg
+
+
+def test_sql_v05_non_chain_missing_column_uses_legacy_message(tmp_path):
+    """Story 3.3 AC6 — when the missing set contains NO chain columns
+    (a pre-v0.2 schema, or any unrelated drift), the legacy v0.2
+    `"v0.2 doesn't ship migrations"` phrasing fires instead of the
+    literal-SQL v0.5 path. Protects backward-compat."""
+    from sqlalchemy import (
+        BLOB,
+        JSON,
+        Column,
+        DateTime,
+        Integer,
+        MetaData,
+        String,
+        Table,
+        Text,
+        create_engine,
+    )
+
+    from ulog.handlers.sql import SchemaError, SQLHandler
+
+    db = tmp_path / "non_chain.sqlite"
+    url = f"sqlite:///{db}"
+    # Build a v0.5-ish table MISSING `exc` (a non-chain v0.2 column).
+    engine = create_engine(url, future=True)
+    md = MetaData()
+    Table(
+        "logs",
+        md,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("ts", DateTime(timezone=False), nullable=False),
+        Column("level", String(10), nullable=False),
+        Column("logger", String(255), nullable=False),
+        Column("msg", Text, nullable=False),
+        Column("file", String(255), nullable=False),
+        Column("line", Integer, nullable=False),
+        # exc omitted on purpose
+        Column("context", JSON, nullable=True),
+        Column("chain_pos", Integer, nullable=False, server_default="0"),
+        Column("record_hash", BLOB, nullable=True),
+        Column("prev_hash", BLOB, nullable=True),
+        Column("immutable", Integer, nullable=False, server_default="0"),
+    )
+    md.create_all(engine)
+    engine.dispose()
+
+    handler = SQLHandler(url=url, batch_size=1)
+    with pytest.raises(SchemaError) as excinfo:
+        handler._ensure_schema()
+    handler.close()
+    msg = str(excinfo.value)
+    # Legacy phrasing fires; literal-SQL phrasing must NOT.
+    assert "v0.2 doesn't ship migrations" in msg, f"legacy phrasing absent: {msg!r}"
+    assert "ALTER TABLE" not in msg, f"literal-SQL path leaked into non-chain case: {msg!r}"
+    assert "'exc'" in msg or "exc" in msg

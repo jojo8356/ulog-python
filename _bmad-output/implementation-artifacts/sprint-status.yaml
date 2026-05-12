@@ -42,7 +42,7 @@
 # defines. Story IDs preserve their original epics.md numbering for traceability.
 
 generated: 2026-05-05
-last_updated: 2026-05-11
+last_updated: 2026-05-12
 project: ulog-python
 project_key: NOKEY
 tracking_system: file-system
@@ -95,20 +95,20 @@ development_status:
   # ========================================================================
   # Epic 3: v0.5 — Storage core & chain integrity (12 stories)
   # ========================================================================
-  epic-3: in-progress
+  epic-3: done
   3-1-schema-extension-immutable-chain-pos-record-hash-prev-hash-columns: done
-  3-2-sql-trigger-blocking-update-delete-on-immutable-rows: backlog
-  3-3-schemaerror-upgrade-message-with-literal-alter-table-sql: backlog
-  3-4-chainwriter-protocol-sqlitechainwriter-impl: backlog
-  3-5-sqlhandler-chain-integration-wal-mode-begin-immediate: backlog
-  3-6-setup-new-params-integrity-immutable-when-min-retention-days: backlog
-  3-7-ulog-verify-cli-subcommand: backlog
-  3-8-ulog-repair-confirm-cli-subcommand: backlog
-  3-9-ulog-purge-before-date-cli-subcommand: backlog
-  3-10-integrity-badge-data-plumbing-verify-state-json-sidecar: backlog
-  3-11-concurrency-stress-test-8-writers-10k-records: backlog
-  3-12-prd-v0-5-storage-chain-edge-cases: backlog
-  epic-3-retrospective: optional
+  3-2-sql-trigger-blocking-update-delete-on-immutable-rows: done
+  3-3-schemaerror-upgrade-message-with-literal-alter-table-sql: done
+  3-4-chainwriter-protocol-sqlitechainwriter-impl: done
+  3-5-sqlhandler-chain-integration-wal-mode-begin-immediate: done
+  3-6-setup-new-params-integrity-immutable-when-min-retention-days: done
+  3-7-ulog-verify-cli-subcommand: done
+  3-8-ulog-repair-confirm-cli-subcommand: done
+  3-9-ulog-purge-before-date-cli-subcommand: done
+  3-10-integrity-badge-data-plumbing-verify-state-json-sidecar: done
+  3-11-concurrency-stress-test-8-writers-10k-records: done
+  3-12-prd-v0-5-storage-chain-edge-cases: done
+  epic-3-retrospective: done
 
   # ========================================================================
   # Epic 4: v0.5 — Queryability (10 stories)

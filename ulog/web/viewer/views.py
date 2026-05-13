@@ -942,12 +942,15 @@ def api_records(request: HttpRequest) -> HttpResponse:
 
 _DOC_PAGES: dict[str, str] = {
     "quickstart": "Quickstart",
+    "cheatsheet": "Cheat sheet (CLI + API + env vars)",
     "storage": "Storage handlers (SQL / JSON / CSV)",
     "api": "Python API reference",
     "troubleshooting": "Troubleshooting",
     "sectors-and-files": "Sectors and files explained",
     "test-integration": "Test integration",  # Story 1.11 — v0.3
     "author-filter": "Author filter",  # Story 2.11 — v0.4
+    "v0-5-forensic-archive": "v0.5 — Forensic black box",
+    "static-export": "v0.6 — Static HTML export",
 }
 
 

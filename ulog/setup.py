@@ -81,6 +81,8 @@ def setup(
     json_path: str | None = None,
     csv_path: str | None = None,
     issue_template_url: str | None = None,
+    capture_stack: bool = False,
+    capture_stack_locals: bool = False,
     **formatter_kwargs: Any,
 ) -> logging.Logger:
     """Configure a ulog-managed handler on the named (or root) logger.
@@ -140,6 +142,12 @@ def setup(
         from . import _issue_template
 
         _issue_template.set_issue_template_url(issue_template_url)
+
+    # PRD-v0.12 — per-record call-stack capture.
+    if capture_stack or capture_stack_locals:
+        from . import _stack
+
+        _stack.configure(capture_stack=True, with_locals=capture_stack_locals)
 
     use_stream = stream if stream is not None else sys.stderr
     color_on = resolve_color(color, use_stream)

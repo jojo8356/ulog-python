@@ -340,6 +340,13 @@ class SQLHandler(logging.Handler):
         if trace_ctx is not None:
             for k, v in trace_ctx.items():
                 bound.setdefault(k, v)
+        # PRD-v0.12 — per-record call-stack capture when enabled via
+        # `setup(capture_stack=True)`. Stored under context.stack so the
+        # SQL schema stays unchanged.
+        from .._stack import CAPTURE_STACK, capture_frames
+
+        if CAPTURE_STACK and "stack" not in bound:
+            bound["stack"] = capture_frames(skip_frames=8)
         # Merge `extra=...` from the record (mirrors JsonFormatter)
         for k, v in record.__dict__.items():
             if k not in _RESERVED and k not in bound and not k.startswith("_"):

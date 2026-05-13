@@ -22,3 +22,13 @@ tools/bin/
 # Claude Code project-local install (skills installed by `bmad install`).
 # Re-create on a fresh clone with `bmad install` reading _bmad/config.toml.
 .claude/
+
+# Tailwind standalone CLI binary cache (PRD-v0.6.2 — `make tailwind-build`).
+.tailwind/
+
+# pytest-benchmark output (PRD-v0.6.4).
+.benchmarks/
+benchmark.json
+
+# Bench fixture for export-html (regenerated on demand via `make bench-fixture`).
+tests/fixtures/bench_100k.sqlite

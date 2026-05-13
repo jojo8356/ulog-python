@@ -181,7 +181,7 @@ development_status:
   # Story 8.1 (Tailwind standalone CLI build) accelerates Decision D3.
   # ========================================================================
   epic-8: done
-  8-1-tailwind-standalone-cli-build-pipeline: deferred-ops
+  8-1-tailwind-standalone-cli-build-pipeline: done
   8-2-ulog-export-html-cli-subcommand-boilerplate: done
   8-3-standalone-django-render-to-string-orchestrator: done
   8-4-output-directory-layout-index-pagination: done

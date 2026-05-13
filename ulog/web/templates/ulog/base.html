@@ -4,16 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ULog Viewer{% endblock %}</title>
-    <!-- Tailwind via CDN for v0.2 prototype. Production builds use the
-         standalone CLI compile to vendored CSS — see PRD §FR41. -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PRD-v0.6.2 — Tailwind v4 bundled CSS, built locally by
+         `make tailwind-build`. The CDN script was removed for offline
+         viewer support (NFR-OFFLINE-80) + to drop the dev-mode warning
+         the CDN runtime prints in DevTools. -->
+    <link rel="stylesheet" href="{% static 'ulog/tailwind.css' %}">
     <script>
         // Dark mode preference: respect prefers-color-scheme, allow override
-        // via localStorage. Set BEFORE Tailwind paints to avoid FOUC flash.
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { extend: {} }
-        };
+        // via localStorage. Set BEFORE the bundle paints to avoid FOUC flash.
         if (localStorage.theme === 'dark' ||
             (!('theme' in localStorage) &&
              window.matchMedia('(prefers-color-scheme: dark)').matches)) {

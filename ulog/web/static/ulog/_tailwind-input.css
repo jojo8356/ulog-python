@@ -1,0 +1,15 @@
+/* Tailwind v4 input file — scanned by the standalone CLI to produce the
+   purged bundle at `ulog/web/static/ulog/tailwind.css`.
+
+   The @source directive replaces the v3 `content:` config and tells v4
+   which templates to walk for utility classes. */
+
+@import "tailwindcss";
+
+@source "../../templates/ulog/**/*.html";
+@source "../../templates/**/*.html";
+
+/* Story 6.6 — dark mode is a class on <html>, toggled by the live viewer's
+   localStorage script or set once at export time by `ulog export-html
+   --theme dark`. */
+@variant dark (&:where(.dark, .dark *));

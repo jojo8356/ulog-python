@@ -453,11 +453,19 @@
       <p class="text-slate-500 dark:text-slate-400 italic">No records match the current filters.</p>
     {% endif %}
 
-    {# Pagination — flex-shrink-0 so it stays anchored below the scrollable table. #}
+    {# Pagination — flex-shrink-0 so it stays anchored below the scrollable table.
+       PRD-v0.8 — HTMX-augmented: prev/next swap only the records table +
+       this nav, leaving the sidebar untouched. Graceful fallback to full
+       GET reload when HTMX is absent. #}
     {% if total_pages > 1 %}
-    <nav class="mt-4 flex items-center justify-center gap-2 text-sm flex-shrink-0">
+    <nav data-pagination class="mt-4 flex items-center justify-center gap-2 text-sm flex-shrink-0">
       {% if page > 1 %}
       <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:-1 }}"
+         hx-get="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:-1 }}"
+         hx-target="closest main"
+         hx-select="main > *"
+         hx-swap="innerHTML"
+         hx-push-url="true"
          class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1">
          {% lucide "chevron-left" size=14 %}
          <span>Prev</span>
@@ -466,6 +474,11 @@
       <span class="text-slate-500 dark:text-slate-400">page {{ page }} / {{ total_pages }}</span>
       {% if page < total_pages %}
       <a href="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:1 }}"
+         hx-get="?{{ qs }}{% if qs %}&{% endif %}page={{ page|add:1 }}"
+         hx-target="closest main"
+         hx-select="main > *"
+         hx-swap="innerHTML"
+         hx-push-url="true"
          class="px-3 py-1 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1">
          <span>Next</span>
          {% lucide "chevron-right" size=14 %}

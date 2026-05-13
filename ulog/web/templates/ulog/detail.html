@@ -253,6 +253,28 @@
     </div>
     {% endif %}
 
+    {# PRD-v0.16 — Unified solution search button. Only shown when the
+       record has a signature (i.e. carries `record_hash` from the chain
+       OR an explicit msg/stack hash). #}
+    {% if record_signature %}
+    <div data-solution-search="true">
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+        {% lucide "search" size=12 %}
+        <span>Search solutions</span>
+      </h2>
+      <div class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm space-y-2">
+        <p class="text-xs text-slate-500">Signature: <code class="font-mono">{{ record_signature|slice:":12" }}…</code></p>
+        <button type="button"
+                onclick="(()=>{const consent=confirm('Send the SHA-256 signature (no code, no PII) to ulog.solutions to look for community fixes?');fetch('?solutions=1'+(consent?'&consent=1':''), {method:'GET'}).then(r=>r.text()).then(t=>{document.getElementById('solutions-results').innerHTML=t})})()"
+                class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white">
+          {% lucide "search" size=12 %}
+          <span>Search solutions</span>
+        </button>
+        <div id="solutions-results" class="text-xs text-slate-500"></div>
+      </div>
+    </div>
+    {% endif %}
+
     {# PRD-v0.7 phase 2 — span panel. Renders when the record is a span
        (context.span_name + span_ms present). Shows the span chain from
        root to current via parent_span_id. #}

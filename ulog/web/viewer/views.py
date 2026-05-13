@@ -242,6 +242,12 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
     # PRD-v0.13 — local fix DB lookup. None when no sidecar / no match.
     known_fix = _lookup_known_fix(record)
 
+    # PRD-v0.16 — Unified solution search button + ?solutions=1 endpoint.
+    record_signature = _record_signature(record)
+    solutions_html_fragment = _maybe_solutions_fragment(request, record)
+    if solutions_html_fragment is not None:
+        return HttpResponse(solutions_html_fragment)
+
     # Story 6.7 (FR114) — incident cross-links. `resolves` is the hash this
     # record resolves (if any); `resolved_by` is the list of resolve/reopen
     # records pointing AT this record.
@@ -281,8 +287,63 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
             "http_headers_masked": http_headers_masked,
             # PRD-v0.13 — Known fix panel (None when no sidecar/no match).
             "known_fix": known_fix,
+            # PRD-v0.16 — render the "Search solutions" button when signature exists.
+            "record_signature": record_signature,
         },
     )
+
+
+def _record_signature(record: Any) -> str | None:
+    """PRD-v0.16 — return the v0.13 signature for the record, or None."""
+    from ulog._fixes import signature
+
+    msg = record.msg or ""
+    if not msg:
+        return None
+    stack = record.context.get("stack") if isinstance(record.context, dict) else None
+    return signature(msg, stack if isinstance(stack, list) else None)
+
+
+def _maybe_solutions_fragment(request: HttpRequest, record: Any) -> str | None:
+    """PRD-v0.16 — handle the ?solutions=1[&consent=1] GET param.
+
+    Returns an HTML fragment for the inline search results, or None
+    when the param isn't present (normal detail-page render path).
+    """
+    if request.GET.get("solutions") != "1":
+        return None
+    from ulog._solutions import unified_search
+
+    logs_path = getattr(settings, "ULOG_LOGS_PATH", "")
+    if not logs_path:
+        return "<em>no log DB configured</em>"
+    consent = request.GET.get("consent") == "1"
+    stack = record.context.get("stack") if isinstance(record.context, dict) else None
+    results = unified_search(
+        Path(str(logs_path)),
+        record.msg,
+        stack if isinstance(stack, list) else None,
+        consent_community=consent,
+    )
+    if not results:
+        return "<em class='text-slate-500'>No solutions yet — be the first to share one.</em>"
+    parts: list[str] = ['<ul class="space-y-2 mt-2">']
+    for r in results:
+        badge_class = {
+            "local": "bg-emerald-100 text-emerald-800",
+            "community-accepted": "bg-purple-100 text-purple-800",
+            "community": "bg-purple-50 text-purple-700",
+            "known-bug": "bg-slate-200 text-slate-700",
+        }.get(r.provenance, "bg-slate-100 text-slate-700")
+        parts.append(
+            f'<li class="border border-slate-200 dark:border-slate-700 rounded p-2">'
+            f'<span class="inline-block text-xs px-2 py-0.5 rounded {badge_class}">{r.provenance}</span> '
+            f'<span class="text-xs font-mono">by {r.by} · {r.ts}</span>'
+            f'<pre class="text-xs mt-1 whitespace-pre-wrap">{r.writeup}</pre>'
+            "</li>"
+        )
+    parts.append("</ul>")
+    return "".join(parts)
 
 
 def _lookup_known_fix(record: Any) -> dict[str, Any] | None:

@@ -230,6 +230,11 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
     # Story 6.3 (FR111 / G3) — "Open issue" URL when configured.
     issue_url = _build_issue_url(adapter, record, author)
 
+    # PRD-v0.11 — HTTP request inspector. Mask sensitive headers before
+    # exposing the context to the template + serialise for the curl button.
+    http_ctx_json = _build_http_ctx_json(record)
+    http_headers_masked = _mask_headers(record.context.get("headers")) if isinstance(record.context.get("headers"), dict) else None
+
     # Story 6.7 (FR114) — incident cross-links. `resolves` is the hash this
     # record resolves (if any); `resolved_by` is the list of resolve/reopen
     # records pointing AT this record.
@@ -264,7 +269,47 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
             "resolves_target": resolves_target,
             # Story 6.7 — list of resolve/reopen records that touched this incident.
             "resolved_by": resolved_by,
+            # PRD-v0.11 — HTTP panel context (None when not an HTTP record).
+            "http_ctx_json": http_ctx_json,
+            "http_headers_masked": http_headers_masked,
         },
+    )
+
+
+def _mask_headers(headers: Any) -> dict[str, str]:
+    if not isinstance(headers, dict):
+        return {}
+    return {
+        k: ("***" if _SENSITIVE_HEADER_RE.search(k) else str(v))
+        for k, v in headers.items()
+    }
+
+
+_SENSITIVE_HEADER_RE = re.compile(r"auth|token|secret|password|key|cookie", re.IGNORECASE)
+
+
+def _build_http_ctx_json(record: Any) -> str:
+    """PRD-v0.11 — serialise context for the 'Copy as curl' button.
+
+    Sensitive headers (matching `_SENSITIVE_HEADER_RE`) are replaced
+    with `***` BEFORE the JSON serialisation so the masked value is
+    what lands in the clipboard.
+    """
+    ctx = dict(record.context)
+    if not ctx.get("method") or not ctx.get("url"):
+        return ""
+    if "headers" in ctx and isinstance(ctx["headers"], dict):
+        ctx["headers"] = {
+            k: ("***" if _SENSITIVE_HEADER_RE.search(k) else v) for k, v in ctx["headers"].items()
+        }
+    return json.dumps(
+        {
+            "method": ctx.get("method"),
+            "url": ctx.get("url"),
+            "headers": ctx.get("headers") or {},
+            "body": ctx.get("body"),
+        },
+        default=str,
     )
 
 

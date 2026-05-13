@@ -175,6 +175,67 @@
     </div>
     {% endif %}
 
+    {# PRD-v0.11 — HTTP request inspector. Renders when context carries
+       method+url. Sensitive headers (auth/token/secret/password/key/cookie)
+       are masked as `***`. "Copy as curl" button reconstructs the request. #}
+    {% if record.context.method and record.context.url %}
+    <div data-http-panel="true">
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+        {% lucide "globe" size=12 %}
+        <span>HTTP request</span>
+      </h2>
+      <div class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm space-y-2">
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <span class="inline-block text-xs font-mono px-2 py-0.5 rounded
+            {% if record.context.method == 'GET' %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200
+            {% elif record.context.method == 'POST' %}bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200
+            {% elif record.context.method == 'PUT' or record.context.method == 'PATCH' %}bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200
+            {% elif record.context.method == 'DELETE' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+            {% else %}bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-300{% endif %}">
+            {{ record.context.method }}
+          </span>
+          <span class="font-mono text-xs break-all">{{ record.context.url }}</span>
+          {% if record.context.status_code %}
+          <span class="ml-auto inline-block text-xs font-mono px-2 py-0.5 rounded
+            {% if record.context.status_code >= 500 %}bg-red-600 text-white
+            {% elif record.context.status_code >= 400 %}bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200
+            {% elif record.context.status_code >= 300 %}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200
+            {% elif record.context.status_code >= 200 %}bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200
+            {% else %}bg-slate-100 text-slate-500 dark:bg-slate-800/50{% endif %}">
+            {{ record.context.status_code }}
+          </span>
+          {% endif %}
+          {% if record.context.latency_ms %}
+          <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ record.context.latency_ms }}ms</span>
+          {% endif %}
+        </div>
+
+        {% if http_headers_masked %}
+        <details>
+          <summary class="text-xs text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700">Headers ({{ http_headers_masked|length }})</summary>
+          <pre class="text-xs mt-1 font-mono whitespace-pre-wrap break-words" data-http-headers>{% for k, v in http_headers_masked.items %}{{ k }}: {{ v }}
+{% endfor %}</pre>
+        </details>
+        {% endif %}
+
+        {% if record.context.body %}
+        <details open>
+          <summary class="text-xs text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700">Body</summary>
+          <pre class="text-xs mt-1 font-mono whitespace-pre-wrap break-words" data-http-body><code class="language-json">{{ record.context.body }}</code></pre>
+        </details>
+        {% endif %}
+
+        <button type="button"
+                onclick="(()=>{const ctx=JSON.parse(this.dataset.ctx);const parts=['curl','-X',ctx.method||'GET',JSON.stringify(ctx.url)];if(ctx.headers){for(const[k,v]of Object.entries(ctx.headers))parts.push('-H',JSON.stringify(k+': '+v))}if(ctx.body){const b=typeof ctx.body==='string'?ctx.body:JSON.stringify(ctx.body);parts.push('-d',JSON.stringify(b))}const cmd=parts.join(' ');navigator.clipboard.writeText(cmd);this.textContent='copied ✓';setTimeout(()=>{this.textContent='Copy as curl'},1500)})()"
+                data-ctx="{{ http_ctx_json|escape }}"
+                class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600">
+          {% lucide "copy" size=12 %}
+          <span>Copy as curl</span>
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
     {% if record.exc %}
     <div>
       <h2 class="text-xs uppercase font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">

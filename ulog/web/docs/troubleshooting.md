@@ -91,3 +91,32 @@ pip install ulog[web]
 
 If you're inside a venv, double-check `which python` matches your
 expected env.
+
+## v0.5: "`ulog-web`: command not found"
+
+The standalone `ulog-web` script was removed in v0.5. Everything now
+lives under the single `ulog` dispatcher:
+
+```bash
+ulog web ./logs.sqlite       # was: ulog-web ./logs.sqlite
+ulog verify ./logs.sqlite
+ulog incidents --status open --db ./logs.sqlite
+```
+
+One-shot migration:
+
+```bash
+grep -rl 'ulog-web' . | xargs sed -i 's/\bulog-web\b/ulog web/g'
+```
+
+See `RELEASE_NOTES.md` at the repo root.
+
+## v0.5: `ulog verify` reports BROKEN
+
+The chain is corrupt at the reported `chain_pos`. Run
+`ulog repair --confirm <db>` to archive the orphaned rows to a
+sidecar JSONL and truncate the chain to the last-good position.
+The viewer's header pill turns red and `setup(integrity="hash-chain")`
+refuses to re-open the DB until repair clears the state.
+
+Full troubleshooting flow: [v0.5 — Forensic black box](v0.5-forensic-archive).

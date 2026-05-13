@@ -17,37 +17,8 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+from .._reserved import RESERVED as _RESERVED
 from ..context import get_bound
-
-# Reserved LogRecord keys (matches CSVHandler / JsonFormatter).
-_RESERVED = frozenset(
-    {
-        "args",
-        "asctime",
-        "created",
-        "exc_info",
-        "exc_text",
-        "filename",
-        "funcName",
-        "levelname",
-        "levelno",
-        "lineno",
-        "message",
-        "module",
-        "msecs",
-        "msg",
-        "name",
-        "pathname",
-        "process",
-        "processName",
-        "relativeCreated",
-        "stack_info",
-        "thread",
-        "threadName",
-        "taskName",
-    }
-)
-
 
 # Story 3.3 / Decision A2 — literal upgrade DDL for v0.4 → v0.5.
 # Map each v0.5 chain column to its ALTER TABLE statement and (when

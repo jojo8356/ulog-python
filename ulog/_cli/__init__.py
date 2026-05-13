@@ -5,13 +5,16 @@ Single `ulog` console-script entry point. Subcommands live in
 `register(subparsers)`. Each subcommand exposes `run(args) -> int`
 returning a POSIX exit code.
 
-Currently shipped subcommands:
+Currently shipped subcommands (Story 7.2):
+  - web       — open the inspection UI for a stored log file (Story 7.2)
   - verify    — walk the chain and report OK/BROKEN (Story 3.7)
   - repair    — archive orphans + truncate the chain (Story 3.8)
   - purge     — delete rotable rows older than --before (Story 3.9)
   - correlate — over/under-represented dimensions for a filter (Story 4.8)
   - bisect    — first chain record matching a regex (Story 4.8)
   - replay    — iterate matching records or generate a regression test (Story 4.8)
+  - trace     — list all records sharing a trace_id (Story 6.2)
+  - incidents — CI-gate status + Markdown KPI report (Stories 5.4 / 5.5)
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from . import (
     cmd_replay,
     cmd_trace,
     cmd_verify,
+    cmd_web,
 )
 
 
@@ -37,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         description="ULog forensic archive CLI (v0.5+).",
     )
     subparsers = parser.add_subparsers(dest="subcommand")
+    cmd_web.register(subparsers)
     cmd_verify.register(subparsers)
     cmd_repair.register(subparsers)
     cmd_purge.register(subparsers)

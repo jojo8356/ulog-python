@@ -119,32 +119,5 @@ class CSVHandler(logging.Handler):
         super().close()
 
 
-# Reserved keys on LogRecord that are NOT real `extra=` payload (kept
-# in sync with formatters.JsonFormatter._RESERVED).
-_RESERVED = frozenset(
-    {
-        "args",
-        "asctime",
-        "created",
-        "exc_info",
-        "exc_text",
-        "filename",
-        "funcName",
-        "levelname",
-        "levelno",
-        "lineno",
-        "message",
-        "module",
-        "msecs",
-        "msg",
-        "name",
-        "pathname",
-        "process",
-        "processName",
-        "relativeCreated",
-        "stack_info",
-        "thread",
-        "threadName",
-        "taskName",
-    }
-)
+# Story 7.1 — canonical set lives in ulog._reserved.
+from .._reserved import RESERVED as _RESERVED  # noqa: E402

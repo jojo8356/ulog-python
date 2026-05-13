@@ -83,4 +83,34 @@ Register a custom `logging.Formatter` subclass.
 
 - `ulog.SchemaError` — raised by `SQLHandler` when an existing DB
   schema doesn't match what ULog expects. v0.2 doesn't ship
-  migrations.
+  migrations; v0.5 emits a copy-paste `ALTER TABLE` SQL block.
+
+## v0.5 — chain integrity APIs
+
+- `ulog.replay(db, where_dsl=None, on=callback)` — iterate records
+  in chain order. Records are `MappingProxyType` — mutation raises.
+- `ulog.is_replaying()` → `bool` — True inside a `replay()` callback
+  / `replay_records(...)` block.
+- `ulog.testing.replay_records(records)` — context manager for tests.
+- `ulog.correlate(filter_dsl, db)` → `CorrelationReport` with `top_over`
+  / `bottom_under` rows by lift.
+- `ulog.bisect(pattern, db)` → `BisectResult | None` — first match.
+
+## v0.5 — incidents APIs
+
+- `ulog.resolve(incident_hash, by, note="")` — emits RESOLVED record.
+  Hex prefix ≥4 chars. Raises `LookupError` if hash absent /
+  ambiguous, `RuntimeError` if no SQLHandler configured.
+- `ulog.reopen(incident_hash, reason="")` — emits REOPENED record.
+- `ulog.compute_states(records)` → `dict[hash, IncidentState]` — chain
+  walk, latest-wins state per FR106.
+- `ulog.IncidentState(incident_hash, state, last_action, opened_ts,
+  last_action_ts)` — frozen dataclass; `state ∈ {open, closed, reopened}`.
+
+## v0.5 — setup() new keyword args
+
+| Arg | Default | Purpose |
+|---|---|---|
+| `integrity` | `None` | `"hash-chain"` enables Epic 3 features. |
+| `min_retention_days` | `0` | Trigger flips `immutable=1` after N days. |
+| `issue_template_url` | `None` | URL with `{msg}` / `{body}` / `{level}` etc. placeholders for the detail-page "Open issue" button. |

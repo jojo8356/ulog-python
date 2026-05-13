@@ -102,4 +102,21 @@ ulog.setup(
 
 Every record is emitted to terminal AND persisted to all three storage
 backends. Useful when you want to give the user a CSV they can open in
-Excel AND a SQLite for `ulog-web` triage.
+Excel AND a SQLite for `ulog web` triage.
+
+## v0.5 chain integrity
+
+When `integrity="hash-chain"` is passed to `setup()`, the SQL schema
+grows five new columns (auto-migrated on first write):
+
+| Column | Purpose |
+|---|---|
+| `chain_pos` | Monotonic 1-based position in the chain. |
+| `record_hash` | `sha256(canonical_record_json + prev_hash)`. |
+| `prev_hash` | The previous row's `record_hash` (NULL for chain_pos=1). |
+| `immutable` | 1 once `min_retention_days` has elapsed. Trigger blocks UPDATE/DELETE. |
+| `is_replay` | 1 for records emitted inside `ulog.replay(...)` (chain unchanged). |
+
+The chain is **SQL-only** (Decision B1). JSONL / CSV adapters don't
+attempt to carry it because chained semantics over append-only text
+require external write coordination v0.5 deliberately doesn't ship.

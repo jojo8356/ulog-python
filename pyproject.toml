@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ulog"
-version = "0.1.0"
+version = "0.5.0"
 description = "Stdlib `logging` upgraded — sensible defaults, ucolor formatters, byte-stable contract for CLI tools and pipelines"
 authors = [{ name = "jojo8356" }]
 readme = "README.md"
@@ -68,13 +68,20 @@ dev = [
     "pip-audit>=2.7",     # CVE scan against installed packages
     # workflow
     "pre-commit>=4.0",    # orchestrate the above on every commit
+    # Story 7.10 — perf regression benchmarks (SC1/SC2/SC7 baselines in
+    # BENCHMARK.md). CI runs them in advisory mode for the first 2 v0.5
+    # runs (Decision E3) before hardening to a strict gate.
+    "pytest-benchmark>=4.0",
 ]
 
 [project.entry-points.pytest11]
 ulog = "ulog.testing.pytest_plugin"
 
 [project.scripts]
-ulog-web = "ulog.web.cli:main"
+# v0.5 consolidates every entry point under `ulog <subcommand>` (Decision
+# C1 / Story 7.3). The previous `ulog-web` script was removed — its
+# behaviour lives at `ulog web ...`. See RELEASE_NOTES.md for the
+# migration command.
 ulog = "ulog._cli:main"
 
 [project.urls]
@@ -157,6 +164,7 @@ DEP002 = [
     "django-lucide", "django-browser-reload", "pytest-xdist",
     # Dev tools — invoked as CLIs, not imported.
     "ruff", "mypy", "deptry", "pip-audit", "pre-commit", "playwright",
+    "pytest-benchmark",  # pytest plugin — registered via entry point
 ]
 # `ucolor` is vendored as a git submodule under vendor/ucolor-python/
 # and imported lazily via try/except — not a PyPI dependency.
@@ -168,3 +176,4 @@ DEP004 = ["sqlalchemy", "playwright"]
 django-browser-reload = "django_browser_reload"
 django-lucide = "lucide"
 pytest-xdist = "xdist"
+pytest-benchmark = "pytest_benchmark"

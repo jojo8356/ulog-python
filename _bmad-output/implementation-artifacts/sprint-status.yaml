@@ -159,19 +159,19 @@ development_status:
   # ========================================================================
   # Epic 7: v0.5 release — consolidation, documentation & tag (12 stories)
   # ========================================================================
-  epic-7: backlog
-  7-1-reserved-frozenset-centralization-refactor: backlog
-  7-2-ulog-cli-init-argparse-subparser-dispatcher: backlog
-  7-3-remove-ulog-web-console-script-release-notes-transition: backlog
-  7-4-doc-page-v0-5-forensic-archive-md: backlog
-  7-5-update-existing-in-app-doc-pages: backlog
-  7-6-stability-md-7-invariants-written-contract: backlog
-  7-7-benchmark-md-sc1-sc2-sc7-baseline-numbers: backlog
-  7-8-test-qlnes-compat-i5-sc5-byte-stable-regression-test: backlog
-  7-9-ci-gate-dependencies-grep-step: backlog
-  7-10-pytest-benchmark-in-dev-extras-advisory-ci: backlog
-  7-11-tests-coverage-matrix-md-fr-edge-case-test-mapping: backlog
-  7-12-tag-v0-5-0-push-qlnes-migration: backlog
+  epic-7: in-progress
+  7-1-reserved-frozenset-centralization-refactor: done
+  7-2-ulog-cli-init-argparse-subparser-dispatcher: done
+  7-3-remove-ulog-web-console-script-release-notes-transition: done
+  7-4-doc-page-v0-5-forensic-archive-md: done
+  7-5-update-existing-in-app-doc-pages: done
+  7-6-stability-md-7-invariants-written-contract: done
+  7-7-benchmark-md-sc1-sc2-sc7-baseline-numbers: done
+  7-8-test-qlnes-compat-i5-sc5-byte-stable-regression-test: done
+  7-9-ci-gate-dependencies-grep-step: done
+  7-10-pytest-benchmark-in-dev-extras-advisory-ci: done
+  7-11-tests-coverage-matrix-md-fr-edge-case-test-mapping: done
+  7-12-tag-v0-5-0-push-qlnes-migration: ready-for-release
   epic-7-retrospective: optional
 
   # ========================================================================

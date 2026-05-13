@@ -45,7 +45,7 @@ from .setup import (
     setup,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "LOG_LEVELS",

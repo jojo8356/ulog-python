@@ -114,35 +114,8 @@ class JsonFormatter(logging.Formatter):
         log.info("rendered", extra={'rom': 'alter_ego'})
     """
 
-    # Reserved attribute names on LogRecord — anything in `extra=` not
-    # in this set lands in the JSON output.
-    _RESERVED = frozenset(
-        {
-            "args",
-            "asctime",
-            "created",
-            "exc_info",
-            "exc_text",
-            "filename",
-            "funcName",
-            "levelname",
-            "levelno",
-            "lineno",
-            "message",
-            "module",
-            "msecs",
-            "msg",
-            "name",
-            "pathname",
-            "process",
-            "processName",
-            "relativeCreated",
-            "stack_info",
-            "thread",
-            "threadName",
-            "taskName",  # py3.12+
-        }
-    )
+    # Story 7.1 — canonical set lives in ulog._reserved.RESERVED.
+    from ._reserved import RESERVED as _RESERVED
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {

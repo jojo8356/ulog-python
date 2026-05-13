@@ -1,0 +1,54 @@
+# Self-host recipe for `ulog.solutions` — PRD-v0.15 §6.
+#
+# Spin up your own private community-solutions site:
+#
+#   cd docker/ulog-solutions
+#   docker compose up -d
+#
+# Then point your viewer at it:
+#
+#   export ULOG_SOLUTIONS_ENDPOINT=http://localhost:8080/v1
+#   ulog web ./logs.sqlite --debug
+#
+# The site image is a separate project (see README); this compose
+# file documents the runtime contract:
+#   - HTTP server on :8080
+#   - Postgres for the fixes table + GitHub OAuth tokens
+#   - Reads SOLUTIONS_GH_CLIENT_ID / SOLUTIONS_GH_CLIENT_SECRET for OAuth
+#   - CC BY-SA 4.0 watermark in the response body
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ulog
+      POSTGRES_PASSWORD: ulog
+      POSTGRES_DB: solutions
+    volumes:
+      - solutions-db:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ulog -d solutions"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  site:
+    # Placeholder — replace with the actual image once the
+    # `ulog-solutions-server` project ships its OCI artefact.
+    image: ulog/solutions-server:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://ulog:ulog@postgres:5432/solutions
+      SOLUTIONS_GH_CLIENT_ID: ${SOLUTIONS_GH_CLIENT_ID:?GitHub OAuth client id required}
+      SOLUTIONS_GH_CLIENT_SECRET: ${SOLUTIONS_GH_CLIENT_SECRET:?GitHub OAuth client secret required}
+      # Per PRD-v0.15 — CC BY-SA 4.0 watermark on every response.
+      SOLUTIONS_LICENSE: "CC-BY-SA-4.0"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  solutions-db:

@@ -50,6 +50,9 @@ web-dev = [
 ]
 # Pytest plugin runtime (Story 1.1 entry-point).
 testing = ["pytest>=7.0", "pytest-xdist>=3.0"]
+# PRD-v0.15 — community-solutions client (ed25519 signing).
+# Opt-in so plain installs stay zero-PyPI-dep.
+solutions = ["cryptography>=42.0"]
 # Full dev environment — runtime + tests + linters + audit.
 dev = [
     # runtime + test deps

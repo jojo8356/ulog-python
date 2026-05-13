@@ -35,6 +35,7 @@ from . import (
     cmd_repair,
     cmd_replay,
     cmd_snapshot,
+    cmd_solutions,
     cmd_trace,
     cmd_validate_resources,
     cmd_verify,
@@ -64,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd_fix.register(subparsers)
     cmd_enable_fts5.register(subparsers)
     cmd_bug_cache.register(subparsers)
+    cmd_solutions.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

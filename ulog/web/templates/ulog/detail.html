@@ -236,6 +236,23 @@
     </div>
     {% endif %}
 
+    {# PRD-v0.13 — Known fix panel: when this record's signature has a
+       matching entry in the sidecar fixes DB, surface the writeup. #}
+    {% if known_fix %}
+    <div data-known-fix="true">
+      <h2 class="text-xs uppercase font-semibold text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1.5">
+        {% lucide "lightbulb" size=12 %}
+        <span>Known fix</span>
+      </h2>
+      <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded p-3 text-sm space-y-2">
+        <p class="whitespace-pre-wrap">{{ known_fix.writeup }}</p>
+        <div class="text-xs text-slate-500 dark:text-slate-400 font-mono">
+          by {{ known_fix.by }} · {{ known_fix.ts }}{% if known_fix.commit_sha %} · <span title="{{ known_fix.commit_sha }}">{{ known_fix.commit_sha|slice:":7" }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     {% if record.exc %}
     <div>
       <h2 class="text-xs uppercase font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">

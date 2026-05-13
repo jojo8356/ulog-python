@@ -235,6 +235,9 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
     http_ctx_json = _build_http_ctx_json(record)
     http_headers_masked = _mask_headers(record.context.get("headers")) if isinstance(record.context.get("headers"), dict) else None
 
+    # PRD-v0.13 — local fix DB lookup. None when no sidecar / no match.
+    known_fix = _lookup_known_fix(record)
+
     # Story 6.7 (FR114) — incident cross-links. `resolves` is the hash this
     # record resolves (if any); `resolved_by` is the list of resolve/reopen
     # records pointing AT this record.
@@ -272,8 +275,24 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
             # PRD-v0.11 — HTTP panel context (None when not an HTTP record).
             "http_ctx_json": http_ctx_json,
             "http_headers_masked": http_headers_masked,
+            # PRD-v0.13 — Known fix panel (None when no sidecar/no match).
+            "known_fix": known_fix,
         },
     )
+
+
+def _lookup_known_fix(record: Any) -> dict[str, Any] | None:
+    """PRD-v0.13 — match the record's signature against the local fix DB."""
+    from pathlib import Path as _P
+
+    from ulog._fixes import lookup_fix, signature
+
+    logs_path = getattr(settings, "ULOG_LOGS_PATH", None)
+    if not logs_path:
+        return None
+    stack = record.context.get("stack") if isinstance(record.context, dict) else None
+    sig = signature(record.msg, stack if isinstance(stack, list) else None)
+    return lookup_fix(_P(str(logs_path)), sig)
 
 
 def _mask_headers(headers: Any) -> dict[str, str]:

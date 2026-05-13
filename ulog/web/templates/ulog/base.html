@@ -27,11 +27,19 @@
          * fade animation). Applied to background, text, and border colours
          * across the whole document. 500ms is the sweet spot — gentle
          * enough not to strobe, snappy enough not to feel sluggish. */
-        body, header, aside, main, table, tr, td, th, button, input,
-        a, span, code, pre, div {
+        /* PRD-v0.4.5 — universal-selector fallback so every element
+         * flips in lockstep (previous per-tag list missed <label>,
+         * <details>, <p>, headings, SVG fill/stroke, etc.). View
+         * Transitions API takes over when the browser supports it
+         * (Chrome 111+, Edge 111+, Safari 18). */
+        *, *::before, *::after {
             transition: background-color 500ms ease,
                         color 500ms ease,
-                        border-color 500ms ease;
+                        border-color 500ms ease,
+                        fill 500ms ease,
+                        stroke 500ms ease,
+                        box-shadow 500ms ease,
+                        outline-color 500ms ease;
         }
         /* Theme-toggle icon crossfade — the inactive icon fades out, the
          * active one fades in. Both occupy the same grid cell so the
@@ -142,14 +150,26 @@
 {% block content %}{% endblock %}
 
 <script>
+    // PRD-v0.4.5 — View Transitions API + universal-selector fallback
+    // so every element flips in lockstep. The CSS rule above covers the
+    // fallback path; the API takes over on supporting browsers and
+    // animates the whole snapshot (including <svg fill>, <details>,
+    // outlines) atomically.
     document.getElementById('theme-toggle').addEventListener('click', () => {
         const html = document.documentElement;
-        if (html.classList.contains('dark')) {
-            html.classList.remove('dark');
-            localStorage.theme = 'light';
+        const swap = () => {
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                html.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+        };
+        if (document.startViewTransition) {
+            document.startViewTransition(swap);
         } else {
-            html.classList.add('dark');
-            localStorage.theme = 'dark';
+            swap();
         }
     });
 </script>

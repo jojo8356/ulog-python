@@ -142,6 +142,37 @@
         </div>
       {% endif %}
 
+      {# PRD-v0.10 phase 2 — Fleet sidebar tree.
+         Renders when at least one fleet probe record (logger='ulog.fleet')
+         exists. Builds the target tree from the `parents` lists. #}
+      {% if fleet_tree %}
+        <div>
+          <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
+              title="Fleet probes (@probe-decorated tests). Parent/child tree built from `parents=[...]` annotations.">
+            {% lucide "share-2" size=14 %}
+            <span>Fleet</span>
+          </h3>
+          <ul class="space-y-1 max-h-60 overflow-y-auto text-xs">
+            {% for node in fleet_tree %}
+              <li>
+                <a href="?bound=target={{ node.target|urlencode }}"
+                   class="flex items-center gap-2 px-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                   title="{{ node.target }}">
+                  <span class="{% if node.last_status == 'ok' %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %}">{% if node.last_status == 'ok' %}●{% else %}✗{% endif %}</span>
+                  <span class="font-mono flex-1 truncate">{{ node.target }}</span>
+                  <span class="ml-auto text-slate-500 tabular-nums">{{ node.count }}</span>
+                </a>
+                {% if node.parents %}
+                <ul class="ml-3 mt-0.5 text-slate-500 font-mono">
+                  {% for p in node.parents %}<li>↑ {{ p }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
       {# Sectors (logger-name tree) — FR44 #}
       <div>
         <h3 class="font-semibold mb-2 text-slate-700 dark:text-slate-300 flex items-center gap-1.5"

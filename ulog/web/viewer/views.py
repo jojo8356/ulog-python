@@ -180,6 +180,8 @@ def list_view(request: HttpRequest) -> HttpResponse:
         "test_summary": result.test_summary,
         # Story 6.8 (FR115) — Incidents sidebar counts (None when none exist).
         "incident_summary": incident_summary,
+        # PRD-v0.10 phase 2 — Fleet sidebar tree.
+        "fleet_tree": _build_fleet_tree(adapter),
         "incident_filter_choices": [
             ("open", "Open"),
             ("closed_7d", "Closed (last 7d)"),
@@ -293,6 +295,46 @@ def _lookup_known_fix(record: Any) -> dict[str, Any] | None:
     stack = record.context.get("stack") if isinstance(record.context, dict) else None
     sig = signature(record.msg, stack if isinstance(stack, list) else None)
     return lookup_fix(_P(str(logs_path)), sig)
+
+
+def _build_fleet_tree(adapter: Adapter) -> list[dict[str, Any]] | None:
+    """PRD-v0.10 phase 2 — aggregate ulog.fleet records into a target list.
+
+    Returns None when no fleet probes have run. Each entry:
+      {target, parents, count, last_status}
+    """
+    from .adapters import SQLiteAdapter
+
+    if not isinstance(adapter, SQLiteAdapter):
+        return None
+    from sqlalchemy import text
+
+    nodes: dict[str, dict[str, Any]] = {}
+    with adapter._engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT context FROM logs WHERE logger='ulog.fleet' "
+                "ORDER BY id DESC"
+            )
+        ).all()
+    if not rows:
+        return None
+    for (ctx_raw,) in rows:
+        if not ctx_raw:
+            continue
+        ctx = json.loads(ctx_raw)
+        target = ctx.get("target")
+        if not target:
+            continue
+        if target not in nodes:
+            nodes[target] = {
+                "target": target,
+                "parents": ctx.get("parents") or [],
+                "count": 0,
+                "last_status": ctx.get("probe_status", "ok"),
+            }
+        nodes[target]["count"] += 1
+    return sorted(nodes.values(), key=lambda n: n["target"])
 
 
 def _mask_headers(headers: Any) -> dict[str, str]:

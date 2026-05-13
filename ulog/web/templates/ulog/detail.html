@@ -253,6 +253,68 @@
     </div>
     {% endif %}
 
+    {# PRD-v0.7 phase 2 — span panel. Renders when the record is a span
+       (context.span_name + span_ms present). Shows the span chain from
+       root to current via parent_span_id. #}
+    {% if record.context.span_name %}
+    <div data-span-panel="true">
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+        {% lucide "gauge" size=12 %}
+        <span>Span</span>
+      </h2>
+      <div class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm space-y-2">
+        <div class="flex items-baseline gap-2 flex-wrap">
+          <span class="font-mono text-sm font-semibold">{{ record.context.span_name }}</span>
+          <span class="text-xs font-mono text-slate-500">id={{ record.context.span_id }}</span>
+          <span class="ml-auto inline-block text-xs font-mono px-2 py-0.5 rounded
+            {% if record.context.span_status == 'fail' %}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200
+            {% else %}bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200{% endif %}">
+            {{ record.context.span_status|default:"ok" }}
+          </span>
+          <span class="text-xs font-mono tabular-nums">{{ record.context.span_ms }}ms</span>
+        </div>
+        {% if record.context.parent_span_id %}
+        <div class="text-xs font-mono text-slate-500">
+          parent: <a href="?q=span_id%3D{{ record.context.parent_span_id }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ record.context.parent_span_id }}</a>
+        </div>
+        {% else %}
+        <div class="text-xs font-mono text-slate-400">(root span)</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# PRD-v0.12 phase 2 — call-stack panel. Renders when context.stack
+       (list of frames) is present. Collapsible <details> by default. #}
+    {% if record.context.stack %}
+    <div data-stack-panel="true">
+      <h2 class="text-xs uppercase font-semibold text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
+        {% lucide "layers" size=12 %}
+        <span>Call stack ({{ record.context.stack|length }} frames)</span>
+      </h2>
+      <details class="bg-slate-100 dark:bg-slate-800 rounded p-3 text-sm">
+        <summary class="cursor-pointer text-slate-600 dark:text-slate-300">show frames</summary>
+        <ol class="mt-2 space-y-1 text-xs font-mono">
+          {% for frame in record.context.stack reversed %}
+          <li class="flex items-baseline gap-2 flex-wrap">
+            <span class="text-slate-400 dark:text-slate-500 tabular-nums w-6 text-right">{{ forloop.counter }}.</span>
+            <span class="text-blue-700 dark:text-blue-400">{{ frame.function }}</span>
+            <span class="text-slate-500">at</span>
+            <span class="text-slate-600 dark:text-slate-300 break-all">{{ frame.file }}:{{ frame.line }}</span>
+            {% if frame.locals %}
+            <details class="basis-full ml-8 mt-1">
+              <summary class="text-slate-400 text-xs cursor-pointer">locals ({{ frame.locals|length }})</summary>
+              <pre class="bg-slate-50 dark:bg-slate-900 rounded p-2 mt-1 whitespace-pre-wrap break-words text-xs">{% for k, v in frame.locals.items %}{{ k }} = {{ v }}
+{% endfor %}</pre>
+            </details>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+      </details>
+    </div>
+    {% endif %}
+
     {% if record.exc %}
     <div>
       <h2 class="text-xs uppercase font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">

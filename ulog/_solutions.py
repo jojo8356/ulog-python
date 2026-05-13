@@ -91,12 +91,25 @@ def search_known_bugs(sig: str) -> list[SearchResult]:
     return out
 
 
-def search_community(sig: str, *, endpoint: str = "https://ulog.solutions/v1/search") -> list[SearchResult]:
+def _default_community_endpoint() -> str:
+    """PRD-v0.15 self-host support — honour ULOG_SOLUTIONS_ENDPOINT env."""
+    import os
+
+    base = os.environ.get("ULOG_SOLUTIONS_ENDPOINT") or "https://ulog.solutions/v1"
+    return base.rstrip("/") + "/search"
+
+
+def search_community(sig: str, *, endpoint: str | None = None) -> list[SearchResult]:
     """v0.15 backend — community site lookup.
 
     Network call gated by the caller (the viewer's consent modal).
     Returns [] on any error (timeout, 5xx, DNS, missing deps).
+
+    Endpoint resolution priority: `endpoint=` arg > ULOG_SOLUTIONS_ENDPOINT
+    env > default `https://ulog.solutions/v1/search`.
     """
+    if endpoint is None:
+        endpoint = _default_community_endpoint()
     try:
         req = urllib.request.Request(
             f"{endpoint}?sig={sig}",

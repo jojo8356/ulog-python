@@ -25,12 +25,28 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-DEFAULT_ENDPOINT = "https://ulog.solutions/v1"
+_DEFAULT_PUBLIC = "https://ulog.solutions/v1"
 DEFAULT_KEY_PATH = Path.home() / ".config" / "ulog" / "solutions-key"
 
 
-def fetch_signature(signature: str, *, endpoint: str = DEFAULT_ENDPOINT, timeout: float = 2.0) -> list[dict[str, Any]]:
+def _resolved_endpoint() -> str:
+    """PRD-v0.15 self-host support — honour ULOG_SOLUTIONS_ENDPOINT env."""
+    import os
+
+    return os.environ.get("ULOG_SOLUTIONS_ENDPOINT") or _DEFAULT_PUBLIC
+
+
+# Module-level constant kept for backward compat + CLI default text.
+# Computed eagerly so test fixtures that monkey-patch the env after
+# import don't accidentally break, but `_resolved_endpoint()` is the
+# live source of truth for runtime calls.
+DEFAULT_ENDPOINT = _resolved_endpoint()
+
+
+def fetch_signature(signature: str, *, endpoint: str | None = None, timeout: float = 2.0) -> list[dict[str, Any]]:
     """GET /search?sig=… — returns the raw `results` list, [] on error."""
+    if endpoint is None:
+        endpoint = _resolved_endpoint()
     try:
         req = urllib.request.Request(
             f"{endpoint}/search?sig={signature}",
@@ -49,7 +65,7 @@ def publish(
     by: str,
     *,
     private_key_path: Path | None = None,
-    endpoint: str = DEFAULT_ENDPOINT,
+    endpoint: str | None = None,
     timeout: float = 5.0,
 ) -> dict[str, Any]:
     """POST a fix to /publish. Signs the body via ed25519.
@@ -57,6 +73,8 @@ def publish(
     Raises RuntimeError if the `cryptography` opt-in dep is missing.
     Returns the server's JSON response (or {"error": "..."}).
     """
+    if endpoint is None:
+        endpoint = _resolved_endpoint()
     try:
         from cryptography.hazmat.primitives.serialization import (
             Encoding,

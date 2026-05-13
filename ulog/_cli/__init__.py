@@ -26,6 +26,7 @@ from . import (
     cmd_bisect,
     cmd_correlate,
     cmd_export_html,
+    cmd_import,
     cmd_incidents,
     cmd_purge,
     cmd_repair,
@@ -56,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd_export_html.register(subparsers)
     cmd_snapshot.register(subparsers)
     cmd_validate_resources.register(subparsers)
+    cmd_import.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

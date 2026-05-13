@@ -9,12 +9,12 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .parsers import (
     PARSER_REGISTRY,
-    ParseError,
     ParsedRecord,
+    ParseError,
     Parser,
     make_regex_parser,
 )
@@ -79,7 +79,7 @@ def _open_text(path: Path, encoding: str) -> Any:
 
 def import_files(inputs: list[Path], opts: ImportOptions) -> ImportResult:
     """Stream-parse `inputs`, insert into `opts.output_db`."""
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import create_engine
 
     engine = create_engine(f"sqlite:///{opts.output_db}", future=True)
     _ensure_schema(engine)
@@ -150,7 +150,7 @@ def _ingest_one(
                 msg = f"  line {line_no}: {e}"
                 if opts.strict:
                     print(msg, file=sys.stderr)
-                    raise SystemExit(f"ulog import: --strict abort at {path}:{line_no}")
+                    raise SystemExit(f"ulog import: --strict abort at {path}:{line_no}") from e
                 continue
             _maybe_tag(rec, opts.source_tag)
             batch.append(_record_to_row(rec))

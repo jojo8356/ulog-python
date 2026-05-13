@@ -30,9 +30,8 @@ def _seed(tmp_path: Path) -> Path:
     with ulog.span("outer"):
         with ulog.span("setup_db"):
             pass
-        with ulog.span("body"):
-            with ulog.span("query"):
-                pass
+        with ulog.span("body"), ulog.span("query"):
+            pass
     for h in logging.getLogger().handlers:
         h.flush()
     return db
@@ -81,8 +80,9 @@ def test_explain_root_filter(tmp_path, capsys):
     """--root <prefix> restricts to one tree."""
     db = _seed(tmp_path)
     # Read the outer span_id to use as prefix.
-    from sqlalchemy import create_engine, text
     import json as _j
+
+    from sqlalchemy import create_engine, text
 
     engine = create_engine(f"sqlite:///{db}", future=True)
     with engine.connect() as conn:

@@ -26,4 +26,5 @@ def test_view_transition_api_wired_in_toggle():
     body = BASE.read_text(encoding="utf-8")
     assert "document.startViewTransition" in body
     # And falls back when unsupported.
-    assert "} else {" in body and "swap();" in body
+    assert "} else {" in body
+    assert "swap();" in body

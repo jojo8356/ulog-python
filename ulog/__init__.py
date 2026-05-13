@@ -24,7 +24,6 @@ from ._bisect import BisectResult, bisect
 from ._correlate import CorrelationReport, CorrelationRow, correlate
 from ._incidents import IncidentState, compute_states, reopen, resolve
 from .context import bind, clear, context, get_bound, unbind
-from .spans import current_span_id, span
 from .formatters import (
     JsonFormatter,
     QlnesFormatter,
@@ -45,6 +44,7 @@ from .setup import (
     set_level,
     setup,
 )
+from .spans import current_span_id, span
 
 __version__ = "0.5.0"
 
@@ -78,6 +78,7 @@ __all__ = [
     "compute_states",
     "context",
     "correlate",
+    "current_span_id",
     "default_db_path",
     "get_bound",
     "get_logger",
@@ -95,5 +96,7 @@ __all__ = [
     "set_level",
     # Setup
     "setup",
+    # Spans (v0.7)
+    "span",
     "unbind",
 ]

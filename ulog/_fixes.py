@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import hashlib
-import json
 import re
 from pathlib import Path
 from typing import Any
@@ -46,7 +45,7 @@ def signature(msg: str, stack: list[dict[str, Any]] | None = None) -> str:
     if stack:
         frames = [f"{f.get('file', '')}:{f.get('function', '')}" for f in stack]
         stack_hash = hashlib.sha256("\n".join(frames).encode("utf-8")).hexdigest()
-    payload = f"{cm}\0{stack_hash}".encode("utf-8")
+    payload = f"{cm}\0{stack_hash}".encode()
     return hashlib.sha256(payload).hexdigest()
 
 

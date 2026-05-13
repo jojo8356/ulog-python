@@ -78,9 +78,8 @@ def test_span_panel_hidden_for_non_span(tmp_path):
 def test_span_panel_shows_parent_link(tmp_path):
     db = tmp_path / "nested.sqlite"
     ulog.setup(handlers=["sql"], sql_url=f"sqlite:///{db}", sql_batch_size=1)
-    with ulog.span("outer"):
-        with ulog.span("inner"):
-            pass
+    with ulog.span("outer"), ulog.span("inner"):
+        pass
     for h in logging.getLogger().handlers:
         h.flush()
     engine = create_engine(f"sqlite:///{db}", future=True)

@@ -71,7 +71,8 @@ def test_pagination_fallback_href_still_present(tmp_path):
     db = _seed_many(tmp_path, 150)
     body = _client(db).get("/").content.decode("utf-8")
     # The Next link MUST have both href and hx-get (same target).
-    assert 'href="?' in body and 'hx-get="?' in body
+    assert 'href="?' in body
+    assert 'hx-get="?' in body
 
 
 def test_pagination_absent_for_small_archive(tmp_path):

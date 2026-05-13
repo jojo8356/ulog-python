@@ -6,7 +6,6 @@ import gzip
 import json
 from pathlib import Path
 
-import pytest
 from sqlalchemy import create_engine, text
 
 from ulog._cli import main as cli_main
@@ -29,7 +28,7 @@ def _rows(db: Path) -> list[dict]:
     with engine.connect() as conn:
         rs = conn.execute(text("SELECT ts, level, logger, msg, context, is_imported FROM logs")).all()
     engine.dispose()
-    return [dict(zip(["ts", "level", "logger", "msg", "context", "is_imported"], r)) for r in rs]
+    return [dict(zip(["ts", "level", "logger", "msg", "context", "is_imported"], r, strict=False)) for r in rs]
 
 
 # ---- JSONL --------------------------------------------------------------

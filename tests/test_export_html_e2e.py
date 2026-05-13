@@ -25,8 +25,8 @@ import logging
 import socket
 import socketserver
 import threading
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 
@@ -75,7 +75,8 @@ def served_export(tmp_path: Path) -> Iterator[tuple[str, Path]]:
     out = tmp_path / "out"
     HtmlExporter(db, ExportOptions(output=out, inline_data=False)).run()
     port = _free_port()
-    handler = lambda *a, **kw: http.server.SimpleHTTPRequestHandler(*a, directory=str(out), **kw)
+    def handler(*a, **kw):
+        return http.server.SimpleHTTPRequestHandler(*a, directory=str(out), **kw)
     httpd = socketserver.TCPServer(("127.0.0.1", port), handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()

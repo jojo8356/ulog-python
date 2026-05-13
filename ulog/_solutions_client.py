@@ -78,9 +78,7 @@ def publish(
     try:
         from cryptography.hazmat.primitives.serialization import (
             Encoding,
-            PrivateFormat,
             PublicFormat,
-            NoEncryption,
             load_pem_private_key,
         )
     except ImportError as e:
@@ -136,8 +134,8 @@ def keygen(path: Path | None = None) -> Path:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
         from cryptography.hazmat.primitives.serialization import (
             Encoding,
-            PrivateFormat,
             NoEncryption,
+            PrivateFormat,
         )
     except ImportError as e:
         raise RuntimeError(

@@ -1088,7 +1088,7 @@ def _markdown_to_html(md: str) -> str:
                 in_table = True
             table_buf.append(stripped)
             continue
-        elif in_table:
+        if in_table:
             close_table()
         # Horizontal rule.
         if stripped in ("---", "***", "___"):
@@ -1103,7 +1103,7 @@ def _markdown_to_html(md: str) -> str:
                 in_quote = True
             out.append(f"<p>{_inline_md(stripped[2:])}</p>")
             continue
-        elif in_quote:
+        if in_quote:
             close_quote()
         # Headings.
         if stripped.startswith("# "):

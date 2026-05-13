@@ -45,8 +45,10 @@ def test_table_rendering():
     assert "<table" in html
     assert "<th" in html
     assert "<td" in html
-    assert ">A<" in html and ">B<" in html
-    assert ">1<" in html and ">4<" in html
+    assert ">A<" in html
+    assert ">B<" in html
+    assert ">1<" in html
+    assert ">4<" in html
 
 
 def test_existing_features_still_work():

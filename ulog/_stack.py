@@ -41,7 +41,7 @@ def capture_frames(skip_frames: int = 2) -> list[dict[str, Any]]:
     frames: list[dict[str, Any]] = []
     # Walk frames + their FrameSummary in parallel so we can grab locals.
     py_frames = list(_iter_frames())
-    for fs, frame in zip(raw[:-skip_frames], py_frames[: len(raw) - skip_frames]):
+    for fs, frame in zip(raw[:-skip_frames], py_frames[: len(raw) - skip_frames], strict=False):
         if _is_internal(fs.filename):
             continue
         entry: dict[str, Any] = {

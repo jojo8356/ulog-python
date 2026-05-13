@@ -15,7 +15,6 @@ from ulog._solutions_client import (
     publish,
 )
 
-
 # ---- fetch (read-only, anonymous) ---------------------------------------
 
 
@@ -31,7 +30,6 @@ def test_fetch_parses_results_field():
     mock_resp.__enter__.return_value = mock_resp
     mock_resp.__exit__.return_value = None
     with patch("urllib.request.urlopen", return_value=mock_resp):
-        import json
         with patch("json.load", return_value={"results": [{"title": "fix", "by": "x"}]}):
             results = fetch_signature("sig123")
     assert len(results) == 1

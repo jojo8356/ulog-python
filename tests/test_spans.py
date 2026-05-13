@@ -58,9 +58,8 @@ def test_single_span_emits_record(tmp_path):
 
 def test_nested_spans_link_parent(tmp_path):
     db = _setup(tmp_path)
-    with ulog.span("outer") as outer_id:
-        with ulog.span("inner"):
-            pass
+    with ulog.span("outer") as outer_id, ulog.span("inner"):
+        pass
     for h in logging.getLogger().handlers:
         h.flush()
     records = _span_records(db)
@@ -97,10 +96,8 @@ def test_current_span_id_inside_matches_yielded(tmp_path):
 
 def test_three_level_nesting(tmp_path):
     db = _setup(tmp_path)
-    with ulog.span("a") as a_id:
-        with ulog.span("b") as b_id:
-            with ulog.span("c"):
-                pass
+    with ulog.span("a") as a_id, ulog.span("b") as b_id, ulog.span("c"):
+        pass
     for h in logging.getLogger().handlers:
         h.flush()
     records = _span_records(db)

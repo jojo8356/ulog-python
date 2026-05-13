@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any
 
 # Reserved context names (Story 6.3 / FR108) — parser-captured groups
 # named these collide with chain fields and are rejected.

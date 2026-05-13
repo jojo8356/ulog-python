@@ -77,3 +77,37 @@ jobs:
           pip install -e ".[dev,storage,web]"
       - name: Run benchmarks (advisory)
         run: pytest -m slow -q tests/bench_*.py || echo "advisory; non-fatal during first 2 v0.5 runs"
+
+  # PRD-v0.6.3 — Cross-browser Playwright matrix for ulog export-html.
+  # NFR-COMPAT-60. Linux runner only; Chrome + Firefox + WebKit.
+  playwright-cross-browser:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+      - run: pip install -e ".[dev,storage,web,web-dev]"
+      - name: Install browsers (cache miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: python -m playwright install --with-deps chromium firefox webkit
+      - name: Install OS deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: python -m playwright install-deps
+      - name: Run e2e across all 3 browsers
+        run: |
+          pytest tests/test_export_html_e2e.py -q \
+            --browser chromium --browser firefox --browser webkit \
+            --tracing=retain-on-failure
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/

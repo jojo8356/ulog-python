@@ -72,6 +72,8 @@ dev = [
     # BENCHMARK.md). CI runs them in advisory mode for the first 2 v0.5
     # runs (Decision E3) before hardening to a strict gate.
     "pytest-benchmark>=4.0",
+    # PRD-v0.6.3 — cross-browser Playwright matrix for ulog export-html.
+    "pytest-playwright>=0.5",
 ]
 
 [project.entry-points.pytest11]
@@ -165,6 +167,7 @@ DEP002 = [
     # Dev tools — invoked as CLIs, not imported.
     "ruff", "mypy", "deptry", "pip-audit", "pre-commit", "playwright",
     "pytest-benchmark",  # pytest plugin — registered via entry point
+    "pytest-playwright",  # pytest plugin — registered via entry point
 ]
 # `ucolor` is vendored as a git submodule under vendor/ucolor-python/
 # and imported lazily via try/except — not a PyPI dependency.
@@ -177,3 +180,4 @@ django-browser-reload = "django_browser_reload"
 django-lucide = "lucide"
 pytest-xdist = "xdist"
 pytest-benchmark = "pytest_benchmark"
+pytest-playwright = "pytest_playwright"

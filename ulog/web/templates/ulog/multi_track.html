@@ -10,7 +10,17 @@
     <span>Multi-track</span>
   </h1>
 
-  <form method="get" class="flex items-center gap-2 text-sm">
+  {# PRD-v0.8 — HTMX-augmented form. With JS off / HTMX absent, the
+     form falls back to a full-page GET reload (standard browser
+     behaviour). With HTMX loaded, only `[data-multi-track-root]` is
+     swapped server-side. #}
+  <form method="get"
+        hx-get="{% url 'ulog-multi-track' %}"
+        hx-target="[data-multi-track-root]"
+        hx-select="[data-multi-track-root]"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+        class="flex items-center gap-2 text-sm">
     <label class="flex items-center gap-1">
       <span class="text-slate-500">From</span>
       <input type="text" name="from" value="{{ window_start }}"

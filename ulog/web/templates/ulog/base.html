@@ -9,6 +9,11 @@
          viewer support (NFR-OFFLINE-80) + to drop the dev-mode warning
          the CDN runtime prints in DevTools. -->
     <link rel="stylesheet" href="{% static 'ulog/tailwind.css' %}">
+    <!-- PRD-v0.8 — Alpine.js + HTMX (CDN; v0.8.2 will vendor them
+         via the standalone build pipeline). Alpine deferred so the
+         FOUC-prevention `class="dark"` toggle below fires first. -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
     <script>
         // Dark mode preference: respect prefers-color-scheme, allow override
         // via localStorage. Set BEFORE the bundle paints to avoid FOUC flash.

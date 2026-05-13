@@ -1,0 +1,46 @@
+{% extends 'ulog/base.html' %}
+{% load lucide %}
+
+{% block title %}ULog — Team{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto p-4 md:p-6 space-y-4">
+  <h1 class="text-xl font-bold flex items-center gap-2">
+    {% lucide "users" size=18 %}
+    <span>Team</span>
+  </h1>
+
+  {% if team is None %}
+    <p class="text-sm text-slate-500 italic">
+      No author indexer active. Launch <code>ulog web --repo &lt;path&gt;</code> to
+      enable the AuthorIndex.
+    </p>
+  {% elif not team %}
+    <p class="text-sm text-slate-500 italic">No tracked authors yet.</p>
+  {% else %}
+    <p class="text-sm text-slate-500">{{ team|length }} authors{% if unknown_count %} ·  &lt;unknown&gt; on {{ unknown_count }} record(s){% endif %}.</p>
+    <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {% for c in team %}
+        <li class="border border-slate-200 dark:border-slate-800 rounded-lg p-3 bg-slate-50 dark:bg-slate-900">
+          <div class="flex items-baseline justify-between gap-2">
+            <a href="{% url 'ulog-list' %}?author={{ c.email|urlencode }}"
+               class="font-semibold text-blue-600 dark:text-blue-400 hover:underline">{{ c.name }}</a>
+            <span class="text-xs font-mono tabular-nums text-slate-500">{{ c.count }} records</span>
+          </div>
+          <div class="text-xs text-slate-500 font-mono truncate" title="{{ c.email }}">{{ c.email }}</div>
+          <div class="mt-2 flex items-center gap-3 text-xs">
+            <a href="{% url 'ulog-list' %}?author={{ c.email|urlencode }}"
+               class="text-blue-600 dark:text-blue-400 hover:underline">view records →</a>
+            {% if c.github_url %}
+              <a href="{{ c.github_url }}" target="_blank" rel="noopener"
+                 class="text-slate-500 hover:underline flex items-center gap-1">
+                {% lucide "github" size=12 %} <span>GitHub</span>
+              </a>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>
+{% endblock %}

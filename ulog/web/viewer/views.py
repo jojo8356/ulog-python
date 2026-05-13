@@ -636,6 +636,60 @@ def _validate_sha(sha: str) -> bool:
     return bool(_SHA_RE.match(sha))
 
 
+def team_directory(request: HttpRequest) -> HttpResponse:
+    """PRD-v0.4.3 — /team/ directory page rendering per-author cards.
+
+    Pulls the AuthorsSummary already computed for the sidebar (cached
+    in blame.py); renders each known author as a card with their
+    count + a link to `/?author=<email>` + an inferred GitHub URL
+    when the email matches `users.noreply.github.com`.
+    """
+    from .blame import compute_authors_summary, get_global_index
+
+    adapter = _adapter_or_404()
+    idx = get_global_index()
+    if idx is None:
+        return render(
+            request,
+            "ulog/team.html",
+            {
+                "logs_path": settings.ULOG_LOGS_PATH,
+                "team": None,
+            },
+        )
+    summary = compute_authors_summary(adapter, idx)
+    cards: list[dict[str, Any]] = []
+    for author, count in summary.known_entries:
+        cards.append(
+            {
+                "name": author.name,
+                "email": author.email,
+                "count": count,
+                "short_sha": author.sha[:7] if author.sha else "",
+                "github_url": _infer_github_url(author.email),
+            }
+        )
+    cards.sort(key=lambda c: -c["count"])
+    return render(
+        request,
+        "ulog/team.html",
+        {
+            "logs_path": settings.ULOG_LOGS_PATH,
+            "team": cards,
+            "unknown_count": summary.unknown_count,
+        },
+    )
+
+
+def _infer_github_url(email: str) -> str | None:
+    """`<id>+<username>@users.noreply.github.com` → https://github.com/<username>"""
+    if "@users.noreply.github.com" in email:
+        local = email.split("@", 1)[0]
+        username = local.split("+", 1)[-1]
+        return f"https://github.com/{username}"
+    return None
+
+
 def qa_view(request: HttpRequest) -> HttpResponse:
     """Debug-only QA checklist page (Epic 1 + Epic 2 + perf v0.4.1).
 

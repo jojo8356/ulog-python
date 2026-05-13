@@ -18,6 +18,8 @@ urlpatterns = [
     path("diff/<str:sha>/", views.diff_view, name="ulog-diff"),
     path("docs/", views.docs_index, name="ulog-docs-index"),
     path("docs/<slug:page>/", views.docs_page, name="ulog-docs-page"),
+    # PRD-v0.4.3 — /team/ directory page (per-author cards).
+    path("team/", views.team_directory, name="ulog-team"),
     # Debug-only QA checklist — visible from the header when the viewer
     # was launched with `ulog-web --debug`. Returns 404 otherwise.
     # State persists in browser localStorage.

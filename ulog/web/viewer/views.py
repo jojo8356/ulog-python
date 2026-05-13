@@ -242,6 +242,9 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
     # PRD-v0.13 — local fix DB lookup. None when no sidecar / no match.
     known_fix = _lookup_known_fix(record)
 
+    # PRD-v0.12 phase 3 — clickable `View source` link (None when no env).
+    source_url = _build_source_url(record)
+
     # PRD-v0.16 — Unified solution search button + ?solutions=1 endpoint.
     record_signature = _record_signature(record)
     solutions_html_fragment = _maybe_solutions_fragment(request, record)
@@ -289,8 +292,26 @@ def detail_view(request: HttpRequest, record_id: int) -> HttpResponse:
             "known_fix": known_fix,
             # PRD-v0.16 — render the "Search solutions" button when signature exists.
             "record_signature": record_signature,
+            # PRD-v0.12 phase 3 — clickable source link (None when no --repo env).
+            "source_url": source_url,
         },
     )
+
+
+def _build_source_url(record: Any) -> str | None:
+    """PRD-v0.12 phase 3 — `View source` link target.
+
+    Priority: ULOG_SOURCE_BASE_URL > ULOG_AUTHOR_REPO > None.
+    """
+    if not record.file or not record.line:
+        return None
+    base = os.environ.get("ULOG_SOURCE_BASE_URL")
+    if base:
+        return f"{base.rstrip('/')}/{record.file}#L{record.line}"
+    repo = os.environ.get("ULOG_AUTHOR_REPO")
+    if repo:
+        return f"file://{Path(repo).resolve()}/{record.file}#L{record.line}"
+    return None
 
 
 def _record_signature(record: Any) -> str | None:

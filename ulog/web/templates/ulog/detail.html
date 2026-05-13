@@ -21,7 +21,18 @@
       </span>
       <span class="font-mono text-sm text-slate-600 dark:text-slate-400">{{ record.ts }}</span>
       <span class="font-mono text-sm text-slate-600 dark:text-slate-400">{{ record.logger }}</span>
+      {# PRD-v0.12 phase 3 — clickable source link when --repo OR
+         ULOG_SOURCE_BASE_URL is set. Otherwise plain text. #}
+      {% if source_url %}
+      <a href="{{ source_url }}" target="_blank" rel="noopener"
+         class="font-mono text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+         title="Open source in repo">
+        {% lucide "external-link" size=10 %}
+        <span>{{ record.file }}:{{ record.line }}</span>
+      </a>
+      {% else %}
       <span class="font-mono text-xs text-slate-500 dark:text-slate-400">{{ record.file }}:{{ record.line }}</span>
+      {% endif %}
     </div>
 
     <div>

@@ -8,7 +8,18 @@
 
   {# === Filter sidebar (FR35) === #}
   <aside class="w-full md:w-72 lg:w-80 border-r border-slate-200 dark:border-slate-800 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-900">
-    <form method="get" id="filter-form" class="space-y-4 text-sm">
+    {# PRD-v0.8 — HTMX-augmented filter form. With HTMX loaded, the
+       Apply click swaps the WHOLE flex row (main records + this sidebar)
+       in place — no full page reload, scroll position + open <details>
+       state are preserved. Without HTMX, falls back to standard form GET. #}
+    <form method="get"
+          id="filter-form"
+          hx-get="{% url 'ulog-list' %}"
+          hx-target="closest .flex.flex-col.md\:flex-row"
+          hx-select=".flex.flex-col.md\:flex-row > *"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          class="space-y-4 text-sm">
 
       {# Levels #}
       <div>

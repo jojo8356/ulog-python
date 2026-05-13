@@ -197,6 +197,18 @@ def main(argv: list[str] | None = None) -> int:
 
     django.setup()
 
+    # PRD-v0.4.4 — startup pre-warm. Issue a default Filters query so
+    # SQLite page cache + reflected schema + bound-context column scan
+    # are warm before the user's first request. Best-effort: any error
+    # is swallowed (the viewer still serves uncached).
+    try:
+        from .viewer.adapters import Filters, get_adapter
+
+        _prewarm_adapter = get_adapter(args.path)
+        _prewarm_adapter.query(Filters(), page=1, page_size=100)
+    except Exception as e:
+        print(f"ulog-web: prewarm failed (non-fatal): {e}", file=sys.stderr)
+
     if not args.no_open:
         _open_browser_when_ready(args.host, port)
 

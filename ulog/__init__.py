@@ -24,6 +24,7 @@ from ._bisect import BisectResult, bisect
 from ._correlate import CorrelationReport, CorrelationRow, correlate
 from ._incidents import IncidentState, compute_states, reopen, resolve
 from .context import bind, clear, context, get_bound, unbind
+from .spans import current_span_id, span
 from .formatters import (
     JsonFormatter,
     QlnesFormatter,

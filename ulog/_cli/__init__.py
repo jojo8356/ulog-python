@@ -37,6 +37,7 @@ from . import (
     cmd_replay,
     cmd_snapshot,
     cmd_solutions,
+    cmd_tail,
     cmd_trace,
     cmd_validate_resources,
     cmd_verify,
@@ -68,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd_bug_cache.register(subparsers)
     cmd_solutions.register(subparsers)
     cmd_explain.register(subparsers)
+    cmd_tail.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

@@ -182,6 +182,8 @@ def list_view(request: HttpRequest) -> HttpResponse:
         "incident_summary": incident_summary,
         # PRD-v0.10 phase 2 — Fleet sidebar tree.
         "fleet_tree": _build_fleet_tree(adapter),
+        # PRD-v0.9 phase 2 — Resources panel (process-wide; cheap).
+        "resources_summary": _build_resources_summary(),
         "incident_filter_choices": [
             ("open", "Open"),
             ("closed_7d", "Closed (last 7d)"),
@@ -295,6 +297,53 @@ def _lookup_known_fix(record: Any) -> dict[str, Any] | None:
     stack = record.context.get("stack") if isinstance(record.context, dict) else None
     sig = signature(record.msg, stack if isinstance(stack, list) else None)
     return lookup_fix(_P(str(logs_path)), sig)
+
+
+_RESOURCES_CACHE: dict[str, Any] | None = None
+
+
+def _build_resources_summary() -> dict[str, Any] | None:
+    """PRD-v0.9 phase 2 — scan the viewer's cwd for resource files.
+
+    Cached for the process lifetime (env `ULOG_RESOURCES_DIR` overrides
+    the root; absent = skip the scan to keep the live viewer fast).
+    """
+    global _RESOURCES_CACHE
+    if _RESOURCES_CACHE is not None:
+        return _RESOURCES_CACHE
+    root_env = os.environ.get("ULOG_RESOURCES_DIR", "")
+    if not root_env:
+        _RESOURCES_CACHE = None
+        return None
+    root = Path(root_env)
+    if not root.exists():
+        _RESOURCES_CACHE = None
+        return None
+    from ulog._cli.cmd_validate_resources import DEFAULT_EXCLUDES, _validate_one
+
+    items: list[dict[str, str | None]] = []
+    ok = 0
+    broken = 0
+    extensions = {".json", ".toml", ".csv", ".ini"}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        if any(part in DEFAULT_EXCLUDES for part in path.parts):
+            continue
+        if path.suffix.lower() not in extensions:
+            continue
+        err = _validate_one(path, path.suffix.lower())
+        rel = str(path.relative_to(root))
+        short = rel if len(rel) <= 36 else "…" + rel[-35:]
+        items.append({"path": rel, "short": short, "error": err})
+        if err is None:
+            ok += 1
+        else:
+            broken += 1
+        if len(items) >= 100:
+            break
+    _RESOURCES_CACHE = {"items": items, "ok": ok, "broken": broken}
+    return _RESOURCES_CACHE
 
 
 def _build_fleet_tree(adapter: Adapter) -> list[dict[str, Any]] | None:

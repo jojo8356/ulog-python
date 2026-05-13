@@ -163,7 +163,7 @@ Then inspect the result in a browser:
 
 ```bash
 pip install ulog[web]
-ulog-web ./logs.sqlite       # auto-detects sqlite/jsonl/csv
+ulog web ./logs.sqlite       # auto-detects sqlite/jsonl/csv
 ```
 
 Features of the v0.2 UI:
@@ -177,12 +177,132 @@ Features of the v0.2 UI:
 - Built-in `/docs` (5 pages: quickstart, storage, api,
   troubleshooting, sectors-and-files)
 
+## v0.5+ — Forensic black box
+
+The `ulog` CLI ships 15+ subcommands beyond `ulog web` (see
+[RELEASE_NOTES.md](./RELEASE_NOTES.md) for the full migration from
+`ulog-web` → `ulog web`):
+
+```bash
+ulog setup integrity=hash-chain      # via setup() — hash-chained SQLite
+ulog verify ./logs.sqlite            # walk the chain, OK / BROKEN exit codes
+ulog repair --confirm ./logs.sqlite  # archive orphans + truncate
+ulog purge --before 2026-01-01       # purge respecting min_retention_days
+
+ulog correlate "level=ERROR"         # over/under-represented dimensions
+ulog bisect "stripe.*5\d\d"          # first chain row matching a regex
+ulog replay "level=ERROR" --to-pytest /tmp/test_inc.py  # generate a regression test
+ulog explain                         # waterfall span tree (PRD-v0.7)
+ulog trace 4bf92f...                 # cross-service OTel trace_id
+
+ulog incidents --status open         # CI gate: exit code = open incident count
+ulog incidents --report --since 1m   # Markdown KPIs (MTTR / P95 / top closers)
+ulog fix resolve --record-id 42 \    # signature-based fix DB (PRD-v0.13)
+        --writeup "restarted pool" --by "Johan"
+
+ulog import nginx-access.log --db prod.sqlite      # ingest external logs (PRD-v0.17)
+ulog snapshot --format pdf --since today           # multi-format archive (PRD-v0.6.1)
+ulog export-html ./logs.sqlite --output /tmp/audit # static HTML bundle (PRD-v0.6)
+ulog enable-fts5 ./logs.sqlite                     # opt-in full-text search
+ulog validate-resources --path .                   # JSON/TOML/CSV/INI parse gate
+ulog bug-cache refresh --source-file curated.json  # local known-bugs cache
+ulog solutions {keygen,publish,fetch}              # community solutions site client
+```
+
+### Python API additions (v0.5+)
+
+```python
+import ulog
+
+# v0.5 — chain integrity + replay + incidents
+ulog.setup(integrity="hash-chain", min_retention_days=30,
+           handlers=["sql"], sql_url="sqlite:///./logs.sqlite",
+           issue_template_url="https://linear.app/team/new?title={msg}",
+           capture_stack=True)        # PRD-v0.12 — every record captures its stack
+ulog.resolve("3f7c12a", by="Johan")  # incident lifecycle
+ulog.reopen("3f7c12a", reason="recurrence")
+ulog.compute_states(records)         # latest-wins state walk
+
+# v0.5 — query API
+ulog.replay("./logs.sqlite", where_dsl="level=ERROR", on=lambda r: ...)
+ulog.correlate("level=ERROR", db="./logs.sqlite")
+ulog.bisect("timeout", db="./logs.sqlite")
+
+# v0.7 — span-based execution timeline
+with ulog.span("setup_db"):
+    with ulog.span("git_clone"):
+        ...
+
+# v0.10 — fleet probes
+from ulog.fleet import probe
+@probe(target="https://api.example.com/health", parents=["db.internal"])
+def test_api_health():
+    ...
+```
+
+### Viewer features added v0.5+
+
+- **Integrity badge** in every page header (green ✓ / red ✗ BROKEN /
+  gray "never verified").
+- **Incidents sidebar** quick filters + detail-page "Resolves /
+  Resolved by" cross-links.
+- **Multi-track view** at `/multi-track/` — 4 SVG strips (level /
+  service / author / file) over shared time axis.
+- **HTTP request inspector** panel — auto-detects `method+url` in
+  context, renders body / headers / status with "Copy as curl"
+  (sensitive headers masked).
+- **Known-fix panel** — when the record's signature matches the
+  local fix DB, the writeup surfaces inline.
+- **Search solutions** button — per-record consent dialog, fans
+  out across local (v0.13), known-bugs cache (v0.14), community
+  site (v0.15).
+- **Call-stack panel** — collapsible frame tree with optional
+  locals capture (PRD-v0.12).
+- **Span panel** — span_name + duration + parent chain link
+  (PRD-v0.7).
+- **Fleet sidebar tree** — `@probe`-decorated probes grouped by
+  parent/child (PRD-v0.10).
+- **Resources sidebar** — JSON/TOML/CSV/INI parse status badges
+  (PRD-v0.9; opt-in via `ULOG_RESOURCES_DIR=`).
+- **/team/** directory — per-author cards with GitHub URL
+  inference (PRD-v0.4.3).
+- **View-source links** on file:line — `ULOG_SOURCE_BASE_URL=` or
+  `ULOG_AUTHOR_REPO=` env config (PRD-v0.12 phase 3).
+- **HTMX-augmented** multi-track form + records pagination (PRD-v0.8)
+  — sidebar stays cached, only the affected region swaps.
+- **Prism.js syntax highlighting** on `/docs/*` (PRD-v0.8.1).
+- **Tailwind built locally** via `make tailwind-build` — no CDN
+  runtime, offline-clean.
+
 ## Tests
 
 ```bash
-make test         # 69 unit + integration tests across v0.1 + v0.2
+make test         # 900+ tests across v0.1 → v0.17
 make mypy         # mypy --strict
 make check        # both
+
+# Per-PRD slice:
+.venv/bin/pytest tests/test_chain*.py        # Epic 3 — chain integrity
+.venv/bin/pytest tests/test_replay*.py       # Epic 4 — queryability
+.venv/bin/pytest tests/test_incidents*.py    # Epic 5 — incident lifecycle
+.venv/bin/pytest tests/test_export_html.py   # Epic 8 — static export
+```
+
+## Release engineering
+
+```bash
+make tailwind-build       # rebuild ulog/web/static/ulog/tailwind.css
+make tailwind-check       # CI gate: fail on committed CSS drift
+make bench-fixture        # generate tests/fixtures/bench_100k.sqlite
+make bench-export         # pytest-benchmark export-html SC1 gate
+```
+
+Self-host the community-solutions site:
+
+```bash
+cd docker/ulog-solutions && docker compose up -d
+export ULOG_SOLUTIONS_ENDPOINT=http://localhost:8080/v1
+ulog web ./logs.sqlite
 ```
 
 ## License

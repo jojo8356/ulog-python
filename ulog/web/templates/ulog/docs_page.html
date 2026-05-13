@@ -3,6 +3,25 @@
 {% block title %}ULog — {{ title }}{% endblock %}
 
 {% block content %}
+{# PRD-v0.8.1 — Prism.js syntax highlighting for /docs/*.
+   CDN load (~7 KB gzipped); v0.8.2 will vendor under static/ulog/prism/. #}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/themes/prism.min.css" data-theme="light">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/themes/prism-tomorrow.min.css" data-theme="dark" disabled>
+<script>
+  // Toggle the right Prism theme link based on <html class="dark">.
+  (() => {
+    const light = document.querySelector('link[data-theme="light"]');
+    const dark = document.querySelector('link[data-theme="dark"]');
+    function apply() {
+      const isDark = document.documentElement.classList.contains('dark');
+      light.disabled = isDark;
+      dark.disabled = !isDark;
+    }
+    apply();
+    new MutationObserver(apply).observe(document.documentElement, {attributes: true, attributeFilter: ['class']});
+  })();
+</script>
+
 <div class="max-w-3xl mx-auto p-4 md:p-6 grid md:grid-cols-[12rem_1fr] gap-6">
   <aside class="text-sm">
     <h2 class="font-semibold mb-2">Pages</h2>
@@ -22,4 +41,23 @@
     {{ content_html|safe }}
   </article>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-sql.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-yaml.min.js"></script>
+<script>
+  // Re-highlight after Prism loads (auto-runs on DOMContentLoaded, but
+  // the fenced code blocks use Pygments-style language hints; map them
+  // to Prism's `language-X` class names).
+  document.addEventListener('DOMContentLoaded', () => {
+    for (const code of document.querySelectorAll('pre code')) {
+      const m = code.className.match(/lang-([a-z0-9_-]+)/);
+      if (m) code.classList.add(`language-${m[1]}`);
+    }
+    if (window.Prism) Prism.highlightAll();
+  });
+</script>
 {% endblock %}

@@ -65,8 +65,30 @@ def search_local(main_db: Path, sig: str) -> list[SearchResult]:
 
 
 def search_known_bugs(sig: str) -> list[SearchResult]:
-    """v0.14 backend — local bug cache. Empty until v0.14 ships."""
-    return []
+    """v0.14 backend — local bug cache (`~/.cache/ulog/bug-cache.sqlite`).
+
+    Returns [] when the cache is absent or has no match. Populated via
+    `ulog bug-cache refresh --source-file <curated.json>` (full
+    scraper is v0.14 phase 2 deferred).
+    """
+    from ulog._bug_cache import default_cache_path, search_by_signature
+
+    matches = search_by_signature(default_cache_path(), sig)
+    out: list[SearchResult] = []
+    for m in matches:
+        provenance = "known-bug-accepted" if m["accepted"] else "known-bug"
+        out.append(
+            SearchResult(
+                provenance=provenance,
+                title=m["title"],
+                writeup=m["body"],
+                by=m["source"],
+                ts=m["ts"],
+                score=_PROVENANCE_WEIGHTS[provenance],
+                extras={"url": m["url"] or ""},
+            )
+        )
+    return out
 
 
 def search_community(sig: str, *, endpoint: str = "https://ulog.solutions/v1/search") -> list[SearchResult]:

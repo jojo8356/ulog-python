@@ -24,6 +24,7 @@ import sys
 
 from . import (
     cmd_bisect,
+    cmd_bug_cache,
     cmd_correlate,
     cmd_enable_fts5,
     cmd_export_html,
@@ -62,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd_import.register(subparsers)
     cmd_fix.register(subparsers)
     cmd_enable_fts5.register(subparsers)
+    cmd_bug_cache.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

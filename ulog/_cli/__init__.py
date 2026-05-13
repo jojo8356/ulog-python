@@ -30,6 +30,7 @@ from . import (
     cmd_purge,
     cmd_repair,
     cmd_replay,
+    cmd_snapshot,
     cmd_trace,
     cmd_verify,
     cmd_web,
@@ -52,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd_trace.register(subparsers)
     cmd_incidents.register(subparsers)
     cmd_export_html.register(subparsers)
+    cmd_snapshot.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

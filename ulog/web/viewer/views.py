@@ -847,22 +847,68 @@ def docs_page(request: HttpRequest, page: str) -> HttpResponse:
 def _markdown_to_html(md: str) -> str:
     """Tiny markdown → HTML for docs (no external markdown lib).
 
-    Supports: # headings, ## sub-headings, ```code blocks```, inline
-    `code`, lists, paragraphs. That's enough for v0.2 doc pages.
-    A future v0.3 could swap in `markdown-it-py` if richer rendering
-    is needed.
+    PRD-v0.4.2 extends the v0.2 renderer with: ordered lists (`1.`),
+    blockquotes (`>`), horizontal rules (`---`), `*em*`, GitHub-style
+    pipe tables. Still zero PyPI dep.
     """
     out: list[str] = []
     in_code = False
-    in_list = False
+    in_ul = False
+    in_ol = False
+    in_quote = False
     code_lang = ""
     code_buf: list[str] = []
+    table_buf: list[str] = []  # accumulated table rows (when in_table)
+    in_table = False
 
-    def close_list() -> None:
-        nonlocal in_list
-        if in_list:
+    def close_lists() -> None:
+        nonlocal in_ul, in_ol
+        if in_ul:
             out.append("</ul>")
-            in_list = False
+            in_ul = False
+        if in_ol:
+            out.append("</ol>")
+            in_ol = False
+
+    def close_quote() -> None:
+        nonlocal in_quote
+        if in_quote:
+            out.append("</blockquote>")
+            in_quote = False
+
+    def close_table() -> None:
+        """Emit accumulated table_buf as a styled HTML table."""
+        nonlocal in_table, table_buf
+        if not in_table:
+            return
+        if len(table_buf) < 2:
+            # Need at least header + separator.
+            in_table = False
+            table_buf = []
+            return
+        # Parse: row 1 = header, row 2 = separator (--- pattern), rest = body.
+        def _cells(row: str) -> list[str]:
+            return [c.strip() for c in row.strip().strip("|").split("|")]
+        headers = _cells(table_buf[0])
+        body_rows = [r for r in table_buf[2:] if r.strip()]
+        thead = "".join(
+            f'<th class="py-2 px-3 border-b border-slate-300 dark:border-slate-700 text-left font-semibold">{_inline_md(h)}</th>'
+            for h in headers
+        )
+        tbody_html = []
+        for row in body_rows:
+            cells = _cells(row)
+            tds = "".join(
+                f'<td class="py-1.5 px-3 border-b border-slate-200 dark:border-slate-800">{_inline_md(c)}</td>'
+                for c in cells
+            )
+            tbody_html.append(f"<tr>{tds}</tr>")
+        out.append(
+            '<div class="overflow-x-auto my-3"><table class="text-sm border-collapse w-full">'
+            f"<thead><tr>{thead}</tr></thead><tbody>{''.join(tbody_html)}</tbody></table></div>"
+        )
+        in_table = False
+        table_buf = []
 
     def flush_code() -> None:
         nonlocal in_code, code_buf, code_lang
@@ -877,48 +923,95 @@ def _markdown_to_html(md: str) -> str:
             in_code = False
             code_lang = ""
 
+    def close_block() -> None:
+        close_lists()
+        close_quote()
+        close_table()
+
     for line in md.splitlines():
         stripped = line.rstrip()
+        # Code fence.
         if stripped.startswith("```"):
             if in_code:
                 flush_code()
             else:
-                close_list()
+                close_block()
                 in_code = True
                 code_lang = stripped[3:].strip()
             continue
         if in_code:
             code_buf.append(line)
             continue
+        # GitHub pipe tables (must collect at least 2 lines before deciding).
+        if "|" in stripped and stripped.startswith("|"):
+            if not in_table:
+                close_block()
+                in_table = True
+            table_buf.append(stripped)
+            continue
+        elif in_table:
+            close_table()
+        # Horizontal rule.
+        if stripped in ("---", "***", "___"):
+            close_block()
+            out.append('<hr class="my-4 border-slate-300 dark:border-slate-700">')
+            continue
+        # Blockquote.
+        if stripped.startswith("> "):
+            close_lists()
+            if not in_quote:
+                out.append('<blockquote class="border-l-4 border-slate-300 dark:border-slate-700 pl-3 my-2 italic text-slate-600 dark:text-slate-300">')
+                in_quote = True
+            out.append(f"<p>{_inline_md(stripped[2:])}</p>")
+            continue
+        elif in_quote:
+            close_quote()
+        # Headings.
         if stripped.startswith("# "):
-            close_list()
+            close_block()
             out.append(
                 f'<h1 class="text-3xl font-bold mt-4 mb-2">{_html_escape(stripped[2:])}</h1>'
             )
         elif stripped.startswith("## "):
-            close_list()
+            close_block()
             out.append(
                 f'<h2 class="text-2xl font-semibold mt-4 mb-2">{_html_escape(stripped[3:])}</h2>'
             )
         elif stripped.startswith("### "):
-            close_list()
+            close_block()
             out.append(
                 f'<h3 class="text-xl font-semibold mt-3 mb-1">{_html_escape(stripped[4:])}</h3>'
             )
+        # Unordered list.
         elif stripped.startswith("- "):
-            if not in_list:
+            close_quote()
+            close_table()
+            if in_ol:
+                close_lists()
+            if not in_ul:
                 out.append('<ul class="list-disc list-inside space-y-1 my-2">')
-                in_list = True
+                in_ul = True
             out.append(f"<li>{_inline_md(stripped[2:])}</li>")
+        # Ordered list (any digit + `. `).
+        elif re.match(r"^\d+\.\s", stripped):
+            close_quote()
+            close_table()
+            if in_ul:
+                close_lists()
+            if not in_ol:
+                out.append('<ol class="list-decimal list-inside space-y-1 my-2">')
+                in_ol = True
+            content = re.sub(r"^\d+\.\s+", "", stripped, count=1)
+            out.append(f"<li>{_inline_md(content)}</li>")
         elif stripped == "":
-            close_list()
+            close_block()
             out.append("")
         else:
-            close_list()
+            close_block()
             out.append(f'<p class="my-2">{_inline_md(stripped)}</p>')
 
     flush_code()
-    close_list()
+    close_block()
     return "\n".join(out)
 
 
@@ -929,6 +1022,8 @@ def _inline_md(text: str) -> str:
         r"`([^`]+)`", r'<code class="bg-slate-100 dark:bg-slate-800 px-1 rounded">\1</code>', text
     )
     text = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", text)
+    # PRD-v0.4.2 — italics `*em*` (after **bold** so it doesn't catch `**` greedy).
+    text = re.sub(r"(?<![*])\*([^*\n]+)\*(?![*])", r"<em>\1</em>", text)
     text = re.sub(
         r"\[([^\]]+)\]\(([^)]+)\)",
         r'<a class="text-blue-600 dark:text-blue-400 underline" href="\2">\1</a>',

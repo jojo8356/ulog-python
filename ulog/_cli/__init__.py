@@ -25,6 +25,7 @@ import sys
 from . import (
     cmd_bisect,
     cmd_correlate,
+    cmd_export_html,
     cmd_incidents,
     cmd_purge,
     cmd_repair,
@@ -50,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd_replay.register(subparsers)
     cmd_trace.register(subparsers)
     cmd_incidents.register(subparsers)
+    cmd_export_html.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

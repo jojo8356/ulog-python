@@ -32,6 +32,9 @@ Chaque ligne pointe vers le PRD complet.
 | v0.15.0 | [PRD-v0.15-community-solutions-site.md](./PRD-v0.15-community-solutions-site.md) | LONG-TERM — `ulog.solutions` hosted community site. Devs push their v0.13 fixes signed via ed25519 keypair bound to GH OAuth identity; same signatures across orgs surface each other's solutions. CC BY-SA 4.0. Self-host Docker Compose ships from day 1. | draft v1 | 281 |
 | v0.16.0 | [PRD-v0.16-unified-solution-search.md](./PRD-v0.16-unified-solution-search.md) | Unified solution search — ONE "Search solutions" button on every detail view (when signature present). Per-record consent dialog → parallel fan-out: community (v0.15) + local DB (v0.13) + known-bugs (v0.14 when shipped) → merged + reranked + deduped. Payload = signature only. Modes: `off` / `opt-in` (default) / `auto-consent` (banner-warned). | draft v1 | 320 |
 | v0.17.0 | [PRD-v0.17-log-import.md](./PRD-v0.17-log-import.md) | Log import — `ulog import <file>… --db <out>.sqlite` ingests external log files (.log, .txt, JSONL, CSV, nginx/apache combined, syslog 3164/5424, journald JSON, raw, custom regex) into ulog's storage. Imported rows marked `is_imported=1`, out-of-chain (chain integrity preserved). Streaming reader; .gz/.bz2 stdlib, .zst opt-in. 6 built-in parsers + regex escape hatch. | draft v1 | — |
+| v0.6.2 | [PRD-v0.6.2-tailwind-build-pipeline.md](./PRD-v0.6.2-tailwind-build-pipeline.md) | Patch — Tailwind standalone CLI build pipeline (no Node/npm). `make tailwind-build` emits `tailwind.css` (purged ≤ 50 KB) + `ulog-light.css` / `ulog-dark.css` consumed by live viewer AND static export. CI gate `make tailwind-check` catches drift. Closes Story 8.1. | draft v1 | — |
+| v0.6.3 | [PRD-v0.6.3-cross-browser-playwright.md](./PRD-v0.6.3-cross-browser-playwright.md) | Patch — Playwright matrix for `ulog export-html`. Chromium + Firefox + WebKit × inline/separate-data. Lighthouse FCP ≤ 1 s @ Slow 3G. NFR-COMPAT-60. Closes Story 8.13. | draft v1 | — |
+| v0.6.4 | [PRD-v0.6.4-export-html-perf-gate.md](./PRD-v0.6.4-export-html-perf-gate.md) | Patch — pytest-benchmark gate on 100K-record fixture: median wall ≤ 30 s, output size ≤ 10 MB (`--separate-data`) / ≤ 50 MB (`--inline-data`). Advisory for first 2 CI runs. NFR-PERF-60 / SC1. Closes Story 8.14. | draft v1 | — |
 
 ## Filiation
 
@@ -63,6 +66,12 @@ PRD-v0.1-core.md
 
 PRD-v0.5-forensic-archive.md
 └── PRD-v0.17-log-import.md  (draft v1 — `ulog import` ingests arbitrary log files into a ulog SQLite DB; out-of-chain via is_imported=1; 6 built-in parsers + regex escape hatch)
+
+PRD-v0.6-static-export.md
+├── PRD-v0.6.1-snapshot-exports.md  (patch — already in tree)
+├── PRD-v0.6.2-tailwind-build-pipeline.md  (patch — Story 8.1 follow-up: standalone Tailwind CLI build pipeline, no Node)
+├── PRD-v0.6.3-cross-browser-playwright.md  (patch — Story 8.13 follow-up: Chromium/Firefox/WebKit matrix + Lighthouse FCP)
+└── PRD-v0.6.4-export-html-perf-gate.md  (patch — Story 8.14 follow-up: pytest-benchmark 100K fixture, SC1 gate ≤30s)
 ```
 
 ## Conventions

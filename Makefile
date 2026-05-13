@@ -114,3 +114,32 @@ bench-export: bench-fixture
 	@.venv/bin/python -m pytest tests/bench_export_html.py -m slow \
 	    --benchmark-only --benchmark-min-rounds=5 \
 	    --benchmark-json=benchmark.json
+
+# ---- PRD-v0.8.2 — vendor Alpine.js + HTMX (offline-clean) ---------------
+
+ALPINE_VERSION := 3.14.9
+HTMX_VERSION   := 2.0.4
+JS_VENDOR_DIR  := ulog/web/static/ulog/js
+
+.PHONY: js-vendor js-check js-clean
+
+js-vendor: $(JS_VENDOR_DIR)/alpine.min.js $(JS_VENDOR_DIR)/htmx.min.js
+	@echo "→ vendored Alpine $(ALPINE_VERSION) + HTMX $(HTMX_VERSION)"
+
+$(JS_VENDOR_DIR)/alpine.min.js:
+	@mkdir -p $(JS_VENDOR_DIR)
+	@curl -sSL -o $@ "https://cdn.jsdelivr.net/npm/alpinejs@$(ALPINE_VERSION)/dist/cdn.min.js"
+	@echo "  alpine: $$(wc -c < $@ | awk '{printf \"%.1f KB\", $$1/1024}')"
+
+$(JS_VENDOR_DIR)/htmx.min.js:
+	@mkdir -p $(JS_VENDOR_DIR)
+	@curl -sSL -o $@ "https://cdn.jsdelivr.net/npm/htmx.org@$(HTMX_VERSION)/dist/htmx.min.js"
+	@echo "  htmx: $$(wc -c < $@ | awk '{printf \"%.1f KB\", $$1/1024}')"
+
+js-check: $(JS_VENDOR_DIR)/alpine.min.js $(JS_VENDOR_DIR)/htmx.min.js
+	@test -s $(JS_VENDOR_DIR)/alpine.min.js || { echo "::error::alpine.min.js missing or empty"; exit 1; }
+	@test -s $(JS_VENDOR_DIR)/htmx.min.js || { echo "::error::htmx.min.js missing or empty"; exit 1; }
+	@echo "OK: vendored JS bundles present."
+
+js-clean:
+	rm -rf $(JS_VENDOR_DIR)

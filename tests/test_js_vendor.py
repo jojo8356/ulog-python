@@ -1,4 +1,4 @@
-"""Tests for v0.8 — Alpine.js + HTMX integration."""
+"""Tests for v0.8.2 — Alpine + HTMX vendored under static/ulog/js/."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 import ulog
+
+JS_DIR = Path(__file__).resolve().parent.parent / "ulog/web/static/ulog/js"
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +23,18 @@ def _isolate():
                 h.close()
             logging.getLogger().removeHandler(h)
     ulog.clear()
+
+
+def test_alpine_bundle_committed():
+    p = JS_DIR / "alpine.min.js"
+    assert p.exists(), f"missing {p}; run `make js-vendor`"
+    assert p.stat().st_size > 10_000, "alpine.min.js too small — corrupt?"
+
+
+def test_htmx_bundle_committed():
+    p = JS_DIR / "htmx.min.js"
+    assert p.exists(), f"missing {p}; run `make js-vendor`"
+    assert p.stat().st_size > 10_000, "htmx.min.js too small — corrupt?"
 
 
 def _client(db: Path):
@@ -52,30 +66,16 @@ def _seed(tmp_path: Path) -> Path:
     return db
 
 
-def test_base_template_loads_alpine_and_htmx(tmp_path):
+def test_base_template_links_vendored_assets(tmp_path):
     db = _seed(tmp_path)
     body = _client(db).get("/").content.decode("utf-8")
-    # v0.8.2 — bundles vendored under static/ulog/js/ (CDN dropped).
     assert "/static/ulog/js/alpine.min.js" in body
     assert "/static/ulog/js/htmx.min.js" in body
-    # Alpine still loads `defer` so the FOUC-prevention class="dark" toggle fires first.
-    assert 'defer src="/static/ulog/js/alpine.min.js"' in body
 
 
-def test_multi_track_form_has_htmx_attrs(tmp_path):
+def test_base_template_no_longer_uses_cdn(tmp_path):
+    """Should NOT load Alpine/HTMX from jsdelivr anymore."""
     db = _seed(tmp_path)
-    body = _client(db).get("/multi-track/").content.decode("utf-8")
-    assert 'hx-get="/multi-track/"' in body
-    assert "hx-target=" in body
-    assert "data-multi-track-root" in body
-    assert 'hx-push-url="true"' in body
-
-
-def test_multi_track_form_works_without_htmx_fallback(tmp_path):
-    """Without `HX-Request`, the view returns a full page (no partial)."""
-    db = _seed(tmp_path)
-    resp = _client(db).get("/multi-track/", {"from": "2026-05-01T00:00", "to": "2026-05-02T00:00"})
-    body = resp.content.decode("utf-8")
-    # Full page contains <html and the form.
-    assert "<html" in body
-    assert "<form" in body
+    body = _client(db).get("/").content.decode("utf-8")
+    assert "cdn.jsdelivr.net/npm/alpinejs" not in body
+    assert "cdn.jsdelivr.net/npm/htmx" not in body

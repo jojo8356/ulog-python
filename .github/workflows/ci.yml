@@ -75,8 +75,37 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev,storage,web]"
+      - name: Cache 100K bench fixture
+        uses: actions/cache@v4
+        with:
+          path: tests/fixtures/bench_100k.sqlite
+          key: bench-fixture-${{ hashFiles('scripts/seed_bench_fixture.py') }}
+      - name: Seed bench fixture
+        run: make bench-fixture
       - name: Run benchmarks (advisory)
-        run: pytest -m slow -q tests/bench_*.py || echo "advisory; non-fatal during first 2 v0.5 runs"
+        run: |
+          pytest -m slow -q tests/bench_*.py \
+              --benchmark-only --benchmark-min-rounds=5 \
+              --benchmark-json=benchmark.json \
+              || echo "advisory; non-fatal during first 2 v0.6.4 runs"
+      - name: Check 30s gate (advisory)
+        run: |
+          python -c "
+          import json, sys
+          data = json.load(open('benchmark.json'))
+          for b in data['benchmarks']:
+              median_s = b['stats']['median']
+              name = b['name']
+              if 'separate' in name and median_s > 30.0:
+                  print(f'::warning::{name} median {median_s:.1f}s exceeds 30s budget')
+              else:
+                  print(f'OK: {name} median {median_s:.2f}s')
+          " || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-results
+          path: benchmark.json
 
   # PRD-v0.6.3 — Cross-browser Playwright matrix for ulog export-html.
   # NFR-COMPAT-60. Linux runner only; Chrome + Firefox + WebKit.

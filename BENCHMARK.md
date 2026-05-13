@@ -19,6 +19,21 @@ with:
 
 ---
 
+## v0.6.4 — `ulog export-html` (Story 8.14 / PRD-v0.6.4)
+
+**Local smoke (5K records)** — informational, not the SC1 measurement:
+
+| Test | Median wall | Output |
+|---|---|---|
+| `test_export_filtered_100k` (`level=ERROR`) | ~4.0 s | ~50 records |
+| `test_export_separate_100k` (`--separate-data`) | ~11.3 s | ~30 MB |
+| `test_export_inline_100k` (`--inline-data`) | ~14.3 s | ~60 MB |
+
+Measured on a 2026 dev laptop, 5K fixture. The 100K target / 30s SC1
+gate fires in CI (`make bench-export` after `make bench-fixture`).
+Numbers populated by the first CI run on `main` after baseline
+stabilises (Decision E3: advisory for first 2 runs).
+
 ## SC1 — `ulog verify ./logs.sqlite` ≤ 5 s / 100K records
 
 **Baseline (v0.5.0):** _to be populated by the first CI run._

@@ -194,6 +194,6 @@ development_status:
   8-11-readme-html-at-output-root: done
   8-12-edge-case-test-suite-empty-broken-xss-traversal-cap: done
   8-13-cross-browser-compatibility-playwright: done
-  8-14-performance-benchmark-sc1-gate: deferred-ops
+  8-14-performance-benchmark-sc1-gate: done
   8-15-doc-page-static-export-md: done
   epic-8-retrospective: optional

@@ -241,12 +241,21 @@ class SQLiteAdapter(Adapter):
     """SQLite-backed adapter — filter pushed down as SQL WHERE clauses."""
 
     def __init__(self, path: Path) -> None:
-        from sqlalchemy import MetaData, Table, create_engine
+        from sqlalchemy import MetaData, Table, create_engine, text
 
         self._engine = create_engine(f"sqlite:///{path}", future=True)
         self._md = MetaData()
         # Reflect the existing schema so users with custom column adds work too.
         self._table = Table("logs", self._md, autoload_with=self._engine)
+        # PRD-v0.4.4 — detect the optional FTS5 mirror (created by
+        # `ulog enable-fts5 <db>`). When present, _base_filters uses
+        # `MATCH` instead of `msg LIKE %q%` for the `?q=` search axis.
+        with self._engine.connect() as conn:
+            self._has_fts5 = bool(
+                conn.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table' AND name='logs_fts'")
+                ).first()
+            )
 
     def _base_filters(self, filters: Filters) -> Any:
         from sqlalchemy import and_, or_
@@ -262,7 +271,20 @@ class SQLiteAdapter(Adapter):
         if filters.files:
             clauses.append(t.c.file.in_(filters.files))
         if filters.search:
-            clauses.append(t.c.msg.like(f"%{filters.search}%"))
+            if self._has_fts5:
+                # PRD-v0.4.4 — FTS5 fast path. logs_fts is a content=
+                # virtual table mirroring `msg`; rowid == logs.id.
+                from sqlalchemy import text as _text
+
+                clauses.append(
+                    t.c.id.in_(
+                        _text(
+                            "SELECT rowid FROM logs_fts WHERE msg MATCH :q"
+                        ).bindparams(q=filters.search)
+                    )
+                )
+            else:
+                clauses.append(t.c.msg.like(f"%{filters.search}%"))
         if filters.ts_from:
             clauses.append(t.c.ts >= filters.ts_from)
         if filters.ts_to:

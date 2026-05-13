@@ -27,6 +27,7 @@ from . import (
     cmd_bug_cache,
     cmd_correlate,
     cmd_enable_fts5,
+    cmd_explain,
     cmd_export_html,
     cmd_fix,
     cmd_import,
@@ -66,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd_enable_fts5.register(subparsers)
     cmd_bug_cache.register(subparsers)
     cmd_solutions.register(subparsers)
+    cmd_explain.register(subparsers)
 
     args = parser.parse_args(argv)
     if args.subcommand is None:

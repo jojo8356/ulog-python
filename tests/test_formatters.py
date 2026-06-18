@@ -54,8 +54,9 @@ def test_qlnes_custom_prefix():
     assert sink.getvalue().strip() == "myapp: error: boom"
 
 
-def test_qlnes_color_on_wraps_prefix_in_ansi():
+def test_qlnes_color_on_wraps_prefix_in_ansi(monkeypatch):
     """When color is forced on, the level prefix gets ANSI codes."""
+    monkeypatch.delenv("NO_COLOR", raising=False)
     sink = io.StringIO()
     ulog.setup(format="qlnes", stream=sink, color="always")
     ulog.get_logger().error("boom")

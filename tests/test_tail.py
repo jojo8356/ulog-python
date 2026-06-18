@@ -53,10 +53,8 @@ def _run_tail_in_thread(args: list[str], stop_after_ms: int = 800) -> threading.
     import signal
 
     def _target():
-        try:
+        with contextlib.suppress(KeyboardInterrupt):
             cli_main(args)
-        except KeyboardInterrupt:
-            pass
 
     t = threading.Thread(target=_target, daemon=True)
     t.start()
@@ -88,10 +86,8 @@ def test_tail_minus_n_emits_last_lines(tmp_path, capsys):
         _os.kill(_os.getpid(), _signal.SIGINT)
 
     threading.Thread(target=_abort_soon, daemon=True).start()
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         cli_main(["tail", "--db", str(db), "-n", "2", "--interval", "100"])
-    except KeyboardInterrupt:
-        pass
     out = capsys.readouterr().out
     # Last 2 records should be printed: "rec 3" and "rec 4".
     assert "rec 3" in out
@@ -110,10 +106,8 @@ def test_tail_since_start_emits_all_existing(tmp_path, capsys):
         _os.kill(_os.getpid(), _signal.SIGINT)
 
     threading.Thread(target=_abort_soon, daemon=True).start()
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         cli_main(["tail", "--db", str(db), "--since-start", "--interval", "100"])
-    except KeyboardInterrupt:
-        pass
     out = capsys.readouterr().out
     for i in range(3):
         assert f"rec {i}" in out
@@ -139,12 +133,10 @@ def test_tail_levels_filter(tmp_path, capsys):
         _os.kill(_os.getpid(), _signal.SIGINT)
 
     threading.Thread(target=_abort_soon, daemon=True).start()
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         cli_main(
             ["tail", "--db", str(db), "--since-start", "--levels", "ERROR", "--interval", "100"]
         )
-    except KeyboardInterrupt:
-        pass
     out = capsys.readouterr().out
     assert "error one" in out
     assert "info one" not in out
@@ -170,10 +162,8 @@ def test_tail_format_qlnes_style(tmp_path, capsys):
         _os.kill(_os.getpid(), _signal.SIGINT)
 
     threading.Thread(target=_abort_soon, daemon=True).start()
-    try:
+    with contextlib.suppress(KeyboardInterrupt):
         cli_main(["tail", "--db", str(db), "--since-start", "--interval", "100"])
-    except KeyboardInterrupt:
-        pass
     out = capsys.readouterr().out
     assert "svc  bare info" in out
     assert "svc: error: prefixed error" in out

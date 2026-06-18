@@ -170,7 +170,7 @@ def test_build_persists_then_subsequent_load_uses_cache(tmp_path):
 
     # First build: fresh.
     sink1 = io.StringIO()
-    idx1 = build_index_at_startup(adapter, repo, progress_stream=sink1)
+    idx1 = build_index_at_startup(adapter, repo, progress_stream=sink1, rebuild=False)
     assert "from cache" not in sink1.getvalue()
     assert idx1.author_for("foo.py", 2) is not None
 
@@ -178,7 +178,7 @@ def test_build_persists_then_subsequent_load_uses_cache(tmp_path):
     set_global_index(None)
     adapter2 = JSONLAdapter(log)  # fresh adapter
     sink2 = io.StringIO()
-    idx2 = build_index_at_startup(adapter2, repo, progress_stream=sink2)
+    idx2 = build_index_at_startup(adapter2, repo, progress_stream=sink2, rebuild=False)
     assert "from cache" in sink2.getvalue()
     a = idx2.author_for("foo.py", 2)
     assert a is not None

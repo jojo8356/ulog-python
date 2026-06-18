@@ -3,15 +3,13 @@ __pycache__/
 .venv/
 .mypy_cache/
 .pytest_cache/
+.uv-cache/
+.playwright-browsers/
 build/
 dist/
 *.egg-info/
 .coverage
 htmlcov/
-
-# uv-generated lockfile — ulog is a library, not an app, so the lockfile
-# is a local install artifact (consumers install via pyproject.toml).
-uv.lock
 
 # Backup files from BMad install / installer reruns.
 *.bak

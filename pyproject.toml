@@ -101,6 +101,7 @@ include = ["ulog*"]
 exclude = ["tests*", "vendor*"]
 
 [tool.pytest.ini_options]
+addopts = "-p no:playwright --durations=30 --durations-min=1.0"
 testpaths = ["tests"]
 markers = ["slow: long-running tests (skip by default; run with `-m slow`)"]
 
@@ -116,6 +117,7 @@ module = [
     "django.*",
     "ucolor",
     "ucolor.*",
+    "yaml",
 ]
 ignore_missing_imports = true
 

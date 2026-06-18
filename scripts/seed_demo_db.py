@@ -302,28 +302,32 @@ def generate_log_db(
         ts_offset = random.uniform(0, span_seconds)
         ts = (start + timedelta(seconds=ts_offset)).isoformat()
 
-        # Bound context — most records carry tenant + request_id
-        ctx: dict = {}
-        if random.random() < 0.7:
-            ctx["tenant_id"] = random.choice(tenants)
-        if random.random() < 0.85:
-            ctx["request_id"] = f"req_{random.randint(10**8, 10**9 - 1):x}"
-        if random.random() < 0.4:
-            ctx["user_id"] = random.choice(users)
-        if random.random() < 0.1:
-            ctx["region"] = random.choice(["us-east-1", "eu-west-1", "ap-southeast-1"])
+        # Bound context — most records carry tenant + request_id.
+        # Keep one deterministic context-less record so detail-view tests
+        # exercise the "no Context block" rendering path without skipping.
+        ctx: dict | None = None
+        if i != 0:
+            ctx = {}
+            if random.random() < 0.7:
+                ctx["tenant_id"] = random.choice(tenants)
+            if random.random() < 0.85:
+                ctx["request_id"] = f"req_{random.randint(10**8, 10**9 - 1):x}"
+            if random.random() < 0.4:
+                ctx["user_id"] = random.choice(users)
+            if random.random() < 0.1:
+                ctx["region"] = random.choice(["us-east-1", "eu-west-1", "ap-southeast-1"])
 
-        # Synthetic operation duration — Pareto-ish: 80% fast (1-50ms),
-        # 18% medium (50-200ms), 2% slow (200ms-2s). Lets the viewer
-        # "Time" column show realistic variance.
-        r = random.random()
-        if r < 0.80:
-            duration_s = random.uniform(0.001, 0.05)
-        elif r < 0.98:
-            duration_s = random.uniform(0.05, 0.2)
-        else:
-            duration_s = random.uniform(0.2, 2.0)
-        ctx["duration_s"] = round(duration_s, 6)
+            # Synthetic operation duration — Pareto-ish: 80% fast (1-50ms),
+            # 18% medium (50-200ms), 2% slow (200ms-2s). Lets the viewer
+            # "Time" column show realistic variance.
+            r = random.random()
+            if r < 0.80:
+                duration_s = random.uniform(0.001, 0.05)
+            elif r < 0.98:
+                duration_s = random.uniform(0.05, 0.2)
+            else:
+                duration_s = random.uniform(0.2, 2.0)
+            ctx["duration_s"] = round(duration_s, 6)
 
         # Some ERROR records carry an exception
         exc = None

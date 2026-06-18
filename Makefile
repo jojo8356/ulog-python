@@ -1,20 +1,44 @@
-.PHONY: test mypy check build clean install-dev \
+.PHONY: test test-fast test-e2e test-e2e-fast test-e2e-lightpanda test-durations \
+        mypy check build clean install-dev \
         help tailwind-doctor tailwind-build tailwind-watch tailwind-check tailwind-clean \
         bench-fixture bench-export
 
+UV_CACHE_DIR ?= .uv-cache
+
 install-dev:
-	python3 -m pip install -e ".[dev]"
+	UV_CACHE_DIR=$(UV_CACHE_DIR) uv sync --extra dev --extra solutions
 
 test:
-	python3 -m pytest tests/ -v
+	UV_CACHE_DIR=$(UV_CACHE_DIR) uv run pytest tests/ -v
+
+test-fast:
+	UV_CACHE_DIR=$(UV_CACHE_DIR) PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers ULOG_PW_TIMEOUT_MS=5000 \
+	    uv run pytest tests/ -q -m "not slow" -p no:benchmark -n auto --dist loadfile
+
+test-e2e:
+	UV_CACHE_DIR=$(UV_CACHE_DIR) PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+	    uv run pytest tests/*e2e.py -q
+
+test-e2e-fast:
+	UV_CACHE_DIR=$(UV_CACHE_DIR) PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers ULOG_PW_TIMEOUT_MS=5000 \
+	    uv run pytest tests/*e2e.py -q -p no:benchmark -n auto --dist loadfile
+
+test-e2e-lightpanda:
+	@test -n "$$ULOG_LIGHTPANDA_CDP" || { echo "Set ULOG_LIGHTPANDA_CDP=ws://127.0.0.1:9222"; exit 2; }
+	UV_CACHE_DIR=$(UV_CACHE_DIR) ULOG_E2E_BROWSER=lightpanda ULOG_PW_TIMEOUT_MS=5000 \
+	    uv run pytest tests/*e2e.py -q -p no:benchmark -n auto --dist loadfile
+
+test-durations:
+	UV_CACHE_DIR=$(UV_CACHE_DIR) PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers \
+	    uv run pytest tests/ -q --durations=50 --durations-min=0.1
 
 mypy:
-	python3 -m mypy ulog/
+	UV_CACHE_DIR=$(UV_CACHE_DIR) uv run mypy ulog/
 
 check: mypy test
 
 build:
-	python3 -m build
+	UV_CACHE_DIR=$(UV_CACHE_DIR) uv build
 
 clean:
 	rm -rf build/ dist/ *.egg-info ulog/__pycache__ tests/__pycache__ .mypy_cache .pytest_cache
@@ -108,10 +132,10 @@ bench-fixture: $(BENCH_FIXTURE)
 
 $(BENCH_FIXTURE):
 	@mkdir -p $$(dirname $(BENCH_FIXTURE))
-	@.venv/bin/python scripts/seed_bench_fixture.py $(BENCH_FIXTURE)
+	@UV_CACHE_DIR=$(UV_CACHE_DIR) uv run python scripts/seed_bench_fixture.py $(BENCH_FIXTURE)
 
 bench-export: bench-fixture
-	@.venv/bin/python -m pytest tests/bench_export_html.py -m slow \
+	@UV_CACHE_DIR=$(UV_CACHE_DIR) uv run pytest tests/bench_export_html.py -m slow \
 	    --benchmark-only --benchmark-min-rounds=5 \
 	    --benchmark-json=benchmark.json
 

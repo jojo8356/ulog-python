@@ -13,6 +13,7 @@ matching what a user sees in their terminal.
 
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import sys
@@ -21,7 +22,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse module-scoped fixture
+from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse session-scoped fixture
 
 # ---- helpers --------------------------------------------------------------
 
@@ -203,10 +204,7 @@ def test_no_git_repo_emits_stderr_warning(tmp_path: Path, seeded_demo: Path) -> 
     log_path = tmp_path / "logs.sqlite"
     shutil.copy(seeded_demo / "logs.sqlite", log_path)
 
-    # Ensure tmp_path has no .git/ ancestor up to /tmp/ root.
-    assert not any((p / ".git").exists() for p in [tmp_path, *tmp_path.parents][:6]), (
-        "tmp_path unexpectedly has a .git/ ancestor"
-    )
+    env = {**os.environ, "GIT_CEILING_DIRECTORIES": str(tmp_path.parent)}
 
     port = _free_port()
     proc = subprocess.Popen(
@@ -220,6 +218,7 @@ def test_no_git_repo_emits_stderr_warning(tmp_path: Path, seeded_demo: Path) -> 
             str(log_path),
         ],
         cwd=str(tmp_path),  # CRITICAL: launch FROM the no-git dir
+        env=env,
         stderr=subprocess.PIPE,
         stdout=subprocess.PIPE,
         text=True,

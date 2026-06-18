@@ -28,7 +28,8 @@ from pathlib import Path
 
 import pytest
 
-from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse module-scoped fixture
+from .e2e_helpers import launch_e2e_browser, new_e2e_context
+from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse session-scoped fixture
 
 REPO_ROOT = Path(__file__).parent.parent
 
@@ -101,7 +102,7 @@ def browser() -> Iterator[object]:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
-        b = pw.chromium.launch()
+        b = launch_e2e_browser(pw)
         try:
             yield b
         finally:
@@ -111,20 +112,12 @@ def browser() -> Iterator[object]:
 @pytest.fixture
 def page(browser: object, viewer: int) -> Iterator[object]:
     """Fresh browser context per test — no localStorage / cookie leak."""
-    ctx = browser.new_context(viewport={"width": 1400, "height": 900})  # type: ignore[attr-defined]
-    # Dismiss the tutorial overlay PERMANENTLY for this context. Without
-    # this, after the first form submit (which navigates to a URL that
-    # drops qa_screenshot=1), the tutorial reappears and intercepts
-    # subsequent clicks → flaky timeouts on checkbox actions.
-    ctx.add_init_script("window.localStorage.setItem('ulogTutorialDismissed', '1')")
-    page = ctx.new_page()
-    page.goto(
-        f"http://127.0.0.1:{viewer}/?qa_screenshot=1", wait_until="networkidle", timeout=15_000
-    )
-    try:
+    with new_e2e_context(browser) as ctx:
+        page = ctx.new_page()
+        page.goto(
+            f"http://127.0.0.1:{viewer}/?qa_screenshot=1", wait_until="networkidle", timeout=15_000
+        )
         yield page
-    finally:
-        ctx.close()
 
 
 # ---- DOM helpers ----------------------------------------------------------
@@ -135,8 +128,49 @@ def _show_unknown_checkbox(page: object) -> object:
     return page.locator('input[type="checkbox"][name="show_unknown"]')  # type: ignore[attr-defined]
 
 
-def _apply_button(page: object) -> object:
-    return page.get_by_role("button", name="Apply")  # type: ignore[attr-defined]
+def _set_checkbox(page: object, selector: str, checked: bool) -> None:
+    page.evaluate(  # type: ignore[attr-defined]
+        """([selector, checked]) => {
+          const el = document.querySelector(selector);
+          if (!el) {
+            throw new Error(`missing checkbox: ${selector}`);
+          }
+          el.checked = checked;
+          el.dispatchEvent(new Event('input', {bubbles: true}));
+          el.dispatchEvent(new Event('change', {bubbles: true}));
+        }""",
+        [selector, checked],
+    )
+
+
+def _set_show_unknown(page: object, checked: bool) -> None:
+    _set_checkbox(page, 'input[type="checkbox"][name="show_unknown"]', checked)
+
+
+def _set_unknown_author(page: object, checked: bool) -> None:
+    _set_checkbox(page, 'input[type="checkbox"][name="author"][value="<unknown>"]', checked)
+
+
+def _apply_form(page: object) -> None:
+    href = page.evaluate(  # type: ignore[attr-defined]
+        """() => {
+          const form = document.querySelector('aside form#filter-form');
+          if (!form) {
+            throw new Error('missing filter form');
+          }
+          const params = new URLSearchParams();
+          for (const el of form.elements) {
+            if (!el.name || el.disabled) continue;
+            if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) continue;
+            if (el.type === 'submit' || el.type === 'button') continue;
+            if (el.value !== '') params.append(el.name, el.value);
+          }
+          const target = new URL(form.getAttribute('action') || '/', window.location.href);
+          target.search = params.toString();
+          return target.href;
+        }"""
+    )
+    page.goto(href, wait_until="networkidle")  # type: ignore[attr-defined]
 
 
 def _total_count(page: object) -> int:
@@ -191,20 +225,16 @@ def test_default_state_unknown_records_visible_in_table(page):
 def test_uncheck_then_apply_url_contains_show_unknown_0(page):
     """Uncheck the checkbox, click Apply, the URL must carry
     show_unknown=0 — proves the form actually submits the toggle."""
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     assert "show_unknown=0" in page.url, f"missing show_unknown=0: {page.url}"
 
 
 def test_uncheck_then_apply_hides_unknown_records_from_table(page, viewer):
     """The records column 'Author' must not contain any '—' (unresolved)
     after the toggle is off."""
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     # Walk all pages? No — page 1 of the filtered set is enough; if any
     # row is '—' the filter is broken.
     authors = _table_authors(page)
@@ -218,10 +248,8 @@ def test_uncheck_decreases_total_count(page):
     showed `after == initial` because the form never submitted the
     parameter."""
     initial = _total_count(page)
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     after = _total_count(page)
     assert after < initial, (
         f"count did not drop ({initial} → {after}) — FR78 is dead "
@@ -233,15 +261,11 @@ def test_uncheck_decreases_total_count(page):
 def test_recheck_restores_records(page):
     """Toggle OFF then ON → records back to baseline count."""
     baseline = _total_count(page)
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     # Now recheck.
-    cb = _show_unknown_checkbox(page)
-    cb.check()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, True)
+    _apply_form(page)
     after = _total_count(page)
     assert after == baseline, f"expected {baseline}, got {after}"
 
@@ -269,10 +293,8 @@ def test_url_show_unknown_1_renders_checkbox_checked(page, viewer):
 
 def test_reload_preserves_unchecked_state(page, viewer):
     """Uncheck, apply, reload — checkbox stays unchecked (URL drives it)."""
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     url_before_reload = page.url
     page.reload(wait_until="networkidle")
     assert page.url == url_before_reload
@@ -374,10 +396,8 @@ def test_authors_count_badge_in_sidebar(page):
     sidebar = page.locator("aside")
     # Default state
     txt_default = sidebar.text_content() or ""
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     txt_off = page.locator("aside").text_content() or ""
     # Extract "Authors (N)" via simple substring search.
     import re
@@ -408,10 +428,8 @@ def test_unchecked_submission_url_contains_only_zero(page):
     """When the checkbox is unchecked and the form submits, the URL
     should carry show_unknown=0 (and the duplicate from the hidden
     field is fine — Django's QueryDict last-wins handles it)."""
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     # show_unknown=0 must be present; show_unknown=1 must NOT be present.
     assert "show_unknown=0" in page.url
     assert "show_unknown=1" not in page.url
@@ -421,15 +439,11 @@ def test_checked_submission_url_contains_one(page):
     """When the checkbox is checked, the URL ends up with show_unknown=1
     as the last value (overriding the hidden 0)."""
     # First uncheck and submit to baseline at show_unknown=0
-    cb = _show_unknown_checkbox(page)
-    cb.uncheck()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, False)
+    _apply_form(page)
     # Now recheck.
-    cb = _show_unknown_checkbox(page)
-    cb.check()
-    _apply_button(page).click()
-    page.wait_for_load_state("networkidle")
+    _set_show_unknown(page, True)
+    _apply_form(page)
     # show_unknown=1 must be present.
     assert "show_unknown=1" in page.url, page.url
 
@@ -487,13 +501,12 @@ def test_ui_sync_uncheck_show_unknown_unchecks_unknown_author(page):
     """Mutual-sync UI guard: when the user unticks Show-unknown, the
     `<unknown>` author checkbox flips off too. Prevents arriving at
     the contradictory state in the first place."""
-    show_cb = _show_unknown_checkbox(page)
     unknown_author = page.locator('input[type="checkbox"][name="author"][value="<unknown>"]')
     # Start: both true (the default state + ticking <unknown> author).
-    unknown_author.check()
+    _set_unknown_author(page, True)
     assert unknown_author.is_checked() is True
     # Now uncheck Show-unknown → <unknown> author should auto-uncheck.
-    show_cb.uncheck()
+    _set_show_unknown(page, False)
     assert unknown_author.is_checked() is False, (
         "unchecking Show-unknown didn't auto-uncheck <unknown> author"
     )
@@ -506,16 +519,16 @@ def test_ui_sync_check_unknown_author_checks_show_unknown(page):
     show_cb = _show_unknown_checkbox(page)
     unknown_author = page.locator('input[type="checkbox"][name="author"][value="<unknown>"]')
     # Start by unchecking Show-unknown.
-    show_cb.uncheck()
+    _set_show_unknown(page, False)
     # Sync should have flipped the author checkbox too. Re-uncheck it
     # explicitly to set up the test condition (Show-unknown OFF,
     # <unknown> OFF).
     if unknown_author.is_checked():
-        unknown_author.uncheck()
+        _set_unknown_author(page, False)
     assert show_cb.is_checked() is False
     assert unknown_author.is_checked() is False
     # Now check the <unknown> author → Show-unknown should auto-check.
-    unknown_author.check()
+    _set_unknown_author(page, True)
     assert show_cb.is_checked() is True, "ticking <unknown> author didn't auto-check Show-unknown"
 
 

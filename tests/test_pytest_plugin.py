@@ -23,6 +23,19 @@ pytest_plugins = ["pytester"]
 
 
 @pytest.fixture(autouse=True)
+def _isolate_pytester_plugins(pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep nested pytester runs focused on ULog's plugin.
+
+    The full dev env installs pytest-playwright and pytest-benchmark. Those
+    plugins auto-load inside pytester subprocesses too, which can change the
+    outcome of one-file synthetic test runs unrelated to ULog. Explicitly load
+    only the plugin under test.
+    """
+    monkeypatch.setenv("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1")
+    pytester.makeini("[pytest]\naddopts = -p ulog.testing.pytest_plugin\n")
+
+
+@pytest.fixture(autouse=True)
 def _isolate_logging():
     """Strip _ulog_managed handlers between tests (mirrors tests/test_setup.py)."""
     yield

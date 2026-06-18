@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse module-scoped fixture
+from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse session-scoped fixture
 
 REPO_ROOT = Path(__file__).parent.parent
 

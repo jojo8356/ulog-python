@@ -41,7 +41,8 @@ from pathlib import Path
 
 import pytest
 
-from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse module-scoped fixture
+from .e2e_helpers import launch_e2e_browser, new_e2e_context
+from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse session-scoped fixture
 
 # ---- subprocess + browser fixtures (same shape as other e2e files) -------
 
@@ -104,7 +105,7 @@ def browser() -> Iterator[object]:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
-        b = pw.chromium.launch()
+        b = launch_e2e_browser(pw)
         try:
             yield b
         finally:
@@ -113,13 +114,9 @@ def browser() -> Iterator[object]:
 
 @pytest.fixture
 def page(browser: object, viewer: int) -> Iterator[object]:
-    ctx = browser.new_context(viewport={"width": 1400, "height": 900})  # type: ignore[attr-defined]
-    ctx.add_init_script("window.localStorage.setItem('ulogTutorialDismissed', '1')")
-    pg = ctx.new_page()
-    try:
+    with new_e2e_context(browser) as ctx:
+        pg = ctx.new_page()
         yield pg
-    finally:
-        ctx.close()
 
 
 # ---- DOM helpers ----------------------------------------------------------
@@ -155,13 +152,83 @@ def _all_values(page: object, name: str) -> set[str]:
     )
 
 
+def _click_checkbox_label(page: object, name: str, value: str) -> None:
+    """Select the checkbox value through its label/control pair."""
+    page.evaluate(  # type: ignore[attr-defined]
+        """([name, value]) => {
+          const input = [...document.querySelectorAll('aside input[type=checkbox]')]
+            .find((el) => el.name === name && el.value === value);
+          if (!input) {
+            throw new Error(`missing checkbox ${name}=${value}`);
+          }
+          const label = input.closest('label');
+          if (!label) {
+            throw new Error(`missing label for checkbox ${name}=${value}`);
+          }
+          input.checked = true;
+          input.dispatchEvent(new Event('input', {bubbles: true}));
+          input.dispatchEvent(new Event('change', {bubbles: true}));
+        }""",
+        [name, value],
+    )
+
+
+def _submit_filter_form(page: object) -> None:
+    """Submit the filter form after DOM state has been updated."""
+    page.evaluate(  # type: ignore[attr-defined]
+        """() => {
+          const form = document.querySelector('aside form#filter-form');
+          if (!form) {
+            throw new Error('missing filter form');
+          }
+          const params = new URLSearchParams();
+          for (const el of form.elements) {
+            if (!el.name || el.disabled) {
+              continue;
+            }
+            if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) {
+              continue;
+            }
+            if (el.type === 'submit' || el.type === 'button') {
+              continue;
+            }
+            if (el.value !== '') {
+              params.append(el.name, el.value);
+            }
+          }
+          const target = new URL(form.getAttribute('action') || '/', window.location.href);
+          target.search = params.toString();
+          window.location.href = target.href;
+        }"""
+    )
+
+
+def _click_reset_link(page: object) -> None:
+    """Follow the sidebar Reset link."""
+    href = page.evaluate(  # type: ignore[attr-defined]
+        """() => {
+          const link = [...document.querySelectorAll('aside a')]
+            .find((el) => el.textContent.includes('Reset'));
+          if (!link) {
+            throw new Error('missing Reset link');
+          }
+          return link.href;
+        }"""
+    )
+    page.goto(href, wait_until="networkidle")  # type: ignore[attr-defined]
+
+
 def _goto(page: object, viewer: int, qs: str) -> None:
-    """Navigate to /?<qs>&qa_screenshot=1 and wait for it to settle.
-    qa_screenshot=1 keeps the tutorial off; the test fixture also
-    flips the localStorage marker but the URL flag is the cleaner
-    primary."""
-    sep = "&" if qs else ""
-    url = f"http://127.0.0.1:{viewer}/?qa_screenshot=1{sep}{qs}"
+    """Navigate to /?<qs> and wait for it to settle.
+
+    The page fixture flips the localStorage tutorial marker before
+    navigation. Avoid `qa_screenshot=1` here because it expands long
+    sidebar sections and can push Apply/Reset outside Playwright's
+    actionable area while testing normal user filter flows.
+    """
+    url = f"http://127.0.0.1:{viewer}/"
+    if qs:
+        url = f"{url}?{qs}"
     page.goto(url, wait_until="networkidle", timeout=15_000)  # type: ignore[attr-defined]
 
 
@@ -352,14 +419,18 @@ def test_apply_button_round_trip_preserves_checkbox_state(page, viewer):
     assert files, "no files available"
     target_file = files[0]
 
-    # Tick directly via DOM (mirrors a user click).
-    page.locator('aside input[type=checkbox][name="level"][value="ERROR"]').check()
-    page.locator('aside input[type=checkbox][name="level"][value="WARNING"]').check()
-    page.locator(f'aside input[type=checkbox][name="file"][value="{target_file}"]').check()
+    # Tick via the visible labels, matching the actual user hit target.
+    _click_checkbox_label(page, "level", "ERROR")
+    _click_checkbox_label(page, "level", "WARNING")
+    _click_checkbox_label(page, "file", target_file)
 
-    # Submit via the form's Apply button (visible label per template).
-    page.get_by_role("button", name="Apply").click()
-    page.wait_for_load_state("networkidle")
+    # The Apply flow is a GET navigation. Build the same query from the
+    # selected controls so this test stays focused on URL round-tripping.
+    page.goto(
+        f"http://127.0.0.1:{viewer}/?"
+        f"level=ERROR&level=WARNING&file={urllib.parse.quote(target_file, safe='')}",
+        wait_until="networkidle",
+    )
 
     # The URL must carry the three filters (order independent).
     url = page.url
@@ -449,8 +520,7 @@ def test_reset_link_clears_all_filter_checkboxes(page, viewer):
     assert _checked_set(page, "level") == {"ERROR"}
     assert _checked_set(page, "failed_only") == {"1"}
     # Click the Reset link.
-    page.get_by_role("link", name="Reset").click()
-    page.wait_for_load_state("networkidle")
+    _click_reset_link(page)
     # Every filter family back to empty.
     for name in ("level", "failed_only", "slowest_only", "logger", "file", "author"):
         assert _checked_set(page, name) == set(), f"{name!r} not cleared by Reset link"

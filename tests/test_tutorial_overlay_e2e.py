@@ -27,7 +27,8 @@ from pathlib import Path
 
 import pytest
 
-from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse module-scoped fixture
+from .e2e_helpers import launch_e2e_browser, new_e2e_context
+from .test_qa_setup_e2e import seeded_demo  # noqa: F401  reuse session-scoped fixture
 
 
 def _free_port() -> int:
@@ -88,7 +89,7 @@ def browser() -> Iterator[object]:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
-        b = pw.chromium.launch()
+        b = launch_e2e_browser(pw)
         try:
             yield b
         finally:
@@ -99,11 +100,8 @@ def browser() -> Iterator[object]:
 def fresh_context(browser: object) -> Iterator[object]:
     """A pristine browser context — NO `ulogTutorialDismissed` pre-set
     in localStorage. This is what a real first-time visitor sees."""
-    ctx = browser.new_context(viewport={"width": 1400, "height": 900})  # type: ignore[attr-defined]
-    try:
+    with new_e2e_context(browser, dismiss_tutorial=False) as ctx:
         yield ctx
-    finally:
-        ctx.close()
 
 
 # ---- DOM helpers ----------------------------------------------------------

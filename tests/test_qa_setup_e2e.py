@@ -36,11 +36,17 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
-def _spawn_viewer(args: list[str], *, cwd: Path | None = None) -> subprocess.Popen:
+def _spawn_viewer(
+    args: list[str],
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> subprocess.Popen:
     """Launch `python -m ulog.web.cli ...` with stderr captured."""
     return subprocess.Popen(
         [sys.executable, "-m", "ulog.web.cli", *args],
         cwd=str(cwd) if cwd else None,
+        env=env,
         stderr=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         text=True,
@@ -67,9 +73,9 @@ def _wait_then_capture_stderr(proc: subprocess.Popen, *, settle_s: float = 6.0) 
 # ---- fixtures -------------------------------------------------------------
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def seeded_demo(tmp_path_factory) -> Path:
-    """Run the seed script once per test module. Smaller params for speed."""
+    """Run the seed script once per pytest worker. Smaller params for speed."""
     demo_dir = tmp_path_factory.mktemp("ulog-qa-demo")
     seed_script = REPO_ROOT / "scripts" / "seed_demo_db.py"
     proc = subprocess.run(
@@ -184,6 +190,10 @@ def test_viewer_without_repo_from_non_git_cwd_warns(tmp_path):
     proc = _spawn_viewer(
         ["--no-open", "--port", str(_free_port()), str(db)],
         cwd=tmp_path,
+        env={
+            **__import__("os").environ,
+            "GIT_CEILING_DIRECTORIES": str(tmp_path.parent),
+        },
     )
     stderr = _wait_then_capture_stderr(proc, settle_s=4.0)
 

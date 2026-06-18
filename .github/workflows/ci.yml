@@ -1,10 +1,9 @@
 name: CI
 
+# CI/CD automatic triggers are disabled for now.
+# Re-enable push / pull_request when the project needs hosted checks again.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:

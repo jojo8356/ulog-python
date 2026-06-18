@@ -1,20 +1,19 @@
 """Cross-browser e2e for `ulog export-html` (PRD-v0.6.3 / Story 8.13).
 
-Parametrized over chromium / firefox / webkit via the pytest-playwright
-plugin's `--browser` flag. Run locally with:
+Parametrized over the `ULOG_E2E_BROWSERS` env var. Run locally with:
 
-    pytest tests/test_export_html_e2e.py \\
-        --browser chromium --browser firefox --browser webkit
+    ULOG_E2E_BROWSERS=chromium,firefox,webkit pytest tests/test_export_html_e2e.py
 
-Tests use the `page` fixture (provided by pytest-playwright) which is
-already browser-aware via the CLI flag.
+Tests use a local sync Playwright fixture so the default test suite can
+disable pytest-playwright plugin autoload. That avoids event-loop
+interference with other E2E modules that also use sync_playwright().
 
 Skipped automatically when:
 - playwright is not installed
-- the specific browser binary isn't available (browser_name fixture)
+- the specific browser binary isn't available
 
-This keeps the suite green on `pytest -q` (no browsers required) and
-turns green on CI with `--browser ...` flags.
+This keeps the suite green on `pytest -q` with only Chromium by default,
+and allows the full browser matrix when explicitly requested.
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ from __future__ import annotations
 import contextlib
 import http.server
 import logging
+import os
 import socket
 import socketserver
 import threading
@@ -31,10 +31,11 @@ from pathlib import Path
 import pytest
 
 playwright = pytest.importorskip("playwright")
-pytest_playwright = pytest.importorskip("pytest_playwright")
 
 import ulog
 from ulog.web.export import ExportOptions, HtmlExporter
+
+from .e2e_helpers import launch_e2e_browser, new_e2e_context
 
 
 @pytest.fixture(autouse=True)
@@ -96,7 +97,27 @@ def inline_export(tmp_path: Path) -> Path:
     return out
 
 
-# ---- Smoke tests across all 3 browsers (when invoked with --browser ...) ----
+def _browser_names() -> list[str]:
+    raw = os.environ.get("ULOG_E2E_BROWSERS", "chromium")
+    return [name.strip() for name in raw.split(",") if name.strip()]
+
+
+@pytest.fixture(params=_browser_names())
+def page(request) -> Iterator[object]:
+    from playwright.sync_api import sync_playwright
+
+    browser_name = request.param
+    with sync_playwright() as pw:
+        browser = launch_e2e_browser(pw, browser_name)
+        try:
+            with new_e2e_context(browser) as ctx:
+                pg = ctx.new_page()
+                yield pg
+        finally:
+            browser.close()
+
+
+# ---- Smoke tests across requested browsers --------------------------------
 
 
 def test_index_loads_and_renders_records(page, served_export) -> None:

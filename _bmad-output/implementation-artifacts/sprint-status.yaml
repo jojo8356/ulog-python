@@ -1,5 +1,5 @@
 # generated: 2026-05-05
-# last_updated: 2026-05-05 (Epic 8 / v0.6 static-export added per PRD-v0.6 — 15 stories appended)
+# last_updated: 2026-06-18 (Epic 9 catch-up ledger added for shipped v0.7-v0.9 PRDs)
 # project: ulog-python
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,7 +42,7 @@
 # defines. Story IDs preserve their original epics.md numbering for traceability.
 
 generated: 2026-05-05
-last_updated: 2026-05-12
+last_updated: 2026-06-18
 project: ulog-python
 project_key: NOKEY
 tracking_system: file-system
@@ -197,3 +197,19 @@ development_status:
   8-14-performance-benchmark-sc1-gate: done
   8-15-doc-page-static-export-md: done
   epic-8-retrospective: optional
+
+  # ========================================================================
+  # Epic 9: BMAD catch-up ledger — v0.7 to v0.9 shipped PRDs
+  # Added 2026-06-18 after confirming CHANGELOG.md and docs/prds/index.md
+  # already mark v0.7, v0.8, v0.8.1, and v0.9 as shipped. These artifacts
+  # regularize traceability only; they did not drive the original impl.
+  # ========================================================================
+  epic-9: done
+  9-1-v0-7-span-core-api-and-record-shape: done
+  9-2-v0-7-span-panel-and-explain-cli: done
+  9-3-v0-8-modern-frontend-stack: done
+  9-4-v0-8-1-docs-syntax-highlighting: done
+  9-5-v0-9-resource-validation-cli: done
+  9-6-v0-9-resources-sidebar-panel: done
+  9-7-prd-changelog-bmad-alignment: done
+  epic-9-retrospective: optional

@@ -1,6 +1,6 @@
 # Story 7.12: Tag v0.5.0 + push + qlnes migration
 
-Status: ready-for-release
+Status: done
 
 **Epic:** 7 — v0.5 release consolidation
 **Implements:** SC6a.
@@ -13,10 +13,33 @@ Status: ready-for-release
 - All Epic 5 + 6 + 7 stories done (32 / 33 — only 7.12 is the
   release act itself).
 
-## Release act (user-triggered, not auto-pushed)
+## Release act
+
+Completed locally on 2026-06-18:
 
 ```bash
-git tag -a v0.5.0 -m "v0.5.0 — Forensic black box (Epics 3-7)"
+git tag -a v0.5.0 d40c2bb -m "v0.5.0 - Forensic black box (Epics 3-7)"
+git push origin v0.5.0
+gh release create v0.5.0 --repo jojo8356/ulog-python --notes-file RELEASE_NOTES.md --title "v0.5.0 - Forensic black box"
+```
+
+Tag target:
+
+- `d40c2bb` — `feat(v0.5): Epic 7 release consolidation — v0.5.0 ready (12 stories)`
+
+GitHub release:
+
+- https://github.com/jojo8356/ulog-python/releases/tag/v0.5.0
+
+qlnes SC6a migration completed on 2026-06-18:
+
+- Repo: `jojo8356/qlnes`
+- Commit: `32d4143` — `chore(deps): pin ulog v0.5`
+- Change: `requirements.txt` now pins `ulog[storage,web] ~= 0.5.0` and uses the `ulog web` command name in dependency comments.
+
+Original release-ops commands:
+
+```bash
 git push origin v0.5.0
 gh release create v0.5.0 --notes-file RELEASE_NOTES.md
 ```

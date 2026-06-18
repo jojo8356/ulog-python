@@ -159,7 +159,7 @@ development_status:
   # ========================================================================
   # Epic 7: v0.5 release — consolidation, documentation & tag (12 stories)
   # ========================================================================
-  epic-7: in-progress
+  epic-7: done
   7-1-reserved-frozenset-centralization-refactor: done
   7-2-ulog-cli-init-argparse-subparser-dispatcher: done
   7-3-remove-ulog-web-console-script-release-notes-transition: done
@@ -171,7 +171,7 @@ development_status:
   7-9-ci-gate-dependencies-grep-step: done
   7-10-pytest-benchmark-in-dev-extras-advisory-ci: done
   7-11-tests-coverage-matrix-md-fr-edge-case-test-mapping: done
-  7-12-tag-v0-5-0-push-qlnes-migration: ready-for-release
+  7-12-tag-v0-5-0-push-qlnes-migration: done
   epic-7-retrospective: optional
 
   # ========================================================================

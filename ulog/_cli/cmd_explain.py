@@ -48,7 +48,7 @@ def run(args: argparse.Namespace) -> int:
         print("ulog explain: no span records found.", file=sys.stderr)
         return 1
 
-    children: dict[str | None, list[dict]] = {}
+    children: dict[str | None, list[dict[str, Any]]] = {}
     for s in spans:
         children.setdefault(s["parent_span_id"], []).append(s)
     for kids in children.values():
@@ -106,7 +106,11 @@ def _load_spans(db: Path) -> list[dict[str, Any]]:
     return out
 
 
-def _render(node: dict[str, Any], children: dict[str | None, list[dict]], depth: int) -> None:
+def _render(
+    node: dict[str, Any],
+    children: dict[str | None, list[dict[str, Any]]],
+    depth: int,
+) -> None:
     bar = "│ " * depth
     glyph = "─" if not children.get(node["span_id"]) else "┬"
     status = node["span_status"]

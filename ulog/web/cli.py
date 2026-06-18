@@ -51,9 +51,16 @@ def _walk_for_git_root(start: Path) -> Path | None:
     """Walk parents (including `start` itself) until a directory with
     a `.git/` subdirectory is found. Returns None if filesystem root
     is reached without finding one."""
+    ceilings = {
+        Path(p).resolve()
+        for p in os.environ.get("GIT_CEILING_DIRECTORIES", "").split(os.pathsep)
+        if p
+    }
     for d in [start, *start.parents]:
         if (d / ".git").is_dir():
             return d
+        if d.resolve() in ceilings:
+            break
     return None
 
 

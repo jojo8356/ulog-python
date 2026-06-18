@@ -76,6 +76,7 @@ def publish(
     if endpoint is None:
         endpoint = _resolved_endpoint()
     try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
         from cryptography.hazmat.primitives.serialization import (
             Encoding,
             PublicFormat,
@@ -93,6 +94,8 @@ def publish(
             f"no key at {key_path}; run `ulog solutions keygen` first"
         )
     private_key = load_pem_private_key(key_path.read_bytes(), password=None)
+    if not isinstance(private_key, Ed25519PrivateKey):
+        raise RuntimeError(f"key at {key_path} is not an ed25519 private key")
 
     body = json.dumps(
         {"signature": signature, "writeup": writeup, "by": by},

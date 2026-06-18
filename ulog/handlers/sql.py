@@ -13,6 +13,7 @@ import datetime
 import logging
 import sys
 import threading
+import time
 import traceback
 from pathlib import Path
 from typing import Any
@@ -105,7 +106,10 @@ class SQLHandler(logging.Handler):
             create_engine,
         )
 
-        self._engine = create_engine(self._url, future=True)
+        engine_kwargs: dict[str, Any] = {"future": True}
+        if self._url.startswith("sqlite:"):
+            engine_kwargs["connect_args"] = {"timeout": 30}
+        self._engine = create_engine(self._url, **engine_kwargs)
 
         metadata = MetaData()
         self._table = Table(
@@ -151,8 +155,7 @@ class SQLHandler(logging.Handler):
         self._chain_writer: Any = None
         if self._chain_mode:
             if self._engine.dialect.name == "sqlite":
-                with self._engine.connect() as conn:
-                    conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+                self._enable_sqlite_wal()
                 # Story 3.12 AC1 — refuse to open in chain mode if a
                 # previous verify reported BROKEN. Forces the user to
                 # run `ulog repair --confirm` before any new chain
@@ -172,6 +175,25 @@ class SQLHandler(logging.Handler):
             self._chain_writer = SQLiteChainWriter(self._engine, self._table_name)
         # Process-exit flush — best-effort, prevents lost records.
         atexit.register(self._safe_flush)
+
+    def _enable_sqlite_wal(self) -> None:
+        """Enable WAL with retries for simultaneous multi-process startup."""
+        from sqlalchemy.exc import OperationalError
+
+        deadline = time.monotonic() + 30.0
+        last_exc: OperationalError | None = None
+        while time.monotonic() < deadline:
+            try:
+                with self._engine.connect() as conn:
+                    conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+                return
+            except OperationalError as exc:
+                if "database is locked" not in str(exc).lower():
+                    raise
+                last_exc = exc
+                time.sleep(0.05)
+        if last_exc is not None:
+            raise last_exc
 
     # -- Public API --
 

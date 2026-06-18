@@ -80,7 +80,7 @@ def import_from_json(path: Path, source_file: Path) -> int:
     if not isinstance(entries, list):
         raise ValueError("bug-cache JSON must be a list")
     now = _dt.datetime.now(_dt.UTC).replace(tzinfo=None).isoformat()
-    rows: list[tuple] = []
+    rows: list[tuple[str, str, str, str, Any, int, str]] = []
     for e in entries:
         if not e.get("signature") or not e.get("title"):
             continue
